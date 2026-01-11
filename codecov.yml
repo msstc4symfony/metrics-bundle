@@ -1,0 +1,26 @@
+coverage:
+  status:
+    project:
+      default:
+        target: 80%
+        threshold: 1%
+    patch:
+      default:
+        target: 80%
+        threshold: 1%
+
+comment:
+  layout: "reach, diff, files"
+  require_changes: true
+
+ignore:
+  - "tests/**"
+  - "vendor/**"
+  - "doc/**"
+  - "src/DependencyInjection/**"
+  - "src/MetricsBundle.php"
+  - "src/Framework/**"
+  - "src/Infrastructure/Doctrine/**"
+  - "src/Infrastructure/Elastica/**"
+  - "src/Infrastructure/HttpClient/**"
+  - "src/Infrastructure/Monolog/**"

@@ -1,0 +1,25 @@
+parameters:
+    level: 9
+    editorUrl: 'phpstorm://open?file=%%file%%&line=%%line%%'
+    treatPhpDocTypesAsCertain: false
+    phpVersion: 80300
+    parallel:
+        jobSize: 5
+        maximumNumberOfProcesses: 12
+        minimumNumberOfJobsPerProcess: 2
+    paths:
+        - src/
+        - tests/
+    excludePaths:
+        - src/Framework/Profiling/Processor/EndSpan/MetricProcessor.php
+        - src/Infrastructure/Doctrine/DBAL/Metrics/Connection.php
+        - src/Infrastructure/Doctrine/DBAL/Metrics/Driver.php
+        - src/Infrastructure/Doctrine/DBAL/Metrics/Middleware.php
+        - src/Infrastructure/Doctrine/DBAL/Metrics/Statement.php
+        - src/Infrastructure/Elastica/TimingTransport.php
+        - src/Infrastructure/Enum/MetricLabelEnum.php
+        - src/Infrastructure/Enum/MetricLabelEnumInterface.php
+        - src/Infrastructure/HttpClient/HttpClientDecorator.php
+
+includes:
+    - phpstan-baseline.neon

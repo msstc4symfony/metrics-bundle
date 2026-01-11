@@ -1,0 +1,57 @@
+{
+  "name": "max-shamaev-php/metrics-bundle",
+  "version": "1.0.0",
+  "license": "MIT",
+  "type": "symfony-bundle",
+  "description": "Metrics bundle",
+  "minimum-stability": "stable",
+  "keywords": ["php", "symfony", "metrics"],
+  "prefer-stable": true,
+  "autoload": {
+    "psr-4": {
+      "MaxShamaev\\MetricsBundle\\": "src/",
+      "MaxShamaev\\MetricsBundle\\Test\\Unit\\": "tests/unit/"
+    }
+  },
+  "autoload-dev": {
+  },
+  "require": {
+    "php": ">=8.1",
+    "ext-redis": "*",
+    "composer-runtime-api": ">=2.2",
+    "promphp/prometheus_client_php": "^2.6",
+    "symfony/console": "^6.4|^7.0|^8.0",
+    "symfony/event-dispatcher": "^6.4|^7.0|^8.0",
+    "symfony/framework-bundle": "^6.4|^7.0|^8.0",
+    "symfony/monolog-bundle": "^3.11.0"
+  },
+  "require-dev": {
+    "friendsofphp/php-cs-fixer": "^3.55",
+    "phpstan/extension-installer": "^1.4",
+    "phpstan/phpstan": "^2.1",
+    "phpstan/phpstan-beberlei-assert": "^2.0",
+    "phpstan/phpstan-doctrine": "^2.0",
+    "phpstan/phpstan-strict-rules": "^2.0",
+    "phpstan/phpstan-symfony": "^2.0",
+    "phpunit/phpunit": ">=10.5",
+    "roave/security-advisories": "dev-latest",
+    "rector/rector": "^2.1",
+    "spaze/phpstan-disallowed-calls": "^v4.0"
+  },
+  "config": {
+    "allow-plugins": {
+      "composer/package-versions-deprecated": true,
+      "phpstan/extension-installer": true
+    },
+    "sort-packages": true
+  },
+  "conflict": {
+    "symfony/symfony": "*"
+  },
+  "extra": {
+    "symfony": {
+      "allow-contrib": false,
+      "require": "^6.4|^7.0|^8.0"
+    }
+  }
+}

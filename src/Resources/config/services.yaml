@@ -1,0 +1,46 @@
+parameters:
+  metrics_bundle.dsnDefault: redis://127.0.0.1:6379
+  metrics_bundle.applicationNameDefault: unknown
+  metrics_bundle.componentNameDefault: unknown
+
+  metrics_bundle.dsn: '%env(default:metrics_bundle.dsnDefault:METRICS_STORAGE_DSN)%'
+  metrics_bundle.applicationName: '%env(default:metrics_bundle.applicationNameDefault:APPLICATION_NAME)%'
+  metrics_bundle.componentName: '%env(default:metrics_bundle.componentNameDefault:COMPONENT_NAME)%'
+
+  metrics_bundle.metric_enums:
+    - MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnum
+
+services:
+  _defaults:
+    autowire: true
+    autoconfigure: true
+    bind:
+      $applicationName: '%metrics_bundle.applicationName%'
+      $componentName: '%metrics_bundle.componentName%'
+
+  MaxShamaev\MetricsBundle\:
+    resource: '../../'
+    exclude:
+      - '../../DependencyInjection/'
+      - '../../Infrastructure/Doctrine/DBAL/'
+      - '../../Infrastructure/HttpClient/HttpClientDecorator.php'
+      - '../../Infrastructure/Elastica/'
+      - '../../MetricsBundle.php'
+
+  MaxShamaev\MetricsBundle\Infrastructure\Repository\MetricRepository:
+    class: MaxShamaev\MetricsBundle\Infrastructure\Repository\MetricRepository
+    factory: ['@MaxShamaev\MetricsBundle\Infrastructure\Factory\MetricRepositoryInterface', create]
+
+  Prometheus\Storage\Adapter:
+    class: Prometheus\Storage\Adapter
+    factory: ['@MaxShamaev\MetricsBundle\Infrastructure\Storage\FactoryInterface', create]
+    arguments:
+      $dsn: '%metrics_bundle.dsn%'
+
+  Prometheus\RegistryInterface:
+    class: Prometheus\CollectorRegistry
+    arguments:
+      $registerDefaultMetrics: false
+
+  Prometheus\RendererInterface:
+    class: Prometheus\RenderTextFormat

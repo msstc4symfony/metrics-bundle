@@ -1,0 +1,271 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Class Doctrine\\DBAL\\Connection not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: src/DependencyInjection/Compiler/AddDoctrineDBALMonitorPass.php
+
+		-
+			message: '#^Class Symfony\\Component\\HttpClient\\ScopingHttpClient not found\.$#'
+			identifier: class.notFound
+			count: 2
+			path: src/DependencyInjection/Compiler/AddHttpClientMonitorPass.php
+
+		-
+			message: '#^Class Symfony\\Contracts\\HttpClient\\HttpClientInterface not found\.$#'
+			identifier: class.notFound
+			count: 2
+			path: src/DependencyInjection/Compiler/AddHttpClientMonitorPass.php
+
+		-
+			message: '#^Class Elastica\\Client not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: src/DependencyInjection/Compiler/SaveElasticaClientsListPass.php
+
+		-
+			message: '#^Offset 0 on array\{float, float, float\} in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.offset
+			count: 1
+			path: src/Framework/EventListener/InfoEventListener.php
+
+		-
+			message: '#^Cannot cast mixed to string\.$#'
+			identifier: cast.string
+			count: 2
+			path: src/Infrastructure/Collector/AbstractCollector.php
+
+		-
+			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterCounter\(\) expects string, int\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Collector/AbstractCollector.php
+
+		-
+			message: '#^Parameter \#2 \$metric of method MaxShamaev\\MetricsBundle\\Infrastructure\\Collector\\ConsoleCollector\:\:processException\(\) expects MaxShamaev\\MetricsBundle\\Infrastructure\\Entity\\Metric\|string, int\|string given\.$#'
+			identifier: argument.type
+			count: 3
+			path: src/Infrastructure/Collector/ConsoleCollector.php
+
+		-
+			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterCounter\(\) expects string, int\|string given\.$#'
+			identifier: argument.type
+			count: 2
+			path: src/Infrastructure/Collector/ConsoleCollector.php
+
+		-
+			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterHistogram\(\) expects string, int\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Collector/ConsoleCollector.php
+
+		-
+			message: '#^Parameter \#2 \$metric of method MaxShamaev\\MetricsBundle\\Infrastructure\\Collector\\DoctrineConnectionCollector\:\:processException\(\) expects MaxShamaev\\MetricsBundle\\Infrastructure\\Entity\\Metric\|string, int\|string given\.$#'
+			identifier: argument.type
+			count: 2
+			path: src/Infrastructure/Collector/DoctrineConnectionCollector.php
+
+		-
+			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterCounter\(\) expects string, int\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Collector/DoctrineConnectionCollector.php
+
+		-
+			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterHistogram\(\) expects string, int\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Collector/DoctrineConnectionCollector.php
+
+		-
+			message: '#^Parameter \#2 \$metric of method MaxShamaev\\MetricsBundle\\Infrastructure\\Collector\\ElasticaCollector\:\:processException\(\) expects MaxShamaev\\MetricsBundle\\Infrastructure\\Entity\\Metric\|string, int\|string given\.$#'
+			identifier: argument.type
+			count: 3
+			path: src/Infrastructure/Collector/ElasticaCollector.php
+
+		-
+			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterCounter\(\) expects string, int\|string given\.$#'
+			identifier: argument.type
+			count: 2
+			path: src/Infrastructure/Collector/ElasticaCollector.php
+
+		-
+			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterHistogram\(\) expects string, int\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Collector/ElasticaCollector.php
+
+		-
+			message: '#^Class Symfony\\Component\\Security\\Core\\Exception\\AccessDeniedException not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: src/Infrastructure/Collector/ErrorCollector.php
+
+		-
+			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterCounter\(\) expects string, int\|string given\.$#'
+			identifier: argument.type
+			count: 2
+			path: src/Infrastructure/Collector/ErrorCollector.php
+
+		-
+			message: '#^Parameter \#2 \$metric of method MaxShamaev\\MetricsBundle\\Infrastructure\\Collector\\ExternalConnectionCollector\:\:processException\(\) expects MaxShamaev\\MetricsBundle\\Infrastructure\\Entity\\Metric\|string, int\|string given\.$#'
+			identifier: argument.type
+			count: 3
+			path: src/Infrastructure/Collector/ExternalConnectionCollector.php
+
+		-
+			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterCounter\(\) expects string, int\|string given\.$#'
+			identifier: argument.type
+			count: 2
+			path: src/Infrastructure/Collector/ExternalConnectionCollector.php
+
+		-
+			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterHistogram\(\) expects string, int\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Collector/ExternalConnectionCollector.php
+
+		-
+			message: '#^Parameter \#2 \$metric of method MaxShamaev\\MetricsBundle\\Infrastructure\\Collector\\InfoCollector\:\:processException\(\) expects MaxShamaev\\MetricsBundle\\Infrastructure\\Entity\\Metric\|string, int\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Collector/InfoCollector.php
+
+		-
+			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterGauge\(\) expects string, int\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Collector/InfoCollector.php
+
+		-
+			message: '#^Parameter \#2 \$metric of method MaxShamaev\\MetricsBundle\\Infrastructure\\Collector\\MongoDbCollector\:\:processException\(\) expects MaxShamaev\\MetricsBundle\\Infrastructure\\Entity\\Metric\|string, int\|string given\.$#'
+			identifier: argument.type
+			count: 3
+			path: src/Infrastructure/Collector/MongoDbCollector.php
+
+		-
+			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterCounter\(\) expects string, int\|string given\.$#'
+			identifier: argument.type
+			count: 2
+			path: src/Infrastructure/Collector/MongoDbCollector.php
+
+		-
+			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterHistogram\(\) expects string, int\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Collector/MongoDbCollector.php
+
+		-
+			message: '#^Parameter \#1 \$values of method MaxShamaev\\MetricsBundle\\Infrastructure\\Collector\\AbstractCollector\:\:prepareLabelValues\(\) expects array\<bool\|float\|int\|string\>, array\<int, string\|null\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Collector/ProfilingCollector.php
+
+		-
+			message: '#^Parameter \#2 \$metric of method MaxShamaev\\MetricsBundle\\Infrastructure\\Collector\\ProfilingCollector\:\:processException\(\) expects MaxShamaev\\MetricsBundle\\Infrastructure\\Entity\\Metric\|string, int\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Collector/ProfilingCollector.php
+
+		-
+			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterHistogram\(\) expects string, int\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Collector/ProfilingCollector.php
+
+		-
+			message: '#^Parameter \#2 \$metric of method MaxShamaev\\MetricsBundle\\Infrastructure\\Collector\\RequestCollector\:\:processException\(\) expects MaxShamaev\\MetricsBundle\\Infrastructure\\Entity\\Metric\|string, int\|string given\.$#'
+			identifier: argument.type
+			count: 4
+			path: src/Infrastructure/Collector/RequestCollector.php
+
+		-
+			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterCounter\(\) expects string, int\|string given\.$#'
+			identifier: argument.type
+			count: 2
+			path: src/Infrastructure/Collector/RequestCollector.php
+
+		-
+			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterHistogram\(\) expects string, int\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Collector/RequestCollector.php
+
+		-
+			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterSummary\(\) expects string, int\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Collector/RequestCollector.php
+
+		-
+			message: '#^Call to function method_exists\(\) with MongoDB\\Driver\\Monitoring\\CommandFailedEvent and ''getHost'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Infrastructure/Doctrine/ODM/Metrics/TimingSubscriber.php
+
+		-
+			message: '#^Call to function method_exists\(\) with MongoDB\\Driver\\Monitoring\\CommandSucceededEvent and ''getHost'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Infrastructure/Doctrine/ODM/Metrics/TimingSubscriber.php
+
+		-
+			message: '#^Class StringBackedEnum not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: src/Infrastructure/Factory/MetricRepositoryFactory.php
+
+		-
+			message: '#^Parameter \#1 \$level of static method Monolog\\Logger\:\:toMonologLevel\(\) expects 100\|200\|250\|300\|400\|500\|550\|600\|''ALERT''\|''alert''\|''CRITICAL''\|''critical''\|''DEBUG''\|''debug''\|''EMERGENCY''\|''emergency''\|''ERROR''\|''error''\|''INFO''\|''info''\|''NOTICE''\|''notice''\|''WARNING''\|''warning''\|Monolog\\Level, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Monolog/Handler/HandlerDecorator.php
+
+		-
+			message: '#^Parameter \#1 \$callback of function array_map expects \(callable\(array\<mixed\>\|string\)\: mixed\)\|null, Closure\(bool\|float\|int\|resource\|string\|null\)\: string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Storage/Factory.php
+
+		-
+			message: '#^Call to method getConnections\(\) on an unknown class Elastica\\Client\.$#'
+			identifier: class.notFound
+			count: 1
+			path: src/MetricsBundle.php
+
+		-
+			message: '#^Call to method getTransportObject\(\) on an unknown class Elastica\\Connection\.$#'
+			identifier: class.notFound
+			count: 1
+			path: src/MetricsBundle.php
+
+		-
+			message: '#^Call to method setTransport\(\) on an unknown class Elastica\\Connection\.$#'
+			identifier: class.notFound
+			count: 1
+			path: src/MetricsBundle.php
+
+		-
+			message: '#^Class Elastica\\Client not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: src/MetricsBundle.php
+
+		-
+			message: '#^PHPDoc tag @var for variable \$connection contains unknown class Elastica\\Connection\.$#'
+			identifier: class.notFound
+			count: 1
+			path: src/MetricsBundle.php
+
+		-
+			message: '#^Unable to resolve the template type B in call to method Symfony\\Component\\DependencyInjection\\ContainerInterface\:\:get\(\)$#'
+			identifier: argument.templateType
+			count: 2
+			path: src/MetricsBundle.php
+
+		-
+			message: '#^Parameter \#4 \$labels of class MaxShamaev\\MetricsBundle\\Infrastructure\\Entity\\Metric constructor expects array\<MaxShamaev\\MetricsBundle\\Infrastructure\\Entity\\Label\>, array\<float\|MaxShamaev\\MetricsBundle\\Infrastructure\\Entity\\Label\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: tests/unit/Infrastructure/Repository/MetricRepositoryTest.php

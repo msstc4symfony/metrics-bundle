@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<files psalm-version="5.26.1@d747f6500b38ac4f7dfc5edbcae6e4b637d7add0">
+  <file src="src/Infrastructure/Collector/ErrorCollector.php">
+    <InvalidArgument>
+      <code><![CDATA[[$level->getName()]]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Infrastructure/Monolog/Handler/HandlerDecorator.php">
+    <MoreSpecificImplementedParamType>
+      <code><![CDATA[$level]]></code>
+    </MoreSpecificImplementedParamType>
+    <UnresolvableConstant>
+      <code><![CDATA[value-of<Level::VALUES>|value-of<Level::NAMES>|Level|LogLevel::*]]></code>
+    </UnresolvableConstant>
+  </file>
+  <file src="src/Infrastructure/Repository/MetricRepository.php">
+    <InvalidArgument>
+      <code><![CDATA[[Level::Emergency->getName(), Level::Alert->getName(), Level::Critical->getName(), Level::Error->getName(), Level::Warning->getName(), Level::Notice->getName()]]]></code>
+    </InvalidArgument>
+  </file>
+</files>
