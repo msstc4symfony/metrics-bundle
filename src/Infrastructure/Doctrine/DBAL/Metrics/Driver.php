@@ -7,6 +7,7 @@ namespace MaxShamaev\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics;
 use Doctrine\DBAL\Driver as DriverInterface;
 use Doctrine\DBAL\Driver\Middleware\AbstractDriverMiddleware;
 use MaxShamaev\MetricsBundle\Infrastructure\Collector\DoctrineConnectionCollector;
+use Override;
 use SensitiveParameter;
 
 final class Driver extends AbstractDriverMiddleware
@@ -19,6 +20,7 @@ final class Driver extends AbstractDriverMiddleware
         parent::__construct($driver);
     }
 
+    #[Override]
     public function connect(
         #[SensitiveParameter]
         array $params,

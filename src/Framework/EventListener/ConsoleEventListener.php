@@ -12,7 +12,7 @@ use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 
 #[AsEventListener(event: ConsoleEvents::COMMAND, method: 'onCommand', priority: 4096)]
 #[AsEventListener(event: ConsoleEvents::TERMINATE, method: 'onTerminate')]
-class ConsoleEventListener
+final class ConsoleEventListener
 {
     private ?float $startedAt = null;
 

@@ -9,6 +9,7 @@ use Elastica\Response;
 use Elastica\Transport\AbstractTransport;
 use LogicException;
 use MaxShamaev\MetricsBundle\Infrastructure\Collector\ElasticaCollector;
+use Override;
 use Throwable;
 
 class TimingTransport extends AbstractTransport
@@ -30,6 +31,7 @@ class TimingTransport extends AbstractTransport
     /**
      * @param array<string, mixed> $params
      */
+    #[Override]
     public function exec(Request $request, array $params): Response
     {
         if (!$this->inner instanceof AbstractTransport || !$this->collector instanceof ElasticaCollector) {

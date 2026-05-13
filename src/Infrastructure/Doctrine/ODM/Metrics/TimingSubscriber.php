@@ -9,20 +9,23 @@ use MongoDB\Driver\Monitoring\CommandFailedEvent;
 use MongoDB\Driver\Monitoring\CommandStartedEvent;
 use MongoDB\Driver\Monitoring\CommandSubscriber;
 use MongoDB\Driver\Monitoring\CommandSucceededEvent;
+use Override;
 use Symfony\Component\DependencyInjection\Attribute\Autoconfigure;
 
 #[Autoconfigure(tags: ['container.service_initializer'], public: true)]
-class TimingSubscriber implements CommandSubscriber
+final readonly class TimingSubscriber implements CommandSubscriber
 {
     public function __construct(
-        private readonly MongoDbCollector $collector,
+        private MongoDbCollector $collector,
     ) {
     }
 
+    #[Override]
     public function commandStarted(CommandStartedEvent $event): void
     {
     }
 
+    #[Override]
     public function commandSucceeded(CommandSucceededEvent $event): void
     {
         $host = method_exists($event, 'getHost') ? $event->getHost() : 'unknown';
@@ -31,6 +34,7 @@ class TimingSubscriber implements CommandSubscriber
         $this->collector->setCommandDuration($event->getCommandName(), $host, $event->getDurationMicros() / 1000000);
     }
 
+    #[Override]
     public function commandFailed(CommandFailedEvent $event): void
     {
         $host = method_exists($event, 'getHost') ? $event->getHost() : 'unknown';

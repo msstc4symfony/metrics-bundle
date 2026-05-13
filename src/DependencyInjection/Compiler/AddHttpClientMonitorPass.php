@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MaxShamaev\MetricsBundle\DependencyInjection\Compiler;
 
 use MaxShamaev\MetricsBundle\Infrastructure\HttpClient\HttpClientDecorator;
+use Override;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
@@ -15,8 +16,9 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 /** @phpstan-ignore function.notFound */
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_iterator;
 
-class AddHttpClientMonitorPass implements CompilerPassInterface
+final class AddHttpClientMonitorPass implements CompilerPassInterface
 {
+    #[Override]
     public function process(ContainerBuilder $container): void
     {
         if (!class_exists(HttpClientInterface::class)) {
@@ -26,15 +28,14 @@ class AddHttpClientMonitorPass implements CompilerPassInterface
         foreach ($container->getDefinitions() as $id => $definition) {
             if (
                 $definition->getClass() === null
-                || $definition->isAbstract()
-                || $definition->getDecoratedService() !== null
+                || !DefinitionFilter::isDecoratable($definition)
                 || !in_array($definition->getClass(), [ScopingHttpClient::class, HttpClientInterface::class], true)
             ) {
                 continue;
             }
 
             $decoratorId = $id . '.decorator.monitor';
-            $decoratorDefinition = (new Definition(HttpClientDecorator::class))
+            $decoratorDefinition = new Definition(HttpClientDecorator::class)
                 ->setAutowired(true)
                 ->setArgument('$inner', new Reference($decoratorId . '.inner'))
                 /** @phpstan-ignore function.notFound */

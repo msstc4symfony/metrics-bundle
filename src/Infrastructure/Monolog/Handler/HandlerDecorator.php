@@ -7,13 +7,14 @@ namespace MaxShamaev\MetricsBundle\Infrastructure\Monolog\Handler;
 use MaxShamaev\MetricsBundle\Infrastructure\Collector\ErrorCollector;
 use Monolog\Level;
 use Monolog\Logger;
+use Override;
 use Psr\Log\LoggerInterface;
 use Stringable;
 use Throwable;
 
-final class HandlerDecorator implements LoggerInterface
+final readonly class HandlerDecorator implements LoggerInterface
 {
-    private const DEFAULT_ALLOWED_LEVELS = [
+    private const array DEFAULT_ALLOWED_LEVELS = [
         Level::Emergency,
         Level::Alert,
         Level::Critical,
@@ -25,14 +26,14 @@ final class HandlerDecorator implements LoggerInterface
     /**
      * @var array<int, true>
      */
-    private readonly array $allowedLevelMap;
+    private array $allowedLevelMap;
 
     /**
      * @param Level[] $allowedLevels
      */
     public function __construct(
-        private readonly LoggerInterface $inner,
-        private readonly ErrorCollector $collector,
+        private LoggerInterface $inner,
+        private ErrorCollector $collector,
         array $allowedLevels = self::DEFAULT_ALLOWED_LEVELS,
     ) {
         $map = [];
@@ -42,6 +43,7 @@ final class HandlerDecorator implements LoggerInterface
         $this->allowedLevelMap = $map;
     }
 
+    #[Override]
     public function emergency(Stringable|string $message, array $context = []): void
     {
         $this->record(Level::Emergency);
@@ -49,6 +51,7 @@ final class HandlerDecorator implements LoggerInterface
         $this->inner->emergency($message, $context);
     }
 
+    #[Override]
     public function alert(Stringable|string $message, array $context = []): void
     {
         $this->record(Level::Alert);
@@ -56,6 +59,7 @@ final class HandlerDecorator implements LoggerInterface
         $this->inner->alert($message, $context);
     }
 
+    #[Override]
     public function critical(Stringable|string $message, array $context = []): void
     {
         $this->record(Level::Critical);
@@ -63,6 +67,7 @@ final class HandlerDecorator implements LoggerInterface
         $this->inner->critical($message, $context);
     }
 
+    #[Override]
     public function error(Stringable|string $message, array $context = []): void
     {
         $this->record(Level::Error);
@@ -70,6 +75,7 @@ final class HandlerDecorator implements LoggerInterface
         $this->inner->error($message, $context);
     }
 
+    #[Override]
     public function warning(Stringable|string $message, array $context = []): void
     {
         $this->record(Level::Warning);
@@ -77,6 +83,7 @@ final class HandlerDecorator implements LoggerInterface
         $this->inner->warning($message, $context);
     }
 
+    #[Override]
     public function notice(Stringable|string $message, array $context = []): void
     {
         $this->record(Level::Notice);
@@ -84,20 +91,19 @@ final class HandlerDecorator implements LoggerInterface
         $this->inner->notice($message, $context);
     }
 
+    #[Override]
     public function info(Stringable|string $message, array $context = []): void
     {
-        $this->record(Level::Info);
-
         $this->inner->info($message, $context);
     }
 
+    #[Override]
     public function debug(Stringable|string $message, array $context = []): void
     {
-        $this->record(Level::Debug);
-
         $this->inner->debug($message, $context);
     }
 
+    #[Override]
     public function log($level, Stringable|string $message, array $context = []): void
     {
         if (!$level instanceof Level) {

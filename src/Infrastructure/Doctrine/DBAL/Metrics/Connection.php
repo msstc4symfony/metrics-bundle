@@ -8,6 +8,7 @@ use Doctrine\DBAL\Driver\Connection as ConnectionInterface;
 use Doctrine\DBAL\Driver\Middleware\AbstractConnectionMiddleware;
 use Doctrine\DBAL\Driver\Statement as DriverStatement;
 use MaxShamaev\MetricsBundle\Infrastructure\Collector\DoctrineConnectionCollector;
+use Override;
 
 final class Connection extends AbstractConnectionMiddleware
 {
@@ -20,6 +21,7 @@ final class Connection extends AbstractConnectionMiddleware
         parent::__construct($connection);
     }
 
+    #[Override]
     public function prepare(string $sql): DriverStatement
     {
         return new Statement(

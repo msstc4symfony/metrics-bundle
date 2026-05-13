@@ -58,28 +58,17 @@ final class FactoryTest extends TestCase
         self::assertInstanceOf(RedisNg::class, $factory->create('redisng://localhost:6379'));
     }
 
-    public function testRedisSchemeWithoutHostFallsBackToInMemoryAndLogs(): void
+    public function testMalformedRedisDsnFallsBackToInMemoryAndLogsError(): void
     {
         $logger = $this->createMock(LoggerInterface::class);
-        // parse_url('redis://') returns false in PHP 8 → "malformed DSN" branch logs an error.
-        $logger->expects(self::atLeastOnce())->method('error');
+        $logger->expects(self::once())
+            ->method('error')
+            ->with(self::stringContains('malformed'))
+        ;
 
         $factory = new Factory($logger);
 
         self::assertInstanceOf(InMemory::class, $factory->create('redis://'));
-    }
-
-    public function testRedisSchemeWithHostMissingPathFallsBackToInMemoryAndWarns(): void
-    {
-        $logger = $this->createMock(LoggerInterface::class);
-        $logger->expects(self::atLeastOnce())->method('warning');
-
-        // parse_url returns valid array with scheme but no host (only happens for some malformed inputs)
-        // Use a DSN where buildRedisOptions returns null for a different reason; here we exercise
-        // the unknown-scheme branch which also logs warning.
-        $factory = new Factory($logger);
-
-        self::assertInstanceOf(InMemory::class, $factory->create('unknown-scheme://something'));
     }
 
     public function testUnknownSchemeFallsBackToInMemoryAndWarns(): void

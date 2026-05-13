@@ -13,7 +13,7 @@ use Symfony\Component\HttpKernel\Event\TerminateEvent;
 #[AsEventListener(event: 'kernel.request', method: 'onRequestFirst', priority: 4096)]
 #[AsEventListener(event: 'kernel.request', method: 'onRequest')]
 #[AsEventListener(event: 'kernel.terminate', method: 'onTerminate')]
-class RequestEventListener
+final class RequestEventListener
 {
     private ?float $startedAt = null;
 

@@ -32,7 +32,7 @@ The bundle is a **classic Symfony bundle** organised in a loose layered shape un
 - **`Presentation/`** — `GetMetricsController` (the `GET /_/metrics` endpoint) and console commands `metrics:list` / `metrics:clear`.
 - **`Framework/EventListener/`** — Symfony kernel/console event listeners (`#[AsEventListener]`) that drive measurement timing for HTTP requests, console commands, exceptions, and one-shot info gauges.
 - **`Framework/Profiling/`** — integration with profiling spans → metrics.
-- **`Infrastructure/Collector/`** — the heart of the bundle. Each collector wraps the Prometheus `RegistryInterface` and exposes domain-specific `inc*`/`set*` methods called from listeners or decorators. All inherit `AbstractCollector`, which automatically prepends three labels (`application`, `component`, `container`) to every sample (`container` reads `POD_NAME` → `POD_UID` → hostname).
+- **`Infrastructure/Collector/`** — the heart of the bundle. Each collector wraps the Prometheus `RegistryInterface` and exposes domain-specific `inc*`/`set*` methods called from listeners or decorators. All inherit `AbstractCollector`, which automatically prepends two labels (`application`, `component`) to every sample.
 - **`Infrastructure/Doctrine/`**, **`Elastica/`**, **`HttpClient/`**, **`Monolog/`** — integration adapters (middlewares, transports, decorators) that hook into third-party systems and call into the matching collector.
 - **`Infrastructure/Storage/Factory`** — picks a Prometheus storage adapter from a DSN scheme: `redis`, `redisng`, `apc`, `apcng`, `inmemory`. Any failure falls back to `InMemory` silently — be aware when debugging "missing metrics".
 - **`Infrastructure/Enum/MetricLabelEnum`** — the **central catalog** of all metric names. Each enum case has a type (counter/gauge/histogram/summary), description, label set, and histogram buckets. Implements `MetricLabelEnumInterface` (extends `BackedEnum`). `MetricRepositoryFactory` reads the container parameter `metrics_bundle.metric_enums` (list of class-strings) and merges `::cases()` from each — this is the extension point for downstream apps to register their own metrics.
@@ -46,7 +46,7 @@ The bundle is a **classic Symfony bundle** organised in a loose layered shape un
 ### Adding a new metric
 
 1. Either extend `MetricLabelEnum` (in-bundle) or create a new `string`-backed enum implementing `MetricLabelEnumInterface` in the host app and append its FQCN to the `metrics_bundle.metric_enums` parameter.
-2. Add a collector method (or extend an existing collector) that calls one of `AbstractCollector`'s helpers (`incCounter`, etc.) — the application/component/container labels are added for you, so `getLabels()` on the enum should only return the *additional* labels.
+2. Add a collector method (or extend an existing collector) that calls one of `AbstractCollector`'s helpers (`incCounter`, etc.) — the application/component labels are added for you, so `getLabels()` on the enum should only return the *additional* labels.
 3. Trigger the collector from an event listener, middleware, or decorator depending on where the measurement point lives.
 
 ## Configuration
@@ -60,8 +60,18 @@ Service config lives in `src/Resources/config/services.yaml`. The Yaml file is l
 
 ## Tests
 
-- Only `tests/unit/` is wired into PHPUnit. Coverage source excludes `DependencyInjection`, `Framework`, `Infrastructure/{Doctrine,Elastica,HttpClient,Monolog}` and `MetricsBundle.php` — those are integration-shaped and tested manually.
-- New unit tests go under `tests/unit/<MirroredNamespace>/`. The PSR-4 namespace for tests is `MaxShamaev\MetricsBundle\Test\Unit\` (defined in `composer.json`).
+Two test suites:
+
+- **`tests/unit/`** — testsuite `unit`. Run by `make test`. PSR-4 namespace `MaxShamaev\MetricsBundle\Test\Unit\`. Coverage source (in `phpunit.xml.dist`) excludes `MetricsBundle.php` and `Infrastructure/HttpClient/HttpClientDecorator.php` (depends on `symfony/http-client`).
+- **`tests/integration/`** — testsuite `integration`. Run by `make test-integration` (uses separate `phpunit-integration.xml.dist`). PSR-4 namespace `MaxShamaev\MetricsBundle\Test\Integration\`. Tests use `markTestSkipped()` in `setUp()` if their optional dependency is missing.
+
+Optional dependencies for integration tests live in **`composer-integration.json`** (extends `composer.json` with `symfony/http-client`, `doctrine/dbal`, `mongodb/mongodb`, `ruflin/elastica`). Install via `make install-integration` (this replaces `vendor/` with the integration profile — to switch back run `composer install`).
+
+CI has two jobs (`.github/workflows/checks.yml`):
+- **`unit`** — `composer install` + `make check` + unit suite. Verifies the bundle works WITHOUT optional libs (proves `class_exists` guards still hold).
+- **`integration`** — `COMPOSER=composer-integration.json composer install` + integration suite + coverage. Runs with full optional-dep stack and `ext-apcu`, `ext-mongodb` PHP extensions.
+
+PHPStan only analyses `src/` + `tests/unit/` (integration tests reference classes that need the optional libs and would explode static analysis under the minimal install).
 
 ## CI
 

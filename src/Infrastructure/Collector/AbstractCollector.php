@@ -7,18 +7,22 @@ namespace MaxShamaev\MetricsBundle\Infrastructure\Collector;
 use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface;
 use MaxShamaev\MetricsBundle\Infrastructure\Repository\MetricRepositoryInterface;
 use Prometheus\RegistryInterface;
+use Psr\Log\LoggerInterface;
+use Symfony\Contracts\Service\Attribute\Required;
 use Throwable;
 
 abstract class AbstractCollector
 {
-    private const DEFAULT_NAMESPACE = 'symfony';
+    private const string DEFAULT_NAMESPACE = 'symfony';
 
     protected string $namespace = self::DEFAULT_NAMESPACE;
 
+    protected ?LoggerInterface $logger = null;
+
     /**
-     * @var string[]|null
+     * @var string[]
      */
-    private ?array $labelPrefix = null;
+    private readonly array $labelPrefix;
 
     public function __construct(
         protected readonly RegistryInterface $registry,
@@ -26,6 +30,13 @@ abstract class AbstractCollector
         protected readonly string $applicationName,
         protected readonly string $componentName,
     ) {
+        $this->labelPrefix = [$this->applicationName, $this->componentName];
+    }
+
+    #[Required]
+    public function setLogger(LoggerInterface $logger): void
+    {
+        $this->logger = $logger;
     }
 
     /**
@@ -40,14 +51,84 @@ abstract class AbstractCollector
                 $this->namespace,
                 $metric->name->value,
                 $metric->description,
-                $metric->getLabelNames(),
+                $metric->labelNames,
             );
 
             $counter->inc($this->prepareLabelValues($labels));
         } catch (Throwable $e) {
-            if (method_exists($this, 'processException')) {
-                $this->processException($e, $metric->name->value);
-            }
+            $this->processException($e, $metric->name->value);
+        }
+    }
+
+    /**
+     * @param scalar[] $labels
+     */
+    protected function setGauge(MetricLabelEnumInterface $enum, float|int $value, array $labels = []): void
+    {
+        $metric = $this->repository->find($enum);
+
+        try {
+            $gauge = $this->registry->getOrRegisterGauge(
+                $this->namespace,
+                $metric->name->value,
+                $metric->description,
+                $metric->labelNames,
+            );
+
+            $gauge->set((float) $value, $this->prepareLabelValues($labels));
+        } catch (Throwable $e) {
+            $this->processException($e, $metric->name->value);
+        }
+    }
+
+    /**
+     * @param scalar[] $labels
+     */
+    protected function observeHistogram(MetricLabelEnumInterface $enum, float $value, array $labels = []): void
+    {
+        $metric = $this->repository->find($enum);
+
+        try {
+            $histogram = $this->registry->getOrRegisterHistogram(
+                $this->namespace,
+                $metric->name->value,
+                $metric->description,
+                $metric->labelNames,
+                $metric->batches,
+            );
+
+            $histogram->observe($value, $this->prepareLabelValues($labels));
+        } catch (Throwable $e) {
+            $this->processException($e, $metric->name->value);
+        }
+    }
+
+    /**
+     * @param scalar[] $labels
+     * @param float[] $quantiles
+     */
+    protected function observeSummary(
+        MetricLabelEnumInterface $enum,
+        float $value,
+        array $labels = [],
+        array $quantiles = [0.5, 0.9, 0.95, 0.99],
+        int $maxAgeSeconds = 86400,
+    ): void {
+        $metric = $this->repository->find($enum);
+
+        try {
+            $summary = $this->registry->getOrRegisterSummary(
+                $this->namespace,
+                $metric->name->value,
+                $metric->description,
+                $metric->labelNames,
+                $maxAgeSeconds,
+                $quantiles,
+            );
+
+            $summary->observe($value, $this->prepareLabelValues($labels));
+        } catch (Throwable $e) {
+            $this->processException($e, $metric->name->value);
         }
     }
 
@@ -59,23 +140,18 @@ abstract class AbstractCollector
     protected function prepareLabelValues(array $values = []): array
     {
         return array_merge(
-            $this->labelPrefix ??= [$this->applicationName, $this->componentName, $this->getContainerId()],
+            $this->labelPrefix,
             array_map(strval(...), $values),
         );
     }
 
-    protected function getContainerId(): string
+    protected function processException(Throwable $exception, int|string $metricName): void
     {
-        if (isset($_ENV['POD_NAME'])) {
-            return (string) $_ENV['POD_NAME'];
+        if ($this->logger instanceof LoggerInterface) {
+            $this->logger->error(
+                'Cannot save metric "' . $metricName . '": ' . $exception->getMessage(),
+                ['exception' => $exception],
+            );
         }
-
-        if (isset($_ENV['POD_UID'])) {
-            return (string) $_ENV['POD_UID'];
-        }
-
-        $hostname = gethostname();
-
-        return is_string($hostname) ? $hostname : 'unknown';
     }
 }

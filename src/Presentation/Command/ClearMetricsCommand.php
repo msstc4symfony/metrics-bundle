@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MaxShamaev\MetricsBundle\Presentation\Command;
 
+use Override;
 use Prometheus\Storage\Adapter;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -13,7 +14,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Contracts\Service\Attribute\Required;
 
 #[AsCommand(name: 'metrics:clear', description: 'Clear metrics storage')]
-class ClearMetricsCommand extends Command
+final class ClearMetricsCommand extends Command
 {
     private Adapter $storage;
 
@@ -23,6 +24,7 @@ class ClearMetricsCommand extends Command
         $this->storage = $storage;
     }
 
+    #[Override]
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);

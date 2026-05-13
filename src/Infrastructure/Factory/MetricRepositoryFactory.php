@@ -6,16 +6,18 @@ namespace MaxShamaev\MetricsBundle\Infrastructure\Factory;
 
 use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface;
 use MaxShamaev\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use ReflectionEnum;
+use ReflectionNamedType;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
-class MetricRepositoryFactory
+final readonly class MetricRepositoryFactory
 {
     /**
      * @param class-string[] $metricsEnumClassNames
      */
     public function __construct(
         #[Autowire(param: 'metrics_bundle.metric_enums')]
-        private readonly array $metricsEnumClassNames,
+        private array $metricsEnumClassNames,
     ) {
     }
 
@@ -28,10 +30,13 @@ class MetricRepositoryFactory
                 continue;
             }
 
+            $backingType = new ReflectionEnum($metricsEnumClassName)->getBackingType();
+            if (!$backingType instanceof ReflectionNamedType || $backingType->getName() !== 'string') {
+                continue;
+            }
+
             foreach ($metricsEnumClassName::cases() as $case) {
-                if (is_string($case->value)) {
-                    $labels[] = $case;
-                }
+                $labels[] = $case;
             }
         }
 

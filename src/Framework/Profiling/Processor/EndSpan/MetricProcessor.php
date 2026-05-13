@@ -8,10 +8,10 @@ use MaxShamaev\MetricsBundle\Infrastructure\Collector\ProfilingCollector;
 use MaxShamaev\ProfilingBundle\Framework\Processor\EndSpan\EndSpanProcessorInterface;
 use MaxShamaev\ProfilingBundle\Framework\Span\SpanInterface;
 
-final class MetricProcessor implements EndSpanProcessorInterface
+final readonly class MetricProcessor implements EndSpanProcessorInterface
 {
     public function __construct(
-        private readonly ProfilingCollector $profilingCollector,
+        private ProfilingCollector $profilingCollector,
     ) {
     }
 

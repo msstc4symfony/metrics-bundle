@@ -13,6 +13,7 @@ use MaxShamaev\MetricsBundle\Infrastructure\Collector\ElasticaCollector;
 use MaxShamaev\MetricsBundle\Infrastructure\Doctrine\ODM\Metrics\TimingSubscriber;
 use MaxShamaev\MetricsBundle\Infrastructure\Elastica\TimingTransport;
 use MongoDB\Client;
+use Override;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
@@ -23,11 +24,13 @@ use function MongoDB\Driver\Monitoring\addSubscriber;
 
 final class MetricsBundle extends Bundle
 {
+    #[Override]
     public function getContainerExtension(): ExtensionInterface
     {
         return new MetricsExtension();
     }
 
+    #[Override]
     public function build(ContainerBuilder $container): void
     {
         parent::build($container);
@@ -38,54 +41,71 @@ final class MetricsBundle extends Bundle
         $container->addCompilerPass(new SaveElasticaClientsListPass());
     }
 
+    #[Override]
     public function boot(): void
     {
         parent::boot();
 
-        if (!$this->container instanceof ContainerInterface) {
+        $container = $this->container;
+        if (!$container instanceof ContainerInterface) {
             return;
         }
 
-        // Add MongoDB timing subscriber
-        if (class_exists(Client::class)) {
-            /** @var ?TimingSubscriber $subscriber */
-            $subscriber = $this->container->get(TimingSubscriber::class, $this->container::NULL_ON_INVALID_REFERENCE);
-            if ($subscriber !== null) {
-                addSubscriber($subscriber);
-            }
+        $this->registerMongoDbSubscriber($container);
+        $this->wireElasticaTransports($container);
+    }
+
+    private function registerMongoDbSubscriber(ContainerInterface $container): void
+    {
+        if (!class_exists(Client::class)) {
+            return;
         }
 
-        // Add Elastica transport
-        /** @var string[]|null $ids */
-        $ids = [];
+        /** @var ?TimingSubscriber $subscriber */
+        $subscriber = $container->get(TimingSubscriber::class, ContainerInterface::NULL_ON_INVALID_REFERENCE);
+        if ($subscriber === null) {
+            return;
+        }
+
+        addSubscriber($subscriber);
+    }
+
+    private function wireElasticaTransports(ContainerInterface $container): void
+    {
         try {
-            $ids = $this->container->getParameter('metrics.elastica.clients');
+            /** @var string[]|null $ids */
+            $ids = $container->getParameter('metrics.elastica.clients');
         } catch (Throwable) {
+            // SaveElasticaClientsListPass did not run (Elastica not installed) — nothing to wire.
+            return;
         }
-        if (is_array($ids) && $ids !== []) {
-            /** @var ?ElasticaCollector $collector */
-            $collector = $this->container->get(ElasticaCollector::class, $this->container::NULL_ON_INVALID_REFERENCE);
-            if ($collector !== null) {
-                /** @var string $id */
-                foreach ($ids as $id) {
-                    $client = $this->container->get($id);
 
-                    if (!$client instanceof \Elastica\Client) {
-                        continue;
-                    }
+        if (!is_array($ids) || $ids === []) {
+            return;
+        }
 
-                    // ruflin/elastica 1.x-7.x
-                    if (method_exists($client, 'getConnections')) {
-                        /** @var \Elastica\Connection $connection */
-                        foreach ($client->getConnections() as $connection) {
-                            if (method_exists($connection, 'setTransport')) {
-                                $connection->setTransport(
-                                    (new TimingTransport())->init($connection->getTransportObject(), $collector),
-                                );
-                            }
-                        }
-                    }
+        /** @var ?ElasticaCollector $collector */
+        $collector = $container->get(ElasticaCollector::class, ContainerInterface::NULL_ON_INVALID_REFERENCE);
+        if ($collector === null) {
+            return;
+        }
+
+        /** @var string $id */
+        foreach ($ids as $id) {
+            $client = $container->get($id);
+            if (!$client instanceof \Elastica\Client || !method_exists($client, 'getConnections')) {
+                continue;
+            }
+
+            /** @var \Elastica\Connection $connection */
+            foreach ($client->getConnections() as $connection) {
+                if (!method_exists($connection, 'setTransport')) {
+                    continue;
                 }
+
+                $connection->setTransport(
+                    new TimingTransport()->init($connection->getTransportObject(), $collector),
+                );
             }
         }
     }

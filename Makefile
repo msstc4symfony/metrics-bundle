@@ -5,11 +5,20 @@ check: ## Check code
 	composer audit
 	vendor/bin/rector process -n
 
-test: ## Test code
-	vendor/bin/phpunit
+test: ## Test code (unit suite)
+	vendor/bin/phpunit --testsuite=unit
 
-test-with-coverage: ## Test code with coverage
-	XDEBUG_MODE=coverage vendor/bin/phpunit --coverage-html coverage
+test-integration: ## Test code (integration suite — requires composer-integration.json deps)
+	vendor/bin/phpunit -c phpunit-integration.xml.dist
+
+test-with-coverage: ## Test code with coverage (unit suite)
+	XDEBUG_MODE=coverage vendor/bin/phpunit --testsuite=unit --coverage-html coverage
+
+test-integration-with-coverage: ## Test integration suite with coverage (requires composer-integration.json deps)
+	XDEBUG_MODE=coverage vendor/bin/phpunit -c phpunit-integration.xml.dist --coverage-html coverage
+
+install-integration: ## Install composer dependencies including optional libs
+	COMPOSER=composer-integration.json composer install --prefer-dist --no-progress --no-interaction
 
 regenerate-baseline: ## Regenerate baseline
 	vendor/bin/phpstan analyse --memory-limit=512M -b phpstan-baseline.neon

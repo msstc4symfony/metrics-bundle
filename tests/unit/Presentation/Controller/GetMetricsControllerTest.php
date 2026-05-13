@@ -48,7 +48,7 @@ TXT,
             $response->getContent(),
         );
         self::assertSame(RenderTextFormat::MIME_TYPE, $response->headers->get('Content-Type'));
-        self::assertStringContainsString('private', (string) $response->headers->get('Cache-Control'));
-        self::assertStringContainsString('max-age=5', (string) $response->headers->get('Cache-Control'));
+        self::assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+        self::assertStringContainsString('max-age=0', (string) $response->headers->get('Cache-Control'));
     }
 }

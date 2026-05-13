@@ -9,6 +9,7 @@ use Doctrine\DBAL\Driver\Result as ResultInterface;
 use Doctrine\DBAL\Driver\Statement as StatementInterface;
 use MaxShamaev\MetricsBundle\Infrastructure\Collector\DoctrineConnectionCollector;
 use MaxShamaev\MetricsBundle\Infrastructure\Enum\DoctrineQueryTypeEnum;
+use Override;
 
 final class Statement extends AbstractStatementMiddleware
 {
@@ -22,6 +23,7 @@ final class Statement extends AbstractStatementMiddleware
         parent::__construct($statement);
     }
 
+    #[Override]
     public function execute($params = null): ResultInterface
     {
         $startTime = microtime(true);
@@ -42,7 +44,7 @@ final class Statement extends AbstractStatementMiddleware
             return DoctrineQueryTypeEnum::OTHER;
         }
 
-        return DoctrineQueryTypeEnum::from($match[1]);
+        return DoctrineQueryTypeEnum::from(strtolower($match[1]));
     }
 
     private function assembleTableName(string $sql): ?string
@@ -58,6 +60,13 @@ final class Statement extends AbstractStatementMiddleware
             return null;
         }
 
-        return $match[1];
+        // Alternation: only one capture group will be non-empty; pick the first match.
+        foreach ([1, 2, 3, 4] as $group) {
+            if (isset($match[$group]) && $match[$group] !== '') {
+                return $match[$group];
+            }
+        }
+
+        return null;
     }
 }

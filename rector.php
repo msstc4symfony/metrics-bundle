@@ -19,7 +19,7 @@ return RectorConfig::configure()
         __DIR__ . '/tests',
     ])
     ->withoutParallel()
-    ->withPhpSets(php81: true)
+    ->withPhpSets(php84: true)
     ->withComposerBased(doctrine: true, phpunit: true, symfony: true)
     ->withSymfonyContainerPhp(__DIR__ . '/var/cache/dev/App_KernelDevDebugContainer.php')
     ->withAttributesSets(symfony: true, doctrine: true, mongoDb: true, phpunit: true)

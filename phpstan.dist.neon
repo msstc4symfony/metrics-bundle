@@ -2,14 +2,14 @@ parameters:
     level: 9
     editorUrl: 'phpstorm://open?file=%%file%%&line=%%line%%'
     treatPhpDocTypesAsCertain: false
-    phpVersion: 80300
+    phpVersion: 80400
     parallel:
         jobSize: 5
         maximumNumberOfProcesses: 12
         minimumNumberOfJobsPerProcess: 2
     paths:
         - src/
-        - tests/
+        - tests/unit/
     excludePaths:
         - src/Framework/Profiling/Processor/EndSpan/MetricProcessor.php
         - src/Infrastructure/Doctrine/DBAL/Metrics/Connection.php

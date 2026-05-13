@@ -15,7 +15,7 @@ use Symfony\Component\Routing\Attribute\Route;
 #[AsController]
 final class GetMetricsController extends AbstractController
 {
-    public const ROUTE_NAME = 'metrics-get';
+    public const string ROUTE_NAME = 'metrics-get';
 
     public function __construct(
         private readonly RendererInterface $renderer,
@@ -31,7 +31,7 @@ final class GetMetricsController extends AbstractController
             Response::HTTP_OK,
             [
                 'Content-Type' => RenderTextFormat::MIME_TYPE,
-                'Cache-Control' => 'private, max-age=5',
+                'Cache-Control' => 'no-store, max-age=0',
             ],
         );
     }

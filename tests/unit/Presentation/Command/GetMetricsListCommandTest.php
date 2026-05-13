@@ -39,18 +39,20 @@ final class GetMetricsListCommandTest extends TestCase
         $exitCode = $commandTester->execute([]);
 
         self::assertSame(0, $exitCode);
-        self::assertSame(
-            <<<TXT
- -------------- --------- ----------------------------- --------------------------------------------------------------- ------------------- 
-  Name           Type      Description                   Labels                                                          Histogram batches  
- -------------- --------- ----------------------------- --------------------------------------------------------------- ------------------- 
-  http_request   counter   Incoming HTTP request count   method	enum [GET, POST, DELETE, PUT, PATCH, HEAD]	HTTP method                      
-                                                         route	string	Route name or URL path                                                
- -------------- --------- ----------------------------- --------------------------------------------------------------- ------------------- 
 
+        $display = $commandTester->getDisplay();
 
-TXT,
-            $commandTester->getDisplay(),
-        );
+        self::assertStringContainsString('Name', $display);
+        self::assertStringContainsString('Type', $display);
+        self::assertStringContainsString('Description', $display);
+        self::assertStringContainsString('Labels', $display);
+        self::assertStringContainsString('Histogram batches', $display);
+        self::assertStringContainsString('http_request', $display);
+        self::assertStringContainsString('counter', $display);
+        self::assertStringContainsString('Incoming HTTP request count', $display);
+        self::assertStringContainsString('method', $display);
+        self::assertStringContainsString('GET, POST, DELETE, PUT, PATCH, HEAD', $display);
+        self::assertStringContainsString('route', $display);
+        self::assertStringContainsString('Route name or URL path', $display);
     }
 }

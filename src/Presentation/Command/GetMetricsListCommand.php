@@ -7,6 +7,7 @@ namespace MaxShamaev\MetricsBundle\Presentation\Command;
 use MaxShamaev\MetricsBundle\Infrastructure\Entity\Label;
 use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelTypeEnum;
 use MaxShamaev\MetricsBundle\Infrastructure\Repository\MetricRepositoryInterface;
+use Override;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -15,7 +16,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Contracts\Service\Attribute\Required;
 
 #[AsCommand(name: 'metrics:list', description: 'Get metrics list')]
-class GetMetricsListCommand extends Command
+final class GetMetricsListCommand extends Command
 {
     private MetricRepositoryInterface $repository;
 
@@ -25,6 +26,7 @@ class GetMetricsListCommand extends Command
         $this->repository = $repository;
     }
 
+    #[Override]
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);

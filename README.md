@@ -81,11 +81,13 @@ Redis query parameters: `database`, `read_timeout` (default `1`), `timeout` (def
 redis://user:pass@redis:6379/4?read_timeout=2&persistent_connections=1
 ```
 
+> **Operational note.** `ssl_verify_peer` defaults to `true`: TLS Redis with a self-signed CA chain will fail to connect and the bundle will silently fall back to `InMemory` (each PHP worker keeps its own metrics, none are exposed to Prometheus). Pass `?ssl_verify_peer=0` in the DSN when intentionally using a private CA. The same silent fallback applies if `read_timeout=1` is too aggressive for the network — increase via the query parameter.
+
 ## Endpoints and commands
 
 | Method             | What                                                                |
 | ------------------ | ------------------------------------------------------------------- |
-| `GET /_/metrics`   | Returns all collected metrics in Prometheus text format. Cached for 5 seconds via `Cache-Control`. |
+| `GET /_/metrics`   | Returns all collected metrics in Prometheus text format. Responds with `Cache-Control: no-store, max-age=0` so every scrape sees fresh values. |
 | `bin/console metrics:list`  | Tabular list of every registered metric (name, type, labels, histogram buckets). |
 | `bin/console metrics:clear` | Wipes the storage adapter.                                   |
 
@@ -134,7 +136,7 @@ redis://user:pass@redis:6379/4?read_timeout=2&persistent_connections=1
             - App\Metrics\AppMetrics
     ```
 
-3. Write a service that extends `MaxShamaev\MetricsBundle\Infrastructure\Collector\AbstractCollector` and exposes the methods you'll call from your code. The base collector takes care of registering the metric, applying the `application`/`component`/`container` labels, and catching storage errors.
+3. Write a service that extends `MaxShamaev\MetricsBundle\Infrastructure\Collector\AbstractCollector` and exposes the methods you'll call from your code. The base collector takes care of registering the metric, applying the `application`/`component` labels, and catching storage errors.
 
 ## Bundle parameters
 
@@ -146,8 +148,6 @@ redis://user:pass@redis:6379/4?read_timeout=2&persistent_connections=1
 | `metrics_bundle.metric_enums`                   | `[MetricLabelEnum::class]`          | List of FQCNs of `MetricLabelEnumInterface` enums to register. |
 | `metrics_bundle.exceptionLabelShortClassName`   | `false`                             | If `true`, the `exception_total` metric labels by short class name instead of FQCN — reduces info leakage. |
 | `metrics_bundle.httpClientSanitizePath`         | `true`                              | Replaces id/uuid/hash segments in outbound HTTP paths (`/users/42` → `/users/:id`) when no `URLAssembler` matched. |
-
-The `container` label is taken from `$_ENV['POD_NAME']`, `$_ENV['POD_UID']`, or `gethostname()` in that order.
 
 ## How it works
 

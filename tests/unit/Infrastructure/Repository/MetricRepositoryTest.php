@@ -31,13 +31,13 @@ final class MetricRepositoryTest extends TestCase
         self::assertSame(MetricLabelEnum::HTTP_REQUEST->getBatches(), $metric->batches);
 
         $expectedNames = array_merge(
-            ['application', 'component', 'container'],
+            ['application', 'component'],
             array_map(
                 static fn (Label $label): string => $label->name,
                 MetricLabelEnum::HTTP_REQUEST->getLabels(),
             ),
         );
-        self::assertSame($expectedNames, $metric->getLabelNames());
+        self::assertSame($expectedNames, $metric->labelNames);
 
         self::assertEquals(
             new Label('application', MetricLabelTypeEnum::STRING, 'Application name'),

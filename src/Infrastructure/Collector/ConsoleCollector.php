@@ -5,16 +5,10 @@ declare(strict_types=1);
 namespace MaxShamaev\MetricsBundle\Infrastructure\Collector;
 
 use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
-use Throwable;
 
-class ConsoleCollector extends AbstractCollector
+final class ConsoleCollector extends AbstractCollector
 {
-    use LoggerCollectorTrait;
-
-    /**
-     * @var string[]
-     */
-    private array $ignoredCommands = [
+    private const array IGNORED_COMMANDS = [
         'metrics:',
         'healthcheck:',
         'list',
@@ -33,20 +27,7 @@ class ConsoleCollector extends AbstractCollector
             return;
         }
 
-        $metric = $this->repository->find(MetricLabelEnum::CONSOLE_COMMAND_START);
-
-        try {
-            $counter = $this->registry->getOrRegisterCounter(
-                $this->namespace,
-                $metric->name->value,
-                $metric->description,
-                $metric->getLabelNames(),
-            );
-
-            $counter->inc($this->prepareLabelValues([$command]));
-        } catch (Throwable $e) {
-            $this->processException($e, $metric->name->value);
-        }
+        $this->incCounter(MetricLabelEnum::CONSOLE_COMMAND_START, [$command]);
     }
 
     public function incConsoleCommandFinish(string $command): void
@@ -55,20 +36,7 @@ class ConsoleCollector extends AbstractCollector
             return;
         }
 
-        $metric = $this->repository->find(MetricLabelEnum::CONSOLE_COMMAND_FINISH);
-
-        try {
-            $counter = $this->registry->getOrRegisterCounter(
-                $this->namespace,
-                $metric->name->value,
-                $metric->description,
-                $metric->getLabelNames(),
-            );
-
-            $counter->inc($this->prepareLabelValues([$command]));
-        } catch (Throwable $e) {
-            $this->processException($e, $metric->name->value);
-        }
+        $this->incCounter(MetricLabelEnum::CONSOLE_COMMAND_FINISH, [$command]);
     }
 
     public function setCommandDuration(string $command, float $duration): void
@@ -77,29 +45,14 @@ class ConsoleCollector extends AbstractCollector
             return;
         }
 
-        $metric = $this->repository->find(MetricLabelEnum::CONSOLE_COMMAND_DURATION_HISTOGRAM_SECONDS);
-
-        try {
-            $histogram = $this->registry->getOrRegisterHistogram(
-                $this->namespace,
-                $metric->name->value,
-                $metric->description,
-                $metric->getLabelNames(),
-                $metric->batches,
-            );
-
-            $histogram->observe($duration, $this->prepareLabelValues([$command]));
-        } catch (Throwable $e) {
-            $this->processException($e, $metric->name->value);
-        }
+        $this->observeHistogram(MetricLabelEnum::CONSOLE_COMMAND_DURATION_HISTOGRAM_SECONDS, $duration, [$command]);
     }
 
     private function isAllowedMeasureCommand(string $command): bool
     {
-        return !in_array($command, $this->ignoredCommands, true)
-            && array_filter(
-                $this->ignoredCommands,
-                static fn (string $pattern): bool => str_starts_with($command, $pattern),
-            ) === [];
+        return !array_any(
+            self::IGNORED_COMMANDS,
+            static fn (string $pattern): bool => $command === $pattern || str_starts_with($command, $pattern),
+        );
     }
 }

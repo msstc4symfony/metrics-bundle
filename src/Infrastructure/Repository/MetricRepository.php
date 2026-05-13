@@ -8,11 +8,12 @@ use MaxShamaev\MetricsBundle\Infrastructure\Entity\Label;
 use MaxShamaev\MetricsBundle\Infrastructure\Entity\Metric;
 use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface;
 use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelTypeEnum;
+use Override;
 
-class MetricRepository implements MetricRepositoryInterface
+final class MetricRepository implements MetricRepositoryInterface
 {
     /**
-     * @var array<string, Metric>
+     * @var array<int, Metric>
      */
     private array $cache = [];
 
@@ -27,6 +28,7 @@ class MetricRepository implements MetricRepositoryInterface
     /**
      * @return Metric[]
      */
+    #[Override]
     public function findAll(): array
     {
         $result = [];
@@ -38,11 +40,10 @@ class MetricRepository implements MetricRepositoryInterface
         return $result;
     }
 
+    #[Override]
     public function find(MetricLabelEnumInterface $label): Metric
     {
-        $key = $label::class . '::' . $label->value;
-
-        return $this->cache[$key] ??= new Metric(
+        return $this->cache[spl_object_id($label)] ??= new Metric(
             $label,
             $label->getType(),
             $label->getDescription(),
@@ -60,7 +61,6 @@ class MetricRepository implements MetricRepositoryInterface
             [
                 new Label('application', MetricLabelTypeEnum::STRING, 'Application name'),
                 new Label('component', MetricLabelTypeEnum::STRING, 'Application component name'),
-                new Label('container', MetricLabelTypeEnum::STRING, 'Container / pod ID'),
             ],
             $label->getLabels(),
         );

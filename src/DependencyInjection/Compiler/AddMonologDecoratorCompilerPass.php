@@ -5,29 +5,27 @@ declare(strict_types=1);
 namespace MaxShamaev\MetricsBundle\DependencyInjection\Compiler;
 
 use MaxShamaev\MetricsBundle\Infrastructure\Monolog\Handler\HandlerDecorator;
+use Override;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
-class AddMonologDecoratorCompilerPass implements CompilerPassInterface
+final class AddMonologDecoratorCompilerPass implements CompilerPassInterface
 {
-    /**
-     * @var string[]
-     */
-    private array $excludeChannels = [
+    private const array EXCLUDE_CHANNELS = [
         'profiling',
         'removal_request',
         'deprecation',
     ];
 
+    #[Override]
     public function process(ContainerBuilder $container): void
     {
         foreach ($container->getDefinitions() as $id => $definition) {
             if (
                 !str_starts_with($id, 'monolog.logger')
-                || in_array(substr($id, 15), $this->excludeChannels, true)
+                || in_array(substr($id, 15), self::EXCLUDE_CHANNELS, true)
                 || $definition->getClass() === HandlerDecorator::class
-                || $definition->isAbstract()
-                || $definition->getDecoratedService() !== null
+                || !DefinitionFilter::isDecoratable($definition)
             ) {
                 continue;
             }

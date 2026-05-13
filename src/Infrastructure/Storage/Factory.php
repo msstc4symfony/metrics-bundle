@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MaxShamaev\MetricsBundle\Infrastructure\Storage;
 
+use Override;
 use Prometheus\Storage\Adapter;
 use Prometheus\Storage\APC;
 use Prometheus\Storage\APCng;
@@ -14,13 +15,28 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Throwable;
 
-class Factory implements FactoryInterface
+final readonly class Factory implements FactoryInterface
 {
+    private const string DEFAULT_REDIS_HOST = '127.0.0.1';
+
+    private const int DEFAULT_REDIS_PORT = 6379;
+
+    private const int DEFAULT_REDIS_DATABASE = 0;
+
+    private const int DEFAULT_REDIS_READ_TIMEOUT = 1;
+
+    private const float DEFAULT_REDIS_TIMEOUT = 0.1;
+
+    private const bool DEFAULT_REDIS_VERIFY_PEER = true;
+
+    private const bool DEFAULT_REDIS_PERSISTENT_CONNECTIONS = false;
+
     public function __construct(
-        private readonly LoggerInterface $logger = new NullLogger(),
+        private LoggerInterface $logger = new NullLogger(),
     ) {
     }
 
+    #[Override]
     public function create(string $dsn): Adapter
     {
         $parts = parse_url($dsn);
@@ -88,11 +104,9 @@ class Factory implements FactoryInterface
      * } $parts
      * @param array<string, string> $query
      */
-    private function createRedis(array $parts, array $query): ?Redis
+    private function createRedis(array $parts, array $query): Redis
     {
-        $options = $this->buildRedisOptions($parts, $query);
-
-        return $options === null ? null : new Redis($options);
+        return new Redis($this->buildRedisOptions($parts, $query));
     }
 
     /**
@@ -108,11 +122,9 @@ class Factory implements FactoryInterface
      * } $parts
      * @param array<string, string> $query
      */
-    private function createRedisNg(array $parts, array $query): ?RedisNg
+    private function createRedisNg(array $parts, array $query): RedisNg
     {
-        $options = $this->buildRedisOptions($parts, $query);
-
-        return $options === null ? null : new RedisNg($options);
+        return new RedisNg($this->buildRedisOptions($parts, $query));
     }
 
     /**
@@ -127,26 +139,20 @@ class Factory implements FactoryInterface
      * } $parts
      * @param array<string, string> $query
      *
-     * @return array<string, mixed>|null
+     * @return array<string, mixed>
      */
-    private function buildRedisOptions(array $parts, array $query): ?array
+    private function buildRedisOptions(array $parts, array $query): array
     {
-        if (!isset($parts['host'])) {
-            $this->logger->warning('metrics-bundle: Redis DSN missing host, falling back to InMemory');
-
-            return null;
-        }
-
         $options = [
-            'host' => $parts['host'],
-            'port' => (int) ($parts['port'] ?? 6379),
-            'read_timeout' => 1,
-            'timeout' => 0.1,
+            'host' => $parts['host'] ?? self::DEFAULT_REDIS_HOST,
+            'port' => (int) ($parts['port'] ?? self::DEFAULT_REDIS_PORT),
+            'read_timeout' => self::DEFAULT_REDIS_READ_TIMEOUT,
+            'timeout' => self::DEFAULT_REDIS_TIMEOUT,
             'user' => null,
             'password' => null,
-            'ssl' => ['verify_peer' => true],
-            'persistent_connections' => false,
-            'database' => 0,
+            'ssl' => ['verify_peer' => self::DEFAULT_REDIS_VERIFY_PEER],
+            'persistent_connections' => self::DEFAULT_REDIS_PERSISTENT_CONNECTIONS,
+            'database' => self::DEFAULT_REDIS_DATABASE,
         ];
 
         if (isset($parts['user'])) {

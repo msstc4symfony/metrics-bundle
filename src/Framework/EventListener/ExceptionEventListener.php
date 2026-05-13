@@ -9,10 +9,10 @@ use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 
 #[AsEventListener(event: 'kernel.exception', method: 'onException', priority: 4096)]
-class ExceptionEventListener
+final readonly class ExceptionEventListener
 {
     public function __construct(
-        private readonly ErrorCollector $collector,
+        private ErrorCollector $collector,
     ) {
     }
 

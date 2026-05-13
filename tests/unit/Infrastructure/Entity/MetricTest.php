@@ -26,20 +26,6 @@ final class MetricTest extends TestCase
         );
 
         self::assertSame(['a', 'b'], $metric->labelNames);
-        self::assertSame(['a', 'b'], $metric->getLabelNames());
-    }
-
-    public function testGetLabelNamesReturnsSameArrayOnRepeatedCalls(): void
-    {
-        $metric = new Metric(
-            MetricLabelEnum::HTTP_REQUEST,
-            MetricLabelEnum::HTTP_REQUEST->getType(),
-            'desc',
-            [new Label('only', MetricLabelTypeEnum::STRING)],
-            [],
-        );
-
-        self::assertSame($metric->getLabelNames(), $metric->getLabelNames());
     }
 
     public function testEmptyLabelsProduceEmptyNames(): void

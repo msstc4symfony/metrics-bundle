@@ -12,15 +12,15 @@ use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Contracts\Cache\CacheInterface;
 
 #[AsEventListener(event: 'kernel.terminate', method: 'onTerminate', priority: -4096)]
-final class InfoEventListener
+final readonly class InfoEventListener
 {
-    private const DEFAULT_PERIOD = 'PT1M';
+    private const string DEFAULT_PERIOD = 'PT1M';
 
-    private readonly DateInterval $metricsCollectPeriod;
+    private DateInterval $metricsCollectPeriod;
 
     public function __construct(
-        private readonly InfoCollector $infoCollector,
-        private readonly CacheInterface $metricsCache,
+        private InfoCollector $infoCollector,
+        private CacheInterface $metricsCache,
         string $metricsCollectPeriod = self::DEFAULT_PERIOD,
     ) {
         $this->metricsCollectPeriod = new DateInterval($metricsCollectPeriod);
@@ -53,12 +53,6 @@ final class InfoEventListener
         $value = $this->getMemoryUsage();
         if ($value !== null) {
             $this->infoCollector->setMetric(MetricLabelEnum::INFO_MEMORY_USED, $value);
-        }
-
-        // Filesystem usage
-        $value = $this->getFilesystemUsage();
-        if ($value !== null) {
-            $this->infoCollector->setMetric(MetricLabelEnum::INFO_FILESYSTEM_USED, $value);
         }
 
         // Filesystem usage

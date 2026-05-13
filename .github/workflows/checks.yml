@@ -9,8 +9,8 @@ on:
       - main
 
 jobs:
-  checks:
-    name: Run Code Checks and Unit Tests
+  unit:
+    name: Code checks + unit tests (minimal install)
     runs-on: ubuntu-latest
 
     steps:
@@ -20,8 +20,8 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.1'
-          extensions: mbstring, xml, ctype, iconv, intl, xdebug
+          php-version: '8.4'
+          extensions: mbstring, xml, ctype, iconv, intl, xdebug, redis
           coverage: xdebug
           tools: composer:v2
 
@@ -43,14 +43,14 @@ jobs:
         run: make check
 
       - name: Run unit tests
-        run: XDEBUG_MODE=coverage vendor/bin/phpunit --coverage-clover=coverage.xml --log-junit junit.xml
+        run: XDEBUG_MODE=coverage vendor/bin/phpunit --testsuite=unit --coverage-clover=coverage.xml --log-junit junit.xml
 
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/codecov-action@v5
         with:
           files: ./coverage.xml
-          flags: phpunit
+          flags: unit
           fail_ci_if_error: true
           slug: max-shamaev-php/metrics-bundle
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -60,7 +60,63 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           report_type: test_results
-          flags: phpunit
+          flags: unit
+          fail_ci_if_error: true
+          slug: max-shamaev-php/metrics-bundle
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  integration:
+    name: Integration tests (with optional libraries)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, xml, ctype, iconv, intl, xdebug, redis, apcu, mongodb
+          ini-values: apc.enable_cli=1
+          coverage: xdebug
+          tools: composer:v2
+
+      - name: Get composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-integration-${{ hashFiles('composer-integration.json') }}
+          restore-keys: ${{ runner.os }}-composer-integration-
+
+      - name: Install integration dependencies
+        env:
+          COMPOSER: composer-integration.json
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Run unit + integration tests
+        run: XDEBUG_MODE=coverage vendor/bin/phpunit -c phpunit-integration.xml.dist --coverage-clover=coverage-integration.xml --log-junit junit-integration.xml
+
+      - name: Upload integration coverage to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage-integration.xml
+          flags: integration
+          fail_ci_if_error: true
+          slug: max-shamaev-php/metrics-bundle
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload integration test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v5
+        with:
+          report_type: test_results
+          flags: integration
           fail_ci_if_error: true
           slug: max-shamaev-php/metrics-bundle
           token: ${{ secrets.CODECOV_TOKEN }}

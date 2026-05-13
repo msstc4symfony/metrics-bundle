@@ -25,172 +25,34 @@ parameters:
 			path: src/Framework/EventListener/InfoEventListener.php
 
 		-
-			message: '#^Cannot cast mixed to string\.$#'
-			identifier: cast.string
-			count: 2
-			path: src/Infrastructure/Collector/AbstractCollector.php
-
-		-
 			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterCounter\(\) expects string, int\|string given\.$#'
 			identifier: argument.type
 			count: 1
 			path: src/Infrastructure/Collector/AbstractCollector.php
 
 		-
-			message: '#^Parameter \#2 \$metric of method MaxShamaev\\MetricsBundle\\Infrastructure\\Collector\\ConsoleCollector\:\:processException\(\) expects MaxShamaev\\MetricsBundle\\Infrastructure\\Entity\\Metric\|string, int\|string given\.$#'
+			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterGauge\(\) expects string, int\|string given\.$#'
 			identifier: argument.type
-			count: 3
-			path: src/Infrastructure/Collector/ConsoleCollector.php
-
-		-
-			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterCounter\(\) expects string, int\|string given\.$#'
-			identifier: argument.type
-			count: 2
-			path: src/Infrastructure/Collector/ConsoleCollector.php
+			count: 1
+			path: src/Infrastructure/Collector/AbstractCollector.php
 
 		-
 			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterHistogram\(\) expects string, int\|string given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Infrastructure/Collector/ConsoleCollector.php
+			path: src/Infrastructure/Collector/AbstractCollector.php
 
 		-
-			message: '#^Parameter \#2 \$metric of method MaxShamaev\\MetricsBundle\\Infrastructure\\Collector\\DoctrineConnectionCollector\:\:processException\(\) expects MaxShamaev\\MetricsBundle\\Infrastructure\\Entity\\Metric\|string, int\|string given\.$#'
-			identifier: argument.type
-			count: 2
-			path: src/Infrastructure/Collector/DoctrineConnectionCollector.php
-
-		-
-			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterCounter\(\) expects string, int\|string given\.$#'
+			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterSummary\(\) expects string, int\|string given\.$#'
 			identifier: argument.type
 			count: 1
-			path: src/Infrastructure/Collector/DoctrineConnectionCollector.php
-
-		-
-			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterHistogram\(\) expects string, int\|string given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Infrastructure/Collector/DoctrineConnectionCollector.php
-
-		-
-			message: '#^Parameter \#2 \$metric of method MaxShamaev\\MetricsBundle\\Infrastructure\\Collector\\ElasticaCollector\:\:processException\(\) expects MaxShamaev\\MetricsBundle\\Infrastructure\\Entity\\Metric\|string, int\|string given\.$#'
-			identifier: argument.type
-			count: 3
-			path: src/Infrastructure/Collector/ElasticaCollector.php
-
-		-
-			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterCounter\(\) expects string, int\|string given\.$#'
-			identifier: argument.type
-			count: 2
-			path: src/Infrastructure/Collector/ElasticaCollector.php
-
-		-
-			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterHistogram\(\) expects string, int\|string given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Infrastructure/Collector/ElasticaCollector.php
+			path: src/Infrastructure/Collector/AbstractCollector.php
 
 		-
 			message: '#^Class Symfony\\Component\\Security\\Core\\Exception\\AccessDeniedException not found\.$#'
 			identifier: class.notFound
 			count: 1
 			path: src/Infrastructure/Collector/ErrorCollector.php
-
-		-
-			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterCounter\(\) expects string, int\|string given\.$#'
-			identifier: argument.type
-			count: 2
-			path: src/Infrastructure/Collector/ErrorCollector.php
-
-		-
-			message: '#^Parameter \#2 \$metric of method MaxShamaev\\MetricsBundle\\Infrastructure\\Collector\\ExternalConnectionCollector\:\:processException\(\) expects MaxShamaev\\MetricsBundle\\Infrastructure\\Entity\\Metric\|string, int\|string given\.$#'
-			identifier: argument.type
-			count: 3
-			path: src/Infrastructure/Collector/ExternalConnectionCollector.php
-
-		-
-			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterCounter\(\) expects string, int\|string given\.$#'
-			identifier: argument.type
-			count: 2
-			path: src/Infrastructure/Collector/ExternalConnectionCollector.php
-
-		-
-			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterHistogram\(\) expects string, int\|string given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Infrastructure/Collector/ExternalConnectionCollector.php
-
-		-
-			message: '#^Parameter \#2 \$metric of method MaxShamaev\\MetricsBundle\\Infrastructure\\Collector\\InfoCollector\:\:processException\(\) expects MaxShamaev\\MetricsBundle\\Infrastructure\\Entity\\Metric\|string, int\|string given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Infrastructure/Collector/InfoCollector.php
-
-		-
-			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterGauge\(\) expects string, int\|string given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Infrastructure/Collector/InfoCollector.php
-
-		-
-			message: '#^Parameter \#2 \$metric of method MaxShamaev\\MetricsBundle\\Infrastructure\\Collector\\MongoDbCollector\:\:processException\(\) expects MaxShamaev\\MetricsBundle\\Infrastructure\\Entity\\Metric\|string, int\|string given\.$#'
-			identifier: argument.type
-			count: 3
-			path: src/Infrastructure/Collector/MongoDbCollector.php
-
-		-
-			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterCounter\(\) expects string, int\|string given\.$#'
-			identifier: argument.type
-			count: 2
-			path: src/Infrastructure/Collector/MongoDbCollector.php
-
-		-
-			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterHistogram\(\) expects string, int\|string given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Infrastructure/Collector/MongoDbCollector.php
-
-		-
-			message: '#^Parameter \#1 \$values of method MaxShamaev\\MetricsBundle\\Infrastructure\\Collector\\AbstractCollector\:\:prepareLabelValues\(\) expects array\<bool\|float\|int\|string\>, array\<int, string\|null\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Infrastructure/Collector/ProfilingCollector.php
-
-		-
-			message: '#^Parameter \#2 \$metric of method MaxShamaev\\MetricsBundle\\Infrastructure\\Collector\\ProfilingCollector\:\:processException\(\) expects MaxShamaev\\MetricsBundle\\Infrastructure\\Entity\\Metric\|string, int\|string given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Infrastructure/Collector/ProfilingCollector.php
-
-		-
-			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterHistogram\(\) expects string, int\|string given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Infrastructure/Collector/ProfilingCollector.php
-
-		-
-			message: '#^Parameter \#2 \$metric of method MaxShamaev\\MetricsBundle\\Infrastructure\\Collector\\RequestCollector\:\:processException\(\) expects MaxShamaev\\MetricsBundle\\Infrastructure\\Entity\\Metric\|string, int\|string given\.$#'
-			identifier: argument.type
-			count: 4
-			path: src/Infrastructure/Collector/RequestCollector.php
-
-		-
-			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterCounter\(\) expects string, int\|string given\.$#'
-			identifier: argument.type
-			count: 2
-			path: src/Infrastructure/Collector/RequestCollector.php
-
-		-
-			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterHistogram\(\) expects string, int\|string given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Infrastructure/Collector/RequestCollector.php
-
-		-
-			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterSummary\(\) expects string, int\|string given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Infrastructure/Collector/RequestCollector.php
 
 		-
 			message: '#^Call to function method_exists\(\) with MongoDB\\Driver\\Monitoring\\CommandFailedEvent and ''getHost'' will always evaluate to true\.$#'
@@ -244,10 +106,4 @@ parameters:
 			message: '#^PHPDoc tag @var for variable \$connection contains unknown class Elastica\\Connection\.$#'
 			identifier: class.notFound
 			count: 1
-			path: src/MetricsBundle.php
-
-		-
-			message: '#^Unable to resolve the template type B in call to method Symfony\\Component\\DependencyInjection\\ContainerInterface\:\:get\(\)$#'
-			identifier: argument.templateType
-			count: 2
 			path: src/MetricsBundle.php

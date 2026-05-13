@@ -5,20 +5,20 @@ declare(strict_types=1);
 namespace MaxShamaev\MetricsBundle\DependencyInjection\Compiler;
 
 use Elastica\Client;
+use Override;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
-class SaveElasticaClientsListPass implements CompilerPassInterface
+final class SaveElasticaClientsListPass implements CompilerPassInterface
 {
+    #[Override]
     public function process(ContainerBuilder $container): void
     {
         $ids = [];
         foreach ($container->getDefinitions() as $id => $definition) {
             if (
-                $definition->getClass() === null
-                || $definition->getClass() !== Client::class
-                || $definition->isAbstract()
-                || $definition->getDecoratedService() !== null
+                $definition->getClass() !== Client::class
+                || !DefinitionFilter::isDecoratable($definition)
             ) {
                 continue;
             }
