@@ -79,7 +79,9 @@ final class MetricsBundle extends Bundle
                         /** @var \Elastica\Connection $connection */
                         foreach ($client->getConnections() as $connection) {
                             if (method_exists($connection, 'setTransport')) {
-                                $connection->setTransport((new TimingTransport())->init($connection->getTransportObject(), $collector));
+                                $connection->setTransport(
+                                    (new TimingTransport())->init($connection->getTransportObject(), $collector),
+                                );
                             }
                         }
                     }

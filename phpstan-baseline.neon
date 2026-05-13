@@ -13,12 +13,6 @@ parameters:
 			path: src/DependencyInjection/Compiler/AddHttpClientMonitorPass.php
 
 		-
-			message: '#^Class Symfony\\Contracts\\HttpClient\\HttpClientInterface not found\.$#'
-			identifier: class.notFound
-			count: 2
-			path: src/DependencyInjection/Compiler/AddHttpClientMonitorPass.php
-
-		-
 			message: '#^Class Elastica\\Client not found\.$#'
 			identifier: class.notFound
 			count: 1
@@ -211,12 +205,6 @@ parameters:
 			path: src/Infrastructure/Doctrine/ODM/Metrics/TimingSubscriber.php
 
 		-
-			message: '#^Class StringBackedEnum not found\.$#'
-			identifier: class.notFound
-			count: 1
-			path: src/Infrastructure/Factory/MetricRepositoryFactory.php
-
-		-
 			message: '#^Parameter \#1 \$level of static method Monolog\\Logger\:\:toMonologLevel\(\) expects 100\|200\|250\|300\|400\|500\|550\|600\|''ALERT''\|''alert''\|''CRITICAL''\|''critical''\|''DEBUG''\|''debug''\|''EMERGENCY''\|''emergency''\|''ERROR''\|''error''\|''INFO''\|''info''\|''NOTICE''\|''notice''\|''WARNING''\|''warning''\|Monolog\\Level, mixed given\.$#'
 			identifier: argument.type
 			count: 1
@@ -263,9 +251,3 @@ parameters:
 			identifier: argument.templateType
 			count: 2
 			path: src/MetricsBundle.php
-
-		-
-			message: '#^Parameter \#4 \$labels of class MaxShamaev\\MetricsBundle\\Infrastructure\\Entity\\Metric constructor expects array\<MaxShamaev\\MetricsBundle\\Infrastructure\\Entity\\Label\>, array\<float\|MaxShamaev\\MetricsBundle\\Infrastructure\\Entity\\Label\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: tests/unit/Infrastructure/Repository/MetricRepositoryTest.php

@@ -9,7 +9,7 @@ test: ## Test code
 	vendor/bin/phpunit
 
 test-with-coverage: ## Test code with coverage
-	vendor/bin/phpunit --coverage-html coverage
+	XDEBUG_MODE=coverage vendor/bin/phpunit --coverage-html coverage
 
 regenerate-baseline: ## Regenerate baseline
 	vendor/bin/phpstan analyse --memory-limit=512M -b phpstan-baseline.neon

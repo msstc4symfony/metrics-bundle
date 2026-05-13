@@ -7,14 +7,15 @@ namespace MaxShamaev\MetricsBundle\Infrastructure\Elastica;
 use Elastica\Request;
 use Elastica\Response;
 use Elastica\Transport\AbstractTransport;
+use LogicException;
 use MaxShamaev\MetricsBundle\Infrastructure\Collector\ElasticaCollector;
 use Throwable;
 
 class TimingTransport extends AbstractTransport
 {
-    private AbstractTransport $inner;
+    private ?AbstractTransport $inner = null;
 
-    private ElasticaCollector $collector;
+    private ?ElasticaCollector $collector = null;
 
     public function init(
         AbstractTransport $inner,
@@ -26,8 +27,15 @@ class TimingTransport extends AbstractTransport
         return $this;
     }
 
+    /**
+     * @param array<string, mixed> $params
+     */
     public function exec(Request $request, array $params): Response
     {
+        if (!$this->inner instanceof AbstractTransport || !$this->collector instanceof ElasticaCollector) {
+            throw new LogicException(self::class . '::init() must be called before exec().');
+        }
+
         try {
             $response = $this->inner->exec($request, $params);
             $this->collector->incRequestSuccess($request->getMethod(), $request->getPath());

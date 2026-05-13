@@ -14,7 +14,7 @@ trait LoggerCollectorTrait
     protected ?LoggerInterface $logger = null;
 
     #[Required]
-    public function setLogger(LoggerInterface $logger): void
+    public function setLogger(?LoggerInterface $logger = null): void
     {
         $this->logger = $logger;
     }

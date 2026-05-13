@@ -15,6 +15,11 @@ abstract class AbstractCollector
 
     protected string $namespace = self::DEFAULT_NAMESPACE;
 
+    /**
+     * @var string[]|null
+     */
+    private ?array $labelPrefix = null;
+
     public function __construct(
         protected readonly RegistryInterface $registry,
         protected readonly MetricRepositoryInterface $repository,
@@ -54,7 +59,7 @@ abstract class AbstractCollector
     protected function prepareLabelValues(array $values = []): array
     {
         return array_merge(
-            [$this->applicationName, $this->componentName, $this->getContainerId()],
+            $this->labelPrefix ??= [$this->applicationName, $this->componentName, $this->getContainerId()],
             array_map(strval(...), $values),
         );
     }

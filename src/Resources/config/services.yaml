@@ -7,6 +7,9 @@ parameters:
   metrics_bundle.applicationName: '%env(default:metrics_bundle.applicationNameDefault:APPLICATION_NAME)%'
   metrics_bundle.componentName: '%env(default:metrics_bundle.componentNameDefault:COMPONENT_NAME)%'
 
+  metrics_bundle.exceptionLabelShortClassName: false
+  metrics_bundle.httpClientSanitizePath: true
+
   metrics_bundle.metric_enums:
     - MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnum
 
@@ -25,11 +28,12 @@ services:
       - '../../Infrastructure/Doctrine/DBAL/'
       - '../../Infrastructure/HttpClient/HttpClientDecorator.php'
       - '../../Infrastructure/Elastica/'
+      - '../../Infrastructure/Monolog/'
       - '../../MetricsBundle.php'
 
   MaxShamaev\MetricsBundle\Infrastructure\Repository\MetricRepository:
     class: MaxShamaev\MetricsBundle\Infrastructure\Repository\MetricRepository
-    factory: ['@MaxShamaev\MetricsBundle\Infrastructure\Factory\MetricRepositoryInterface', create]
+    factory: ['@MaxShamaev\MetricsBundle\Infrastructure\Factory\MetricRepositoryFactory', create]
 
   Prometheus\Storage\Adapter:
     class: Prometheus\Storage\Adapter

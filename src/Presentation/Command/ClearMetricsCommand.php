@@ -7,6 +7,8 @@ namespace MaxShamaev\MetricsBundle\Presentation\Command;
 use Prometheus\Storage\Adapter;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Contracts\Service\Attribute\Required;
 
@@ -21,9 +23,12 @@ class ClearMetricsCommand extends Command
         $this->storage = $storage;
     }
 
-    public function __invoke(SymfonyStyle $io): int
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $io = new SymfonyStyle($input, $output);
+
         $io->writeln('Clearing storage');
+
         $this->storage->wipeStorage();
         $io->success('The storage was successfully cleared.');
 

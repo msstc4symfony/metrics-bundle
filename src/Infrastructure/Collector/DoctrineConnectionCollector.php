@@ -26,14 +26,20 @@ class DoctrineConnectionCollector extends AbstractCollector
                 $metric->getLabelNames(),
             );
 
-            $counter->inc($this->prepareLabelValues([$connection, $type->value, $table ?? self::DEFAULT_TABLE_NAME]));
+            $counter->inc($this->prepareLabelValues(
+                [$connection, $type->value, $table ?? self::DEFAULT_TABLE_NAME],
+            ));
         } catch (Throwable $e) {
             $this->processException($e, $metric->name->value);
         }
     }
 
-    public function setQueryExecuteDuration(string $connection, DoctrineQueryTypeEnum $type, ?string $table, float $duration): void
-    {
+    public function setQueryExecuteDuration(
+        string $connection,
+        DoctrineQueryTypeEnum $type,
+        ?string $table,
+        float $duration,
+    ): void {
         $metric = $this->repository->find(MetricLabelEnum::DOCTRINE_QUERY_DURATION_HISTOGRAM_SECONDS);
 
         try {
@@ -45,7 +51,10 @@ class DoctrineConnectionCollector extends AbstractCollector
                 $metric->batches,
             );
 
-            $histogram->observe($duration, $this->prepareLabelValues([$connection, $type->value, $table ?? self::DEFAULT_TABLE_NAME]));
+            $histogram->observe(
+                $duration,
+                $this->prepareLabelValues([$connection, $type->value, $table ?? self::DEFAULT_TABLE_NAME]),
+            );
         } catch (Throwable $e) {
             $this->processException($e, $metric->name->value);
         }

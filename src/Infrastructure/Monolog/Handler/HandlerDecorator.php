@@ -11,83 +11,113 @@ use Psr\Log\LoggerInterface;
 use Stringable;
 use Throwable;
 
-class HandlerDecorator implements LoggerInterface
+final class HandlerDecorator implements LoggerInterface
 {
+    private const DEFAULT_ALLOWED_LEVELS = [
+        Level::Emergency,
+        Level::Alert,
+        Level::Critical,
+        Level::Error,
+        Level::Warning,
+        Level::Notice,
+    ];
+
+    /**
+     * @var array<int, true>
+     */
+    private readonly array $allowedLevelMap;
+
     /**
      * @param Level[] $allowedLevels
      */
     public function __construct(
         private readonly LoggerInterface $inner,
         private readonly ErrorCollector $collector,
-        private readonly array $allowedLevels = [Level::Emergency, Level::Alert, Level::Critical, Level::Error, Level::Warning, Level::Notice],
+        array $allowedLevels = self::DEFAULT_ALLOWED_LEVELS,
     ) {
+        $map = [];
+        foreach ($allowedLevels as $level) {
+            $map[$level->value] = true;
+        }
+        $this->allowedLevelMap = $map;
     }
 
     public function emergency(Stringable|string $message, array $context = []): void
     {
-        $this->collector->incError(Level::Emergency);
+        $this->record(Level::Emergency);
 
         $this->inner->emergency($message, $context);
     }
 
     public function alert(Stringable|string $message, array $context = []): void
     {
-        $this->collector->incError(Level::Alert);
+        $this->record(Level::Alert);
 
         $this->inner->alert($message, $context);
     }
 
     public function critical(Stringable|string $message, array $context = []): void
     {
-        $this->collector->incError(Level::Critical);
+        $this->record(Level::Critical);
 
         $this->inner->critical($message, $context);
     }
 
     public function error(Stringable|string $message, array $context = []): void
     {
-        $this->collector->incError(Level::Error);
+        $this->record(Level::Error);
 
         $this->inner->error($message, $context);
     }
 
     public function warning(Stringable|string $message, array $context = []): void
     {
-        $this->collector->incError(Level::Warning);
+        $this->record(Level::Warning);
 
         $this->inner->warning($message, $context);
     }
 
     public function notice(Stringable|string $message, array $context = []): void
     {
-        $this->collector->incError(Level::Notice);
+        $this->record(Level::Notice);
 
         $this->inner->notice($message, $context);
     }
 
     public function info(Stringable|string $message, array $context = []): void
     {
+        $this->record(Level::Info);
+
         $this->inner->info($message, $context);
     }
 
     public function debug(Stringable|string $message, array $context = []): void
     {
+        $this->record(Level::Debug);
+
         $this->inner->debug($message, $context);
     }
 
     public function log($level, Stringable|string $message, array $context = []): void
     {
-        if (!($level instanceof Level)) {
+        if (!$level instanceof Level) {
             try {
                 $level = Logger::toMonologLevel($level);
             } catch (Throwable) {
             }
         }
 
-        if ($level instanceof Level && in_array($level, $this->allowedLevels, true)) {
-            $this->collector->incError($level);
+        if ($level instanceof Level) {
+            $this->record($level);
         }
 
         $this->inner->log($level, $message, $context);
+    }
+
+    private function record(Level $level): void
+    {
+        if (isset($this->allowedLevelMap[$level->value])) {
+            $this->collector->incError($level);
+        }
     }
 }

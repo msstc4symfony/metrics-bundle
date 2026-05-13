@@ -105,7 +105,10 @@ final class InfoEventListener
                 $this->infoCollector->setMetric(MetricLabelEnum::INFO_FPM_IDLE_PROCESSES, $data['idle-processes']);
                 $this->infoCollector->setMetric(MetricLabelEnum::INFO_FPM_ACTIVE_PROCESSES, $data['active-processes']);
                 $this->infoCollector->setMetric(MetricLabelEnum::INFO_FPM_TOTAL_PROCESSES, $data['total-processes']);
-                $this->infoCollector->setMetric(MetricLabelEnum::INFO_FPM_MAX_ACTIVE_PROCESSES, $data['max-active-processes']);
+                $this->infoCollector->setMetric(
+                    MetricLabelEnum::INFO_FPM_MAX_ACTIVE_PROCESSES,
+                    $data['max-active-processes'],
+                );
                 $this->infoCollector->setMetric(MetricLabelEnum::INFO_FPM_LISTEN_QUEUE, $data['listen-queue']);
                 $this->infoCollector->setMetric(MetricLabelEnum::INFO_FPM_MAX_LISTEN_QUEUE, $data['max-listen-queue']);
                 $this->infoCollector->setMetric(MetricLabelEnum::INFO_FPM_LISTEN_QUEUE_SIZE, $data['listen-queue-len']);
@@ -148,7 +151,12 @@ final class InfoEventListener
             }
         }
 
-        if (!isset($meminfo['MemTotal']) || !isset($meminfo['MemFree']) || !isset($meminfo['Buffers']) || !isset($meminfo['Cached'])) {
+        if (
+            !isset($meminfo['MemTotal'])
+            || !isset($meminfo['MemFree'])
+            || !isset($meminfo['Buffers'])
+            || !isset($meminfo['Cached'])
+        ) {
             return null;
         }
 

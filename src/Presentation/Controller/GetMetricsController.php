@@ -29,7 +29,10 @@ final class GetMetricsController extends AbstractController
         return new Response(
             $this->renderer->render($this->registry->getMetricFamilySamples()),
             Response::HTTP_OK,
-            ['Content-Type' => RenderTextFormat::MIME_TYPE],
+            [
+                'Content-Type' => RenderTextFormat::MIME_TYPE,
+                'Cache-Control' => 'private, max-age=5',
+            ],
         );
     }
 }

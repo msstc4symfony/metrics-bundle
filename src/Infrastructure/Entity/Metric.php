@@ -12,6 +12,11 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 final class Metric
 {
     /**
+     * @var string[]
+     */
+    public readonly array $labelNames;
+
+    /**
      * @param Label[] $labels
      * @param float[] $batches
      */
@@ -22,6 +27,7 @@ final class Metric
         public readonly array $labels,
         public readonly array $batches,
     ) {
+        $this->labelNames = array_map(static fn (Label $label): string => $label->name, $labels);
     }
 
     /**
@@ -29,6 +35,6 @@ final class Metric
      */
     public function getLabelNames(): array
     {
-        return array_map(static fn (Label $label): string => $label->name, $this->labels);
+        return $this->labelNames;
     }
 }

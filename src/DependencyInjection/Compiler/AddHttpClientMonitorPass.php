@@ -19,6 +19,10 @@ class AddHttpClientMonitorPass implements CompilerPassInterface
 {
     public function process(ContainerBuilder $container): void
     {
+        if (!class_exists(HttpClientInterface::class)) {
+            return;
+        }
+
         foreach ($container->getDefinitions() as $id => $definition) {
             if (
                 $definition->getClass() === null
@@ -41,7 +45,10 @@ class AddHttpClientMonitorPass implements CompilerPassInterface
             switch ($definition->getClass()) {
                 case HttpClientInterface::class:
                     $arguments = $definition->getArguments();
-                    if (isset($arguments[0]) && isset($arguments[0]['base_uri']) && is_string($arguments[0]['base_uri'])) {
+                    if (
+                        isset($arguments[0]['base_uri'])
+                        && is_string($arguments[0]['base_uri'])
+                    ) {
                         $decoratorDefinition->setArgument('$baseUri', $arguments[0]['base_uri']);
                     }
                     break;

@@ -21,5 +21,14 @@
         <include>
             <directory>src</directory>
         </include>
+        <exclude>
+            <directory>src/DependencyInjection</directory>
+            <directory>src/Framework</directory>
+            <directory>src/Infrastructure/Doctrine</directory>
+            <directory>src/Infrastructure/Elastica</directory>
+            <directory>src/Infrastructure/HttpClient</directory>
+            <directory>src/Infrastructure/Monolog</directory>
+            <file>src/MetricsBundle.php</file>
+        </exclude>
     </source>
 </phpunit>

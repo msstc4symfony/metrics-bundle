@@ -12,6 +12,11 @@ use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelTypeEnum;
 class MetricRepository implements MetricRepositoryInterface
 {
     /**
+     * @var array<string, Metric>
+     */
+    private array $cache = [];
+
+    /**
      * @param iterable<MetricLabelEnumInterface> $metricList
      */
     public function __construct(
@@ -35,7 +40,9 @@ class MetricRepository implements MetricRepositoryInterface
 
     public function find(MetricLabelEnumInterface $label): Metric
     {
-        return new Metric(
+        $key = $label::class . '::' . $label->value;
+
+        return $this->cache[$key] ??= new Metric(
             $label,
             $label->getType(),
             $label->getDescription(),

@@ -9,11 +9,13 @@
   "prefer-stable": true,
   "autoload": {
     "psr-4": {
-      "MaxShamaev\\MetricsBundle\\": "src/",
-      "MaxShamaev\\MetricsBundle\\Test\\Unit\\": "tests/unit/"
+      "MaxShamaev\\MetricsBundle\\": "src/"
     }
   },
   "autoload-dev": {
+    "psr-4": {
+      "MaxShamaev\\MetricsBundle\\Test\\Unit\\": "tests/unit/"
+    }
   },
   "require": {
     "php": ">=8.1",

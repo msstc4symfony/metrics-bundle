@@ -6,7 +6,6 @@ namespace MaxShamaev\MetricsBundle\Infrastructure\Factory;
 
 use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface;
 use MaxShamaev\MetricsBundle\Infrastructure\Repository\MetricRepository;
-use StringBackedEnum;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 class MetricRepositoryFactory
@@ -25,16 +24,17 @@ class MetricRepositoryFactory
         $labels = [];
 
         foreach ($this->metricsEnumClassNames as $metricsEnumClassName) {
-            if (
-                !is_a($metricsEnumClassName, MetricLabelEnumInterface::class, true)
-                || !is_a($metricsEnumClassName, StringBackedEnum::class, true)
-            ) {
+            if (!is_a($metricsEnumClassName, MetricLabelEnumInterface::class, true)) {
                 continue;
             }
 
-            $labels[] = $metricsEnumClassName::cases();
+            foreach ($metricsEnumClassName::cases() as $case) {
+                if (is_string($case->value)) {
+                    $labels[] = $case;
+                }
+            }
         }
 
-        return new MetricRepository(array_merge(...$labels));
+        return new MetricRepository($labels);
     }
 }

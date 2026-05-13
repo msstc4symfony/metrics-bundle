@@ -5,10 +5,24 @@ declare(strict_types=1);
 namespace MaxShamaev\MetricsBundle\Infrastructure\Enum;
 
 use MaxShamaev\MetricsBundle\Infrastructure\Entity\Label;
-use Monolog\Level;
 
 enum MetricLabelEnum: string implements MetricLabelEnumInterface
 {
+    private const HTTP_METHODS = ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'HEAD'];
+
+    private const HTTP_METHODS_EXTENDED = ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'HEAD', 'OPTIONS'];
+
+    private const DOCTRINE_QUERY_TYPES = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'OTHER'];
+
+    private const ERROR_LEVEL_NAMES = [
+        'EMERGENCY',
+        'ALERT',
+        'CRITICAL',
+        'ERROR',
+        'WARNING',
+        'NOTICE',
+    ];
+
     case CONSOLE_COMMAND_START = 'console_command_start';
     case CONSOLE_COMMAND_FINISH = 'console_command_finish';
     case CONSOLE_COMMAND_DURATION_HISTOGRAM_SECONDS = 'console_command_duration_histogram_seconds';
@@ -132,16 +146,20 @@ enum MetricLabelEnum: string implements MetricLabelEnumInterface
     public function getLabels(): array
     {
         return match ($this) {
-            self::CONSOLE_COMMAND_START,  self::CONSOLE_COMMAND_FINISH, self::CONSOLE_COMMAND_DURATION_HISTOGRAM_SECONDS => [
+            self::CONSOLE_COMMAND_START,
+            self::CONSOLE_COMMAND_FINISH,
+            self::CONSOLE_COMMAND_DURATION_HISTOGRAM_SECONDS => [
                 new Label('command', MetricLabelTypeEnum::STRING, 'Command name'),
             ],
 
-            self::HTTP_REQUEST, self::REQUEST_DURATION_HISTOGRAM_SECONDS, self::REQUEST_DURATION_SUMMARY_SECONDS => [
-                new Label('method', MetricLabelTypeEnum::ENUM, 'HTTP method', ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'HEAD']),
+            self::HTTP_REQUEST,
+            self::REQUEST_DURATION_HISTOGRAM_SECONDS,
+            self::REQUEST_DURATION_SUMMARY_SECONDS => [
+                new Label('method', MetricLabelTypeEnum::ENUM, 'HTTP method', self::HTTP_METHODS),
                 new Label('route', MetricLabelTypeEnum::STRING, 'Route name or URL path'),
             ],
             self::HTTP_RESPONSE => [
-                new Label('method', MetricLabelTypeEnum::ENUM, 'HTTP method', ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'HEAD']),
+                new Label('method', MetricLabelTypeEnum::ENUM, 'HTTP method', self::HTTP_METHODS),
                 new Label('route', MetricLabelTypeEnum::STRING, 'Route name or URL path'),
                 new Label('status', MetricLabelTypeEnum::INTEGER, 'HTTP response status code'),
             ],
@@ -150,38 +168,39 @@ enum MetricLabelEnum: string implements MetricLabelEnumInterface
                 new Label('class', MetricLabelTypeEnum::STRING, 'Exception class'),
             ],
             self::ERROR => [
-                new Label(
-                    'level',
-                    MetricLabelTypeEnum::ENUM,
-                    'Level code',
-                    [Level::Emergency->getName(), Level::Alert->getName(), Level::Critical->getName(), Level::Error->getName(), Level::Warning->getName(), Level::Notice->getName()],
-                ),
+                new Label('level', MetricLabelTypeEnum::ENUM, 'Level code', self::ERROR_LEVEL_NAMES),
             ],
 
-            self::HTTP_CONNECTION_REQUEST, self::HTTP_CONNECTION_DURATION_HISTOGRAM_SECONDS => [
-                new Label('method', MetricLabelTypeEnum::ENUM, 'HTTP method', ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'HEAD', 'OPTIONS']),
+            self::HTTP_CONNECTION_REQUEST,
+            self::HTTP_CONNECTION_DURATION_HISTOGRAM_SECONDS => [
+                new Label('method', MetricLabelTypeEnum::ENUM, 'HTTP method', self::HTTP_METHODS_EXTENDED),
                 new Label('host', MetricLabelTypeEnum::STRING, 'Request host'),
                 new Label('path', MetricLabelTypeEnum::STRING, 'Request path'),
             ],
             self::HTTP_CONNECTION_RESPONSE => [
-                new Label('method', MetricLabelTypeEnum::ENUM, 'HTTP method', ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'HEAD', 'OPTIONS']),
+                new Label('method', MetricLabelTypeEnum::ENUM, 'HTTP method', self::HTTP_METHODS_EXTENDED),
                 new Label('host', MetricLabelTypeEnum::STRING, 'Request host'),
                 new Label('path', MetricLabelTypeEnum::STRING, 'Request path'),
                 new Label('status', MetricLabelTypeEnum::INTEGER, 'Response status code'),
             ],
 
-            self::DOCTRINE_QUERY_EXECUTE, self::DOCTRINE_QUERY_DURATION_HISTOGRAM_SECONDS => [
+            self::DOCTRINE_QUERY_EXECUTE,
+            self::DOCTRINE_QUERY_DURATION_HISTOGRAM_SECONDS => [
                 new Label('connection', MetricLabelTypeEnum::STRING, 'RDBMS host + DB name'),
-                new Label('type', MetricLabelTypeEnum::ENUM, 'Query type,', ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'OTHER']),
+                new Label('type', MetricLabelTypeEnum::ENUM, 'Query type', self::DOCTRINE_QUERY_TYPES),
                 new Label('table', MetricLabelTypeEnum::STRING, 'Table name'),
             ],
 
-            self::MONGODB_COMMAND_SUCCESS, self::MONGODB_COMMAND_FAILED, self::MONGODB_COMMAND_DURATION_HISTOGRAM_SECONDS => [
+            self::MONGODB_COMMAND_SUCCESS,
+            self::MONGODB_COMMAND_FAILED,
+            self::MONGODB_COMMAND_DURATION_HISTOGRAM_SECONDS => [
                 new Label('command', MetricLabelTypeEnum::STRING, 'Mongodb command'),
                 new Label('host', MetricLabelTypeEnum::STRING, 'Mongodb host'),
             ],
 
-            self::ELASTICA_REQUEST_SUCCESS, self::ELASTICA_REQUEST_FAILED, self::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS => [
+            self::ELASTICA_REQUEST_SUCCESS,
+            self::ELASTICA_REQUEST_FAILED,
+            self::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS => [
                 new Label('method', MetricLabelTypeEnum::STRING, 'Request method'),
                 new Label('path', MetricLabelTypeEnum::STRING, 'Request path'),
             ],
