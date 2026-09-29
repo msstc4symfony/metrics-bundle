@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Test\Unit\Infrastructure\Collector;
+namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Collector;
 
-use MaxShamaev\MetricsBundle\Infrastructure\Collector\AbstractCollector;
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\AbstractCollector;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface;
 
 final class TestableAbstractCollector extends AbstractCollector
 {

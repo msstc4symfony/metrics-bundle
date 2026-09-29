@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Test\Integration\Infrastructure\Monolog\Handler;
+namespace Msstc4Symfony\MetricsBundle\Test\Integration\Infrastructure\Monolog\Handler;
 
-use MaxShamaev\MetricsBundle\Infrastructure\Collector\ErrorCollector;
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
-use MaxShamaev\MetricsBundle\Infrastructure\Monolog\Handler\HandlerDecorator;
-use MaxShamaev\MetricsBundle\Infrastructure\Repository\MetricRepository;
 use Monolog\Level;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ErrorCollector;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Monolog\Handler\HandlerDecorator;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;

@@ -62,8 +62,8 @@ Service config lives in `src/Resources/config/services.yaml`. The Yaml file is l
 
 Two test suites:
 
-- **`tests/unit/`** — testsuite `unit`. Run by `make test`. PSR-4 namespace `MaxShamaev\MetricsBundle\Test\Unit\`. Coverage source (in `phpunit.xml.dist`) excludes `MetricsBundle.php` and `Infrastructure/HttpClient/HttpClientDecorator.php` (depends on `symfony/http-client`).
-- **`tests/integration/`** — testsuite `integration`. Run by `make test-integration` (uses separate `phpunit-integration.xml.dist`). PSR-4 namespace `MaxShamaev\MetricsBundle\Test\Integration\`. Tests use `markTestSkipped()` in `setUp()` if their optional dependency is missing.
+- **`tests/unit/`** — testsuite `unit`. Run by `make test`. PSR-4 namespace `Msstc4Symfony\MetricsBundle\Test\Unit\`. Coverage source (in `phpunit.xml.dist`) excludes `MetricsBundle.php` and `Infrastructure/HttpClient/HttpClientDecorator.php` (depends on `symfony/http-client`).
+- **`tests/integration/`** — testsuite `integration`. Run by `make test-integration` (uses separate `phpunit-integration.xml.dist`). PSR-4 namespace `Msstc4Symfony\MetricsBundle\Test\Integration\`. Tests use `markTestSkipped()` in `setUp()` if their optional dependency is missing.
 
 Optional dependencies for integration tests live in **`composer-integration.json`** (extends `composer.json` with `symfony/http-client`, `doctrine/dbal`, `mongodb/mongodb`, `ruflin/elastica`). Install via `make install-integration` (this replaces `vendor/` with the integration profile — to switch back run `composer install`).
 

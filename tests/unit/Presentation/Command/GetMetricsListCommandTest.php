@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Test\Unit\Presentation\Command;
+namespace Msstc4Symfony\MetricsBundle\Test\Unit\Presentation\Command;
 
-use MaxShamaev\MetricsBundle\Infrastructure\Entity\Metric;
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
-use MaxShamaev\MetricsBundle\Infrastructure\Repository\MetricRepositoryInterface;
-use MaxShamaev\MetricsBundle\Presentation\Command\GetMetricsListCommand;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Entity\Metric;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepositoryInterface;
+use Msstc4Symfony\MetricsBundle\Presentation\Command\GetMetricsListCommand;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
 

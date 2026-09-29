@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Infrastructure\Storage;
+namespace Msstc4Symfony\MetricsBundle\Infrastructure\Storage;
 
 use Override;
 use Prometheus\Storage\Adapter;

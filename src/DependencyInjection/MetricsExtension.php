@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\DependencyInjection;
+namespace Msstc4Symfony\MetricsBundle\DependencyInjection;
 
 use Exception;
 use Override;

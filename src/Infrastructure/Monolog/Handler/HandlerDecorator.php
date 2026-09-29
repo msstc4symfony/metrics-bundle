@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Infrastructure\Monolog\Handler;
+namespace Msstc4Symfony\MetricsBundle\Infrastructure\Monolog\Handler;
 
-use MaxShamaev\MetricsBundle\Infrastructure\Collector\ErrorCollector;
 use Monolog\Level;
 use Monolog\Logger;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ErrorCollector;
 use Override;
 use Psr\Log\LoggerInterface;
 use Stringable;

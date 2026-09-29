@@ -11,7 +11,7 @@ parameters:
   metrics_bundle.httpClientSanitizePath: true
 
   metrics_bundle.metric_enums:
-    - MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnum
+    - Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum
 
 services:
   _defaults:
@@ -21,7 +21,7 @@ services:
       $applicationName: '%metrics_bundle.applicationName%'
       $componentName: '%metrics_bundle.componentName%'
 
-  MaxShamaev\MetricsBundle\:
+  Msstc4Symfony\MetricsBundle\:
     resource: '../../'
     exclude:
       - '../../DependencyInjection/'
@@ -31,13 +31,13 @@ services:
       - '../../Infrastructure/Monolog/'
       - '../../MetricsBundle.php'
 
-  MaxShamaev\MetricsBundle\Infrastructure\Repository\MetricRepository:
-    class: MaxShamaev\MetricsBundle\Infrastructure\Repository\MetricRepository
-    factory: ['@MaxShamaev\MetricsBundle\Infrastructure\Factory\MetricRepositoryFactory', create]
+  Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository:
+    class: Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository
+    factory: ['@Msstc4Symfony\MetricsBundle\Infrastructure\Factory\MetricRepositoryFactory', create]
 
   Prometheus\Storage\Adapter:
     class: Prometheus\Storage\Adapter
-    factory: ['@MaxShamaev\MetricsBundle\Infrastructure\Storage\FactoryInterface', create]
+    factory: ['@Msstc4Symfony\MetricsBundle\Infrastructure\Storage\FactoryInterface', create]
     arguments:
       $dsn: '%metrics_bundle.dsn%'
 

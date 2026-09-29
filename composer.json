@@ -1,7 +1,13 @@
 {
-  "name": "max-shamaev-php/metrics-bundle",
+  "name": "msstc4symfony/metrics-bundle",
   "version": "1.0.0",
   "license": "MIT",
+  "authors": [
+    {
+      "name": "Maxim Shamaev",
+      "email": "maxim.shamaev@gmail.com"
+    }
+  ],
   "type": "symfony-bundle",
   "description": "Metrics bundle",
   "minimum-stability": "stable",
@@ -9,13 +15,13 @@
   "prefer-stable": true,
   "autoload": {
     "psr-4": {
-      "MaxShamaev\\MetricsBundle\\": "src/"
+      "Msstc4Symfony\\MetricsBundle\\": "src/"
     }
   },
   "autoload-dev": {
     "psr-4": {
-      "MaxShamaev\\MetricsBundle\\Test\\Unit\\": "tests/unit/",
-      "MaxShamaev\\MetricsBundle\\Test\\Integration\\": "tests/integration/"
+      "Msstc4Symfony\\MetricsBundle\\Test\\Unit\\": "tests/unit/",
+      "Msstc4Symfony\\MetricsBundle\\Test\\Integration\\": "tests/integration/"
     }
   },
   "require": {

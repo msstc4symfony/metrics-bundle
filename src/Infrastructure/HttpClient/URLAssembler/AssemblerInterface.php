@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Infrastructure\HttpClient\URLAssembler;
+namespace Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\URLAssembler;
 
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 

@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Infrastructure\Doctrine\ODM\Metrics;
+namespace Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\ODM\Metrics;
 
-use MaxShamaev\MetricsBundle\Infrastructure\Collector\MongoDbCollector;
 use MongoDB\Driver\Monitoring\CommandFailedEvent;
 use MongoDB\Driver\Monitoring\CommandStartedEvent;
 use MongoDB\Driver\Monitoring\CommandSubscriber;
 use MongoDB\Driver\Monitoring\CommandSucceededEvent;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\MongoDbCollector;
 use Override;
 use Symfony\Component\DependencyInjection\Attribute\Autoconfigure;
 

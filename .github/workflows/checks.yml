@@ -52,7 +52,7 @@ jobs:
           files: ./coverage.xml
           flags: unit
           fail_ci_if_error: true
-          slug: max-shamaev-php/metrics-bundle
+          slug: msstc4symfony/metrics-bundle
           token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Upload test results to Codecov
@@ -62,7 +62,7 @@ jobs:
           report_type: test_results
           flags: unit
           fail_ci_if_error: true
-          slug: max-shamaev-php/metrics-bundle
+          slug: msstc4symfony/metrics-bundle
           token: ${{ secrets.CODECOV_TOKEN }}
 
   integration:
@@ -108,7 +108,7 @@ jobs:
           files: ./coverage-integration.xml
           flags: integration
           fail_ci_if_error: true
-          slug: max-shamaev-php/metrics-bundle
+          slug: msstc4symfony/metrics-bundle
           token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Upload integration test results to Codecov
@@ -118,5 +118,5 @@ jobs:
           report_type: test_results
           flags: integration
           fail_ci_if_error: true
-          slug: max-shamaev-php/metrics-bundle
+          slug: msstc4symfony/metrics-bundle
           token: ${{ secrets.CODECOV_TOKEN }}

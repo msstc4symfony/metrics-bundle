@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Infrastructure\Collector;
+namespace Msstc4Symfony\MetricsBundle\Infrastructure\Collector;
 
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Symfony\Component\DependencyInjection\Attribute\Autoconfigure;
 
 #[Autoconfigure(tags: ['container.service_initializer'], public: true)]

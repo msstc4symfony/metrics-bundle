@@ -1,7 +1,7 @@
 # Metrics Symfony bundle
 
-![Build Status](https://github.com/max-shamaev-php/metrics-bundle/actions/workflows/checks.yml/badge.svg?branch=main)
-[![codecov](https://codecov.io/github/max-shamaev-php/metrics-bundle/graph/badge.svg?token=EoGwEpONxh)](https://codecov.io/github/max-shamaev-php/metrics-bundle)
+![Build Status](https://github.com/msstc4symfony/metrics-bundle/actions/workflows/checks.yml/badge.svg?branch=main)
+[![codecov](https://codecov.io/github/msstc4symfony/metrics-bundle/graph/badge.svg?token=EoGwEpONxh)](https://codecov.io/github/msstc4symfony/metrics-bundle)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Automatic collection of application runtime metrics and Prometheus-format export over HTTP. Drops into a Symfony app, observes the request, console, exception, log, DB and outbound HTTP layers without code changes, stores aggregated values in Redis (or any Prometheus storage adapter), and exposes them at `GET /_/metrics` for Prometheus to scrape.
@@ -30,7 +30,7 @@ Requires `ext-redis` and a Redis-compatible storage (or APCu / in-memory for tes
 ## Installation
 
 ```sh
-composer require max-shamaev-php/metrics-bundle
+composer require msstc4symfony/metrics-bundle
 ```
 
 Symfony Flex will auto-register the bundle. Otherwise add it to `config/bundles.php`:
@@ -38,7 +38,7 @@ Symfony Flex will auto-register the bundle. Otherwise add it to `config/bundles.
 ```php
 return [
     // ...
-    MaxShamaev\MetricsBundle\MetricsBundle::class => ['all' => true],
+    Msstc4Symfony\MetricsBundle\MetricsBundle::class => ['all' => true],
 ];
 ```
 
@@ -93,13 +93,13 @@ redis://user:pass@redis:6379/4?read_timeout=2&persistent_connections=1
 
 ## Adding a custom metric
 
-1. Implement a string-backed enum on `MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface` describing your metrics:
+1. Implement a string-backed enum on `Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface` describing your metrics:
 
     ```php
-    use MaxShamaev\MetricsBundle\Infrastructure\Entity\Label;
-    use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface;
-    use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelTypeEnum;
-    use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricTypeEnum;
+    use Msstc4Symfony\MetricsBundle\Infrastructure\Entity\Label;
+    use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface;
+    use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelTypeEnum;
+    use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricTypeEnum;
 
     enum AppMetrics: string implements MetricLabelEnumInterface
     {
@@ -132,11 +132,11 @@ redis://user:pass@redis:6379/4?read_timeout=2&persistent_connections=1
     ```yaml
     parameters:
         metrics_bundle.metric_enums:
-            - MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnum
+            - Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum
             - App\Metrics\AppMetrics
     ```
 
-3. Write a service that extends `MaxShamaev\MetricsBundle\Infrastructure\Collector\AbstractCollector` and exposes the methods you'll call from your code. The base collector takes care of registering the metric, applying the `application`/`component` labels, and catching storage errors.
+3. Write a service that extends `Msstc4Symfony\MetricsBundle\Infrastructure\Collector\AbstractCollector` and exposes the methods you'll call from your code. The base collector takes care of registering the metric, applying the `application`/`component` labels, and catching storage errors.
 
 ## Bundle parameters
 

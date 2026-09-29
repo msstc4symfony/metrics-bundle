@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Framework\EventListener;
+namespace Msstc4Symfony\MetricsBundle\Framework\EventListener;
 
-use MaxShamaev\MetricsBundle\Infrastructure\Collector\ConsoleCollector;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ConsoleCollector;
 use Symfony\Component\Console\ConsoleEvents;
 use Symfony\Component\Console\Event\ConsoleCommandEvent;
 use Symfony\Component\Console\Event\ConsoleTerminateEvent;

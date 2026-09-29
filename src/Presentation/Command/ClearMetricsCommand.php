@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Presentation\Command;
+namespace Msstc4Symfony\MetricsBundle\Presentation\Command;
 
 use Override;
 use Prometheus\Storage\Adapter;

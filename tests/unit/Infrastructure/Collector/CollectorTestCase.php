@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Test\Unit\Infrastructure\Collector;
+namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Collector;
 
 use Override;
 use PHPUnit\Framework\TestCase;

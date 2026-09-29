@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Infrastructure\Collector;
+namespace Msstc4Symfony\MetricsBundle\Infrastructure\Collector;
 
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface;
-use MaxShamaev\MetricsBundle\Infrastructure\Repository\MetricRepositoryInterface;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepositoryInterface;
 use Prometheus\RegistryInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Service\Attribute\Required;

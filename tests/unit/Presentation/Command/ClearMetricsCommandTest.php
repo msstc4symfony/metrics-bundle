@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Test\Unit\Presentation\Command;
+namespace Msstc4Symfony\MetricsBundle\Test\Unit\Presentation\Command;
 
-use MaxShamaev\MetricsBundle\Presentation\Command\ClearMetricsCommand;
+use Msstc4Symfony\MetricsBundle\Presentation\Command\ClearMetricsCommand;
 use PHPUnit\Framework\TestCase;
 use Prometheus\Storage\Adapter;
 use Symfony\Component\Console\Tester\CommandTester;

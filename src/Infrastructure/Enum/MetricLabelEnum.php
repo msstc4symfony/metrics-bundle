@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Infrastructure\Enum;
+namespace Msstc4Symfony\MetricsBundle\Infrastructure\Enum;
 
-use MaxShamaev\MetricsBundle\Infrastructure\Entity\Label;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Entity\Label;
 
 enum MetricLabelEnum: string implements MetricLabelEnumInterface
 {

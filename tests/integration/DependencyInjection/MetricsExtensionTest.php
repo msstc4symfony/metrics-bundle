@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Test\Integration\DependencyInjection;
+namespace Msstc4Symfony\MetricsBundle\Test\Integration\DependencyInjection;
 
-use MaxShamaev\MetricsBundle\DependencyInjection\MetricsExtension;
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
-use MaxShamaev\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\MetricsExtension;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
 use PHPUnit\Framework\TestCase;
 use Prometheus\RegistryInterface;
 use Prometheus\RendererInterface;

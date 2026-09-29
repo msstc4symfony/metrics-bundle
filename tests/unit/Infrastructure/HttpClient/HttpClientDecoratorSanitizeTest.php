@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Test\Unit\Infrastructure\HttpClient;
+namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\HttpClient;
 
-use MaxShamaev\MetricsBundle\Infrastructure\HttpClient\PathSanitizer;
+use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\PathSanitizer;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 

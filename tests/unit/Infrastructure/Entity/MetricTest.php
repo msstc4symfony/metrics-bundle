@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Test\Unit\Infrastructure\Entity;
+namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Entity;
 
-use MaxShamaev\MetricsBundle\Infrastructure\Entity\Label;
-use MaxShamaev\MetricsBundle\Infrastructure\Entity\Metric;
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelTypeEnum;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Entity\Label;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Entity\Metric;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelTypeEnum;
 use PHPUnit\Framework\TestCase;
 
 final class MetricTest extends TestCase

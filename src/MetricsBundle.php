@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle;
+namespace Msstc4Symfony\MetricsBundle;
 
-use MaxShamaev\MetricsBundle\DependencyInjection\Compiler\AddDoctrineDBALMonitorPass;
-use MaxShamaev\MetricsBundle\DependencyInjection\Compiler\AddHttpClientMonitorPass;
-use MaxShamaev\MetricsBundle\DependencyInjection\Compiler\AddMonologDecoratorCompilerPass;
-use MaxShamaev\MetricsBundle\DependencyInjection\Compiler\SaveElasticaClientsListPass;
-use MaxShamaev\MetricsBundle\DependencyInjection\MetricsExtension;
-use MaxShamaev\MetricsBundle\Infrastructure\Collector\ElasticaCollector;
-use MaxShamaev\MetricsBundle\Infrastructure\Doctrine\ODM\Metrics\TimingSubscriber;
-use MaxShamaev\MetricsBundle\Infrastructure\Elastica\TimingTransport;
 use MongoDB\Client;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler\AddDoctrineDBALMonitorPass;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler\AddHttpClientMonitorPass;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler\AddMonologDecoratorCompilerPass;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler\SaveElasticaClientsListPass;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\MetricsExtension;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ElasticaCollector;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\ODM\Metrics\TimingSubscriber;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Elastica\TimingTransport;
 use Override;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ContainerInterface;

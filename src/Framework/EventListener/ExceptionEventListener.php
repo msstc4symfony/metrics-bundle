@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Framework\EventListener;
+namespace Msstc4Symfony\MetricsBundle\Framework\EventListener;
 
-use MaxShamaev\MetricsBundle\Infrastructure\Collector\ErrorCollector;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ErrorCollector;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 

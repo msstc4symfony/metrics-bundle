@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Test\Unit\Infrastructure\Collector;
+namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Collector;
 
-use MaxShamaev\MetricsBundle\Infrastructure\Collector\RequestCollector;
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
-use MaxShamaev\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\RequestCollector;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
 
 final class RequestCollectorTest extends CollectorTestCase
 {

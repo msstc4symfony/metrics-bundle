@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Test\Unit\Infrastructure\Factory;
+namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Factory;
 
-use MaxShamaev\MetricsBundle\Infrastructure\Entity\Label;
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface;
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelTypeEnum;
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricTypeEnum;
-use MaxShamaev\MetricsBundle\Infrastructure\Factory\MetricRepositoryFactory;
-use MaxShamaev\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Entity\Label;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelTypeEnum;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricTypeEnum;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Factory\MetricRepositoryFactory;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
 use PHPUnit\Framework\TestCase;
 
 final class MetricRepositoryFactoryTest extends TestCase

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Test\Integration\DependencyInjection\Compiler;
+namespace Msstc4Symfony\MetricsBundle\Test\Integration\DependencyInjection\Compiler;
 
 use Doctrine\DBAL\Connection;
-use MaxShamaev\MetricsBundle\DependencyInjection\Compiler\AddDoctrineDBALMonitorPass;
-use MaxShamaev\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\Middleware;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler\AddDoctrineDBALMonitorPass;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\Middleware;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;

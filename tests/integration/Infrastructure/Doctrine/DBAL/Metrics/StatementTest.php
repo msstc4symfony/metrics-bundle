@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Test\Integration\Infrastructure\Doctrine\DBAL\Metrics;
+namespace Msstc4Symfony\MetricsBundle\Test\Integration\Infrastructure\Doctrine\DBAL\Metrics;
 
 use Doctrine\DBAL\Driver\Statement as StatementInterface;
-use MaxShamaev\MetricsBundle\Infrastructure\Collector\DoctrineConnectionCollector;
-use MaxShamaev\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\Statement;
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\DoctrineQueryTypeEnum;
-use MaxShamaev\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\DoctrineConnectionCollector;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\Statement;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\DoctrineQueryTypeEnum;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;

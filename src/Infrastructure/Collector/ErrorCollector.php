@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Infrastructure\Collector;
+namespace Msstc4Symfony\MetricsBundle\Infrastructure\Collector;
 
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
-use MaxShamaev\MetricsBundle\Infrastructure\Repository\MetricRepositoryInterface;
 use Monolog\Level;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepositoryInterface;
 use Override;
 use Prometheus\RegistryInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;

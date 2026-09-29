@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\DependencyInjection\Compiler;
+namespace Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler;
 
 use Elastica\Client;
 use Override;

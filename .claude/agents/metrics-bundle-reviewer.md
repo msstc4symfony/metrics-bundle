@@ -1,6 +1,6 @@
 ---
 name: metrics-bundle-reviewer
-description: Project-specific reviewer for max-shamaev-php/metrics-bundle. Verifies architectural invariants — collector hierarchy, MetricLabelEnum catalog, compiler-pass wiring, storage DSN handling, and PHPStan/Psalm baseline hygiene. Use PROACTIVELY when changes touch src/Infrastructure/Collector, src/Framework, src/DependencyInjection, src/Infrastructure/{Doctrine,Elastica,HttpClient,Monolog}, src/Infrastructure/Storage or MetricLabelEnum.
+description: Project-specific reviewer for msstc4symfony/metrics-bundle. Verifies architectural invariants — collector hierarchy, MetricLabelEnum catalog, compiler-pass wiring, storage DSN handling, and PHPStan/Psalm baseline hygiene. Use PROACTIVELY when changes touch src/Infrastructure/Collector, src/Framework, src/DependencyInjection, src/Infrastructure/{Doctrine,Elastica,HttpClient,Monolog}, src/Infrastructure/Storage or MetricLabelEnum.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
@@ -51,7 +51,7 @@ These wrap third-party shapes that don't satisfy strict generics. If a PR moves 
 ### 6. Tests & coverage
 - Only `tests/unit/` is wired. `Framework/*` and `Infrastructure/{Doctrine,Elastica,HttpClient,Monolog}` are excluded from the coverage source set — they're integration-shaped. Don't add code there without an integration plan (or move logic to a testable helper).
 - PHPUnit is strict (`failOnWarning`, `failOnRisky`, `failOnPhpunitDeprecation`, `beStrictAboutOutputDuringTests`). New tests must be silent and warning-free.
-- PSR-4 for tests: `MaxShamaev\MetricsBundle\Test\Unit\` → `tests/unit/`.
+- PSR-4 for tests: `Msstc4Symfony\MetricsBundle\Test\Unit\` → `tests/unit/`.
 
 ### 7. Symfony/PHP compatibility
 - `composer.json` requires PHP `>=8.1` and Symfony `^6.4|^7.0|^8.0`. PHPStan is at `phpVersion: 80300` and Rector targets `php81`. Don't introduce 8.2+ syntax (readonly classes, DNF types, etc.) without bumping `composer.json`.

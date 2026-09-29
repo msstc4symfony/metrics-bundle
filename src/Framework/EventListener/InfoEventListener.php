@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Framework\EventListener;
+namespace Msstc4Symfony\MetricsBundle\Framework\EventListener;
 
 use DateInterval;
-use MaxShamaev\MetricsBundle\Infrastructure\Collector\InfoCollector;
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\InfoCollector;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Psr\Cache\CacheItemInterface;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Contracts\Cache\CacheInterface;

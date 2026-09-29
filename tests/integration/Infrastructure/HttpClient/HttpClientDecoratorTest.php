@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Test\Integration\Infrastructure\HttpClient;
+namespace Msstc4Symfony\MetricsBundle\Test\Integration\Infrastructure\HttpClient;
 
-use MaxShamaev\MetricsBundle\Infrastructure\Collector\ExternalConnectionCollector;
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
-use MaxShamaev\MetricsBundle\Infrastructure\HttpClient\HttpClientDecorator;
-use MaxShamaev\MetricsBundle\Infrastructure\HttpClient\URLAssembler\AssemblerInterface;
-use MaxShamaev\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ExternalConnectionCollector;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
+use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\HttpClientDecorator;
+use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\URLAssembler\AssemblerInterface;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
 use Prometheus\Sample;

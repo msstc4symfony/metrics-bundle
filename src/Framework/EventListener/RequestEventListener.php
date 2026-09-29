@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Framework\EventListener;
+namespace Msstc4Symfony\MetricsBundle\Framework\EventListener;
 
-use MaxShamaev\MetricsBundle\Infrastructure\Collector\RequestCollector;
-use MaxShamaev\MetricsBundle\Presentation\Controller\GetMetricsController;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\RequestCollector;
+use Msstc4Symfony\MetricsBundle\Presentation\Controller\GetMetricsController;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\Event\TerminateEvent;

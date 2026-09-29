@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Infrastructure\Entity;
+namespace Msstc4Symfony\MetricsBundle\Infrastructure\Entity;
 
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface;
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricTypeEnum;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricTypeEnum;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 #[Exclude]

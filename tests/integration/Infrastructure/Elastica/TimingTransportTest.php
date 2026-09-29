@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Test\Integration\Infrastructure\Elastica;
+namespace Msstc4Symfony\MetricsBundle\Test\Integration\Infrastructure\Elastica;
 
 use Elastica\Request;
 use Elastica\Response;
 use Elastica\Transport\AbstractTransport;
 use LogicException;
-use MaxShamaev\MetricsBundle\Infrastructure\Collector\ElasticaCollector;
-use MaxShamaev\MetricsBundle\Infrastructure\Elastica\TimingTransport;
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
-use MaxShamaev\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ElasticaCollector;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Elastica\TimingTransport;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
 use Prometheus\Sample;

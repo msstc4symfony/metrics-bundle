@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Infrastructure\HttpClient;
+namespace Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient;
 
-use MaxShamaev\MetricsBundle\Infrastructure\Collector\ExternalConnectionCollector;
-use MaxShamaev\MetricsBundle\Infrastructure\HttpClient\URLAssembler\AssemblerInterface;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ExternalConnectionCollector;
+use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\URLAssembler\AssemblerInterface;
 use Override;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Contracts\HttpClient\HttpClientInterface;

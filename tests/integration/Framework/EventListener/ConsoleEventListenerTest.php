@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Test\Integration\Framework\EventListener;
+namespace Msstc4Symfony\MetricsBundle\Test\Integration\Framework\EventListener;
 
-use MaxShamaev\MetricsBundle\Framework\EventListener\ConsoleEventListener;
-use MaxShamaev\MetricsBundle\Infrastructure\Collector\ConsoleCollector;
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
-use MaxShamaev\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Framework\EventListener\ConsoleEventListener;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ConsoleCollector;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
 use Prometheus\Storage\InMemory;

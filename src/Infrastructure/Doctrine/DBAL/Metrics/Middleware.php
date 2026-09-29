@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics;
+namespace Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics;
 
 use Doctrine\DBAL\Driver as DriverInterface;
 use Doctrine\DBAL\Driver\Middleware as MiddlewareInterface;
-use MaxShamaev\MetricsBundle\Infrastructure\Collector\DoctrineConnectionCollector;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\DoctrineConnectionCollector;
 use Override;
 
 final readonly class Middleware implements MiddlewareInterface

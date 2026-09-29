@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Test\Integration\DependencyInjection\Compiler;
+namespace Msstc4Symfony\MetricsBundle\Test\Integration\DependencyInjection\Compiler;
 
 use Elastica\Client;
-use MaxShamaev\MetricsBundle\DependencyInjection\Compiler\SaveElasticaClientsListPass;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler\SaveElasticaClientsListPass;
 use PHPUnit\Framework\TestCase;
 use stdClass;
 use Symfony\Component\DependencyInjection\ContainerBuilder;

@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Infrastructure\Repository;
+namespace Msstc4Symfony\MetricsBundle\Infrastructure\Repository;
 
-use MaxShamaev\MetricsBundle\Infrastructure\Entity\Label;
-use MaxShamaev\MetricsBundle\Infrastructure\Entity\Metric;
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface;
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelTypeEnum;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Entity\Label;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Entity\Metric;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelTypeEnum;
 use Override;
 
 final class MetricRepository implements MetricRepositoryInterface

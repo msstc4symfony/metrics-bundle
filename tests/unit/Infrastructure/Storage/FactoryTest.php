@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Test\Unit\Infrastructure\Storage;
+namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Storage;
 
-use MaxShamaev\MetricsBundle\Infrastructure\Storage\Factory;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Storage\Factory;
 use PHPUnit\Framework\TestCase;
 use Prometheus\Storage\APC;
 use Prometheus\Storage\APCng;

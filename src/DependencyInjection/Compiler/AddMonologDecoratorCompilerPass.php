@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\DependencyInjection\Compiler;
+namespace Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler;
 
-use MaxShamaev\MetricsBundle\Infrastructure\Monolog\Handler\HandlerDecorator;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Monolog\Handler\HandlerDecorator;
 use Override;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;

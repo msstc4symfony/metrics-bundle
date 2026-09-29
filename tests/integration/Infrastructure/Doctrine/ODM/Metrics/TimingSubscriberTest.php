@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Test\Integration\Infrastructure\Doctrine\ODM\Metrics;
+namespace Msstc4Symfony\MetricsBundle\Test\Integration\Infrastructure\Doctrine\ODM\Metrics;
 
-use MaxShamaev\MetricsBundle\Infrastructure\Collector\MongoDbCollector;
-use MaxShamaev\MetricsBundle\Infrastructure\Doctrine\ODM\Metrics\TimingSubscriber;
-use MaxShamaev\MetricsBundle\Infrastructure\Repository\MetricRepository;
 use MongoDB\Driver\Monitoring\CommandSubscriber;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\MongoDbCollector;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\ODM\Metrics\TimingSubscriber;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
 use Prometheus\Storage\InMemory;

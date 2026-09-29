@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics;
+namespace Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics;
 
 use Doctrine\DBAL\Driver\Middleware\AbstractStatementMiddleware;
 use Doctrine\DBAL\Driver\Result as ResultInterface;
 use Doctrine\DBAL\Driver\Statement as StatementInterface;
-use MaxShamaev\MetricsBundle\Infrastructure\Collector\DoctrineConnectionCollector;
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\DoctrineQueryTypeEnum;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\DoctrineConnectionCollector;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\DoctrineQueryTypeEnum;
 use Override;
 
 final class Statement extends AbstractStatementMiddleware

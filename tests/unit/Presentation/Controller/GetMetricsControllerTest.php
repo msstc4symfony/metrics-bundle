@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Test\Unit\Presentation\Controller;
+namespace Msstc4Symfony\MetricsBundle\Test\Unit\Presentation\Controller;
 
-use MaxShamaev\MetricsBundle\Presentation\Controller\GetMetricsController;
+use Msstc4Symfony\MetricsBundle\Presentation\Controller\GetMetricsController;
 use PHPUnit\Framework\TestCase;
 use Prometheus\MetricFamilySamples;
 use Prometheus\RegistryInterface;

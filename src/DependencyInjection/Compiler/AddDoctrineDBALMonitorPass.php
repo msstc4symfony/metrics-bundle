@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\DependencyInjection\Compiler;
+namespace Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler;
 
 use Doctrine\DBAL\Connection;
-use MaxShamaev\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\Middleware;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\Middleware;
 use Override;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Test\Integration\DependencyInjection\Compiler;
+namespace Msstc4Symfony\MetricsBundle\Test\Integration\DependencyInjection\Compiler;
 
-use MaxShamaev\MetricsBundle\DependencyInjection\Compiler\DefinitionFilter;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler\DefinitionFilter;
 use PHPUnit\Framework\TestCase;
 use stdClass;
 use Symfony\Component\DependencyInjection\Definition;

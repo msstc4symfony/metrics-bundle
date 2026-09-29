@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics;
+namespace Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics;
 
 use Doctrine\DBAL\Driver\Connection as ConnectionInterface;
 use Doctrine\DBAL\Driver\Middleware\AbstractConnectionMiddleware;
 use Doctrine\DBAL\Driver\Statement as DriverStatement;
-use MaxShamaev\MetricsBundle\Infrastructure\Collector\DoctrineConnectionCollector;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\DoctrineConnectionCollector;
 use Override;
 
 final class Connection extends AbstractConnectionMiddleware

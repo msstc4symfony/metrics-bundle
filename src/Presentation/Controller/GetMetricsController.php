@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Presentation\Controller;
+namespace Msstc4Symfony\MetricsBundle\Presentation\Controller;
 
 use Prometheus\RegistryInterface;
 use Prometheus\RendererInterface;

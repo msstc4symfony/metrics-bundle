@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace MaxShamaev\MetricsBundle\Presentation\Command;
+namespace Msstc4Symfony\MetricsBundle\Presentation\Command;
 
-use MaxShamaev\MetricsBundle\Infrastructure\Entity\Label;
-use MaxShamaev\MetricsBundle\Infrastructure\Enum\MetricLabelTypeEnum;
-use MaxShamaev\MetricsBundle\Infrastructure\Repository\MetricRepositoryInterface;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Entity\Label;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelTypeEnum;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepositoryInterface;
 use Override;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
