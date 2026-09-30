@@ -38,7 +38,7 @@
     "doctrine/dbal": "^3.0|^4.0",
     "friendsofphp/php-cs-fixer": "^3.55",
     "infection/infection": "^0.32",
-    "mongodb/mongodb": "^1.17|^2.0",
+    "mongodb/mongodb": "^2.1",
     "phpstan/extension-installer": "^1.4",
     "phpstan/phpstan": "^2.1",
     "phpstan/phpstan-beberlei-assert": "^2.0",
@@ -62,6 +62,9 @@
     "symfony/http-client": "To collect outbound HTTP request metrics"
   },
   "config": {
+    "platform": {
+      "ext-mongodb": "2.5.2"
+    },
     "allow-plugins": {
       "composer/package-versions-deprecated": true,
       "infection/extension-installer": true,

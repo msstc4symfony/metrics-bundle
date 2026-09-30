@@ -63,8 +63,8 @@ final class FactoryTest extends TestCase
 
     public function testApcSchemeReturnsApcAdapter(): void
     {
-        if (!extension_loaded('apcu')) {
-            self::markTestSkipped('apcu extension required');
+        if (!extension_loaded('apcu') || !apcu_enabled()) {
+            self::markTestSkipped('apcu extension with apc.enable_cli=1 required');
         }
 
         $factory = new Factory();
@@ -74,8 +74,8 @@ final class FactoryTest extends TestCase
 
     public function testApcngSchemeReturnsApcngAdapter(): void
     {
-        if (!extension_loaded('apcu')) {
-            self::markTestSkipped('apcu extension required');
+        if (!extension_loaded('apcu') || !apcu_enabled()) {
+            self::markTestSkipped('apcu extension with apc.enable_cli=1 required');
         }
 
         $factory = new Factory();
