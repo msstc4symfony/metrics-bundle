@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler;
 
 use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\HttpClientDecorator;
+use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\URLAssembler\AssemblerInterface;
 use Override;
+use Symfony\Component\DependencyInjection\Argument\TaggedIteratorArgument;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
@@ -13,15 +15,12 @@ use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\HttpClient\ScopingHttpClient;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
-/** @phpstan-ignore function.notFound */
-use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_iterator;
-
 final class AddHttpClientMonitorPass implements CompilerPassInterface
 {
     #[Override]
     public function process(ContainerBuilder $container): void
     {
-        if (!class_exists(HttpClientInterface::class)) {
+        if (!interface_exists(HttpClientInterface::class)) {
             return;
         }
 
@@ -38,8 +37,7 @@ final class AddHttpClientMonitorPass implements CompilerPassInterface
             $decoratorDefinition = new Definition(HttpClientDecorator::class)
                 ->setAutowired(true)
                 ->setArgument('$inner', new Reference($decoratorId . '.inner'))
-                /** @phpstan-ignore function.notFound */
-                ->setArgument('$urlAssemblers', tagged_iterator('metrics.htp_client.url_assembler'))
+                ->setArgument('$urlAssemblers', new TaggedIteratorArgument(AssemblerInterface::TAG))
                 ->setDecoratedService($id)
             ;
 

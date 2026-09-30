@@ -31,6 +31,14 @@ final readonly class Factory implements FactoryInterface
 
     private const bool DEFAULT_REDIS_PERSISTENT_CONNECTIONS = false;
 
+    /**
+     * parse_url() rejects "scheme://" with nothing after it, yet that is the natural
+     * DSN for storages that have no host.
+     *
+     * @var list<non-empty-string>
+     */
+    private const array HOSTLESS_SCHEMES = ['apc', 'apcng', 'inmemory'];
+
     public function __construct(
         private LoggerInterface $logger = new NullLogger(),
     ) {
@@ -39,7 +47,7 @@ final readonly class Factory implements FactoryInterface
     #[Override]
     public function create(string $dsn): Adapter
     {
-        $parts = parse_url($dsn);
+        $parts = $this->parseDsn($dsn);
         if ($parts === false) {
             $this->logger->error('metrics-bundle: malformed METRICS_STORAGE_DSN, falling back to InMemory storage', [
                 'dsn_scheme' => 'invalid',
@@ -50,13 +58,14 @@ final readonly class Factory implements FactoryInterface
 
         $query = [];
         if (isset($parts['query'])) {
-            parse_str($parts['query'], $query);
+            parse_str($parts['query'], $raw);
 
-            /** @var array<string, string> $query */
-            $query = array_combine(
-                array_map(strval(...), array_keys($query)),
-                array_map(strval(...), array_values($query)),
-            );
+            foreach ($raw as $key => $value) {
+                // Nested keys such as "a[]=1" produce arrays; no supported option takes one.
+                if (is_string($value)) {
+                    $query[(string) $key] = $value;
+                }
+            }
         }
 
         $scheme = $parts['scheme'] ?? null;
@@ -89,6 +98,34 @@ final readonly class Factory implements FactoryInterface
         }
 
         return $adapter;
+    }
+
+    /**
+     * @return array{
+     *     scheme?: string,
+     *     host?: string,
+     *     port?: int<0, 65535>,
+     *     user?: string,
+     *     pass?: string,
+     *     path?: string,
+     *     query?: string,
+     *     fragment?: string,
+     * }|false
+     */
+    private function parseDsn(string $dsn): array|false
+    {
+        $parts = parse_url($dsn);
+        if ($parts !== false) {
+            return $parts;
+        }
+
+        foreach (self::HOSTLESS_SCHEMES as $scheme) {
+            if ($dsn === $scheme . '://') {
+                return ['scheme' => $scheme];
+            }
+        }
+
+        return false;
     }
 
     /**

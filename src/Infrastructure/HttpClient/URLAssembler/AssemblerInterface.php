@@ -6,9 +6,11 @@ namespace Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\URLAssembler;
 
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
-#[AutoconfigureTag('metrics.htp_client.url_assembler')]
+#[AutoconfigureTag(self::TAG)]
 interface AssemblerInterface
 {
+    public const string TAG = 'metrics.http_client.url_assembler';
+
     /**
      * @return array{string, string}|null
      */

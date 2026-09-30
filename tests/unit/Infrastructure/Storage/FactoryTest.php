@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Storage;
 
 use Msstc4Symfony\MetricsBundle\Infrastructure\Storage\Factory;
+use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Prometheus\Storage\APC;
 use Prometheus\Storage\APCng;
 use Prometheus\Storage\InMemory;
 use Prometheus\Storage\Redis;
 use Prometheus\Storage\RedisNg;
+use Psr\Log\AbstractLogger;
 use Psr\Log\LoggerInterface;
+use Stringable;
 
 final class FactoryTest extends TestCase
 {
@@ -20,6 +24,41 @@ final class FactoryTest extends TestCase
         $factory = new Factory();
 
         self::assertInstanceOf(InMemory::class, $factory->create('inmemory://anything'));
+    }
+
+    #[DataProvider('provideHostlessDsns')]
+    public function testHostlessDsnIsNotRejectedAsMalformed(string $dsn): void
+    {
+        $logger = new class extends AbstractLogger {
+            /** @var list<string> */
+            public array $messages = [];
+
+            #[Override]
+            public function log(mixed $level, string|Stringable $message, array $context = []): void
+            {
+                $this->messages[] = (string) $message;
+            }
+        };
+
+        new Factory($logger)->create($dsn);
+
+        self::assertSame(
+            [],
+            array_values(array_filter(
+                $logger->messages,
+                static fn (string $message): bool => str_contains($message, 'malformed'),
+            )),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{non-empty-string}>
+     */
+    public static function provideHostlessDsns(): iterable
+    {
+        yield 'apc' => ['apc://'];
+        yield 'apcng' => ['apcng://'];
+        yield 'inmemory' => ['inmemory://'];
     }
 
     public function testApcSchemeReturnsApcAdapter(): void
