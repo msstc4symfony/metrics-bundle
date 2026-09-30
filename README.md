@@ -59,7 +59,16 @@ APPLICATION_NAME=my-app
 COMPONENT_NAME=http
 ```
 
-The bundle registers a route `GET /_/metrics`. **The endpoint is unauthenticated by default and leaks operational data (route names, table names, outbound hosts, exception classes).** Restrict it in your host app's firewall:
+Import the endpoint route — bundles cannot add routes on their own:
+
+```yaml
+# config/routes/metrics.yaml
+metrics:
+    resource: '@MetricsBundle/Presentation/Controller/'
+    type: attribute
+```
+
+This adds `GET /_/metrics`. **The endpoint is unauthenticated by default and leaks operational data (route names, table names, outbound hosts, exception classes).** Restrict it in your host app's firewall:
 
 ```yaml
 # config/packages/security.yaml

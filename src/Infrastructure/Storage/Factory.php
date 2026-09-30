@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Infrastructure\Storage;
 
+use Monolog\Attribute\WithMonologChannel;
 use Override;
 use Prometheus\Storage\Adapter;
 use Prometheus\Storage\APC;
@@ -15,8 +16,13 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Throwable;
 
+// Its own channel keeps the storage logger out of the metrics HandlerDecorator:
+// decorating it would make the adapter depend on ErrorCollector, which needs the adapter.
+#[WithMonologChannel(self::LOG_CHANNEL)]
 final readonly class Factory implements FactoryInterface
 {
+    public const string LOG_CHANNEL = 'metrics';
+
     private const string DEFAULT_REDIS_HOST = '127.0.0.1';
 
     private const int DEFAULT_REDIS_PORT = 6379;

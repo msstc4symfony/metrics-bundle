@@ -14,6 +14,22 @@
 `parse_url('apc://')` === `false` → «malformed DSN» → InMemory, то есть метрики
 APCu не шарились между воркерами. Исправлено разбором схем без хоста.
 
+## Бандл не запускался в приложении с Monolog
+
+Цикл: `Storage\Factory` → `LoggerInterface` (задекорирован `HandlerDecorator`) →
+`ErrorCollector` → `RegistryInterface` → `Adapter` → `Factory`. Контейнер не
+собирался вообще; тесты компилер-пассов на голом `ContainerBuilder` этого не видели.
+Исправлено: `Factory` пишет в свой канал `metrics` (`#[WithMonologChannel]`), канал
+исключён из декорирования. Ловит `tests/integration/ContainerCompileTest`
+(настоящее ядро: Framework + Monolog + Metrics). `monolog/monolog ^3.5` объявлен явно —
+атрибут и `Monolog\Level` есть только в 3.x.
+
+## Маршрут `/_/metrics` не регистрируется сам
+
+Бандл не может добавить маршрут; приложение импортирует
+`@MetricsBundle/Presentation/Controller/` (`type: attribute`). README раньше
+утверждал обратное.
+
 ## `symfony/yaml` не был объявлен
 
 `MetricsExtension` грузит `services.yaml`, пакет приходил транзитивно (deptrac).

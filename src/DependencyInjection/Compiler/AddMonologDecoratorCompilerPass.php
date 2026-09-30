@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler;
 
 use Msstc4Symfony\MetricsBundle\Infrastructure\Monolog\Handler\HandlerDecorator;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Storage\Factory;
 use Override;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -15,6 +16,7 @@ final class AddMonologDecoratorCompilerPass implements CompilerPassInterface
         'profiling',
         'removal_request',
         'deprecation',
+        Factory::LOG_CHANNEL,
     ];
 
     #[Override]
