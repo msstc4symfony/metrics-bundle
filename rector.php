@@ -6,12 +6,8 @@ use Rector\CodingStyle\Rector\Catch_\CatchExceptionNameMatchingTypeRector;
 use Rector\CodingStyle\Rector\PostInc\PostIncDecToPreIncDecRector;
 use Rector\CodingStyle\Rector\Stmt\NewlineAfterStatementRector;
 use Rector\Config\RectorConfig;
-use Rector\EarlyReturn\Rector\If_\ChangeOrIfContinueToMultiContinueRector;
-use Rector\EarlyReturn\Rector\Return_\ReturnBinaryOrToEarlyReturnRector;
 use Rector\Php80\Rector\Class_\ClassPropertyAssignToConstructorPromotionRector;
 use Rector\PHPUnit\AnnotationsToAttributes\Rector\Class_\CoversAnnotationWithValueToAttributeRector;
-use Rector\Strict\Rector\Empty_\DisallowedEmptyRuleFixerRector;
-use Rector\Symfony\CodeQuality\Rector\ClassMethod\ActionSuffixRemoverRector;
 
 return RectorConfig::configure()
     ->withPaths([
@@ -43,14 +39,10 @@ return RectorConfig::configure()
     ->withSkip(
         [
             ClassPropertyAssignToConstructorPromotionRector::class,
-            ChangeOrIfContinueToMultiContinueRector::class,
-            ReturnBinaryOrToEarlyReturnRector::class,
             PostIncDecToPreIncDecRector::class,
-            DisallowedEmptyRuleFixerRector::class,
             NewlineAfterStatementRector::class,
             CatchExceptionNameMatchingTypeRector::class,
             CoversAnnotationWithValueToAttributeRector::class,
-            ActionSuffixRemoverRector::class,
         ],
     )
 ;

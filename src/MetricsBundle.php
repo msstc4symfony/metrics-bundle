@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle;
 
+use Elastica\Client as ElasticaClient;
+use Elastica\Transport\AbstractTransport;
 use MongoDB\Client;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler\AddDoctrineDBALMonitorPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler\AddHttpClientMonitorPass;
@@ -61,9 +63,8 @@ final class MetricsBundle extends Bundle
             return;
         }
 
-        /** @var ?TimingSubscriber $subscriber */
         $subscriber = $container->get(TimingSubscriber::class, ContainerInterface::NULL_ON_INVALID_REFERENCE);
-        if ($subscriber === null) {
+        if (!$subscriber instanceof TimingSubscriber) {
             return;
         }
 
@@ -72,8 +73,12 @@ final class MetricsBundle extends Bundle
 
     private function wireElasticaTransports(ContainerInterface $container): void
     {
+        // TimingTransport hooks the Elastica 7 connection/transport API, which Elastica 8 removed.
+        if (!class_exists(AbstractTransport::class)) {
+            return;
+        }
+
         try {
-            /** @var string[]|null $ids */
             $ids = $container->getParameter('metrics.elastica.clients');
         } catch (Throwable) {
             // SaveElasticaClientsListPass did not run (Elastica not installed) — nothing to wire.
@@ -84,26 +89,22 @@ final class MetricsBundle extends Bundle
             return;
         }
 
-        /** @var ?ElasticaCollector $collector */
         $collector = $container->get(ElasticaCollector::class, ContainerInterface::NULL_ON_INVALID_REFERENCE);
-        if ($collector === null) {
+        if (!$collector instanceof ElasticaCollector) {
             return;
         }
 
-        /** @var string $id */
         foreach ($ids as $id) {
-            $client = $container->get($id);
-            if (!$client instanceof \Elastica\Client || !method_exists($client, 'getConnections')) {
+            $client = is_string($id) ? $container->get($id, ContainerInterface::NULL_ON_INVALID_REFERENCE) : null;
+            if (!$client instanceof ElasticaClient) {
                 continue;
             }
 
-            /** @var \Elastica\Connection $connection */
             foreach ($client->getConnections() as $connection) {
-                if (!method_exists($connection, 'setTransport')) {
-                    continue;
-                }
-
-                $connection->setTransport(
+                // Elastica 7 phpdoc narrows setTransport() to array|string; setParam() takes the
+                // transport object that AbstractTransport::create() accepts at runtime.
+                $connection->setParam(
+                    'transport',
                     new TimingTransport()->init($connection->getTransportObject(), $collector),
                 );
             }

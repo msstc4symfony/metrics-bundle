@@ -10,16 +10,9 @@ parameters:
     paths:
         - src/
         - tests/unit/
+        - tests/integration/
     excludePaths:
         - src/Framework/Profiling/Processor/EndSpan/MetricProcessor.php
-        - src/Infrastructure/Doctrine/DBAL/Metrics/Connection.php
-        - src/Infrastructure/Doctrine/DBAL/Metrics/Driver.php
-        - src/Infrastructure/Doctrine/DBAL/Metrics/Middleware.php
-        - src/Infrastructure/Doctrine/DBAL/Metrics/Statement.php
-        - src/Infrastructure/Elastica/TimingTransport.php
-        - src/Infrastructure/Enum/MetricLabelEnum.php
-        - src/Infrastructure/Enum/MetricLabelEnumInterface.php
-        - src/Infrastructure/HttpClient/HttpClientDecorator.php
 
 includes:
     - phpstan-baseline.neon

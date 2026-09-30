@@ -7,6 +7,7 @@ namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Collector;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
+use Prometheus\MetricFamilySamples;
 use Prometheus\Sample;
 use Prometheus\Storage\InMemory;
 
@@ -41,6 +42,6 @@ abstract class CollectorTestCase extends TestCase
 
     protected function familyExists(string $name): bool
     {
-        return array_any($this->registry->getMetricFamilySamples(), fn ($family): bool => $family->getName() === $name);
+        return array_any($this->registry->getMetricFamilySamples(), fn (MetricFamilySamples $family): bool => $family->getName() === $name);
     }
 }

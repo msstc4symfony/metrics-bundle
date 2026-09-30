@@ -11,6 +11,7 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\URLAssembler\Assembler
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
+use Prometheus\MetricFamilySamples;
 use Prometheus\Sample;
 use Prometheus\Storage\InMemory;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -34,9 +35,9 @@ final class HttpClientDecoratorTest extends TestCase
 
     public function testRequestRecordsRequestResponseAndDurationMetrics(): void
     {
-        $response = $this->createMock(ResponseInterface::class);
+        $response = self::createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(200);
-        $response->method('getInfo')->willReturn(['start_time' => microtime(true) - 0.1]);
+        $response->method('getInfo')->willReturnMap([['start_time', microtime(true) - 0.1]]);
 
         $inner = $this->createMock(HttpClientInterface::class);
         $inner->expects(self::once())
@@ -61,11 +62,11 @@ final class HttpClientDecoratorTest extends TestCase
 
     public function testRequestSkipsDurationWhenStartTimeIsZero(): void
     {
-        $response = $this->createMock(ResponseInterface::class);
+        $response = self::createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(204);
-        $response->method('getInfo')->willReturn(['start_time' => 0.0]);
+        $response->method('getInfo')->willReturnMap([['start_time', 0.0]]);
 
-        $inner = $this->createMock(HttpClientInterface::class);
+        $inner = self::createStub(HttpClientInterface::class);
         $inner->method('request')->willReturn($response);
 
         $decorator = new HttpClientDecorator($inner, $this->collector, []);
@@ -76,11 +77,11 @@ final class HttpClientDecoratorTest extends TestCase
 
     public function testRequestKeepsRawPathWhenSanitizeDisabled(): void
     {
-        $response = $this->createMock(ResponseInterface::class);
+        $response = self::createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(200);
-        $response->method('getInfo')->willReturn(['start_time' => 0.0]);
+        $response->method('getInfo')->willReturnMap([['start_time', 0.0]]);
 
-        $inner = $this->createMock(HttpClientInterface::class);
+        $inner = self::createStub(HttpClientInterface::class);
         $inner->method('request')->willReturn($response);
 
         $decorator = new HttpClientDecorator($inner, $this->collector, [], sanitizePath: false);
@@ -101,11 +102,11 @@ final class HttpClientDecoratorTest extends TestCase
             }
         };
 
-        $response = $this->createMock(ResponseInterface::class);
+        $response = self::createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(200);
-        $response->method('getInfo')->willReturn(['start_time' => 0.0]);
+        $response->method('getInfo')->willReturnMap([['start_time', 0.0]]);
 
-        $inner = $this->createMock(HttpClientInterface::class);
+        $inner = self::createStub(HttpClientInterface::class);
         $inner->method('request')->willReturn($response);
 
         $decorator = new HttpClientDecorator($inner, $this->collector, [$assembler]);
@@ -119,11 +120,11 @@ final class HttpClientDecoratorTest extends TestCase
 
     public function testRelativeUrlIsResolvedAgainstBaseUri(): void
     {
-        $response = $this->createMock(ResponseInterface::class);
+        $response = self::createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(200);
-        $response->method('getInfo')->willReturn(['start_time' => 0.0]);
+        $response->method('getInfo')->willReturnMap([['start_time', 0.0]]);
 
-        $inner = $this->createMock(HttpClientInterface::class);
+        $inner = self::createStub(HttpClientInterface::class);
         $inner->method('request')->willReturn($response);
 
         $decorator = new HttpClientDecorator($inner, $this->collector, [], baseUri: 'https://api.example.com');
@@ -138,11 +139,10 @@ final class HttpClientDecoratorTest extends TestCase
     public function testWithOptionsReturnsCloneWithoutMutatingOriginal(): void
     {
         $inner = $this->createMock(HttpClientInterface::class);
-        $newInner = $this->createMock(HttpClientInterface::class);
         $inner->expects(self::once())
             ->method('withOptions')
             ->with(['timeout' => 1])
-            ->willReturn($newInner)
+            ->willReturnSelf()
         ;
 
         $decorator = new HttpClientDecorator($inner, $this->collector, []);
@@ -172,6 +172,6 @@ final class HttpClientDecoratorTest extends TestCase
 
     private function familyExists(string $name): bool
     {
-        return array_any($this->registry->getMetricFamilySamples(), fn ($family): bool => $family->getName() === $name);
+        return array_any($this->registry->getMetricFamilySamples(), fn (MetricFamilySamples $family): bool => $family->getName() === $name);
     }
 }

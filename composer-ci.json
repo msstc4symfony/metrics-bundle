@@ -1,6 +1,5 @@
 {
   "name": "msstc4symfony/metrics-bundle",
-  "version": "1.0.0",
   "license": "MIT",
   "authors": [
     {
@@ -9,7 +8,7 @@
     }
   ],
   "type": "symfony-bundle",
-  "description": "Metrics bundle (integration test profile — installs optional libraries so integration tests run)",
+  "description": "Metrics bundle (CI profile — installs optional libraries and CI-only tools)",
   "minimum-stability": "stable",
   "keywords": ["php", "symfony", "metrics"],
   "prefer-stable": true,
@@ -32,11 +31,13 @@
     "symfony/console": "^6.4|^7.0|^8.0",
     "symfony/event-dispatcher": "^6.4|^7.0|^8.0",
     "symfony/framework-bundle": "^6.4|^7.0|^8.0",
-    "symfony/monolog-bundle": "^3.11.0"
+    "symfony/monolog-bundle": "^3.11|^4.0"
   },
   "require-dev": {
+    "deptrac/deptrac": "^4.6",
     "doctrine/dbal": "^3.0|^4.0",
     "friendsofphp/php-cs-fixer": "^3.55",
+    "infection/infection": "^0.32",
     "mongodb/mongodb": "^1.17|^2.0",
     "phpstan/extension-installer": "^1.4",
     "phpstan/phpstan": "^2.1",
@@ -47,12 +48,14 @@
     "phpunit/phpunit": ">=10.5",
     "roave/security-advisories": "dev-latest",
     "rector/rector": "^2.1",
-    "ruflin/elastica": "^7.0|^8.0",
+    "roave/backward-compatibility-check": "^8.20",
+    "ruflin/elastica": "^7.3",
     "spaze/phpstan-disallowed-calls": "^v4.0",
     "symfony/http-client": "^6.4|^7.0|^8.0"
   },
   "suggest": {
     "doctrine/dbal": "To collect Doctrine DBAL query metrics",
+    "ext-apcu": "To store metrics in APCu (apc:// and apcng:// storage DSNs)",
     "ext-mongodb": "To collect MongoDB driver command metrics",
     "mongodb/mongodb": "To use MongoDB ODM TimingSubscriber",
     "ruflin/elastica": "To collect Elastica request metrics",
@@ -61,6 +64,7 @@
   "config": {
     "allow-plugins": {
       "composer/package-versions-deprecated": true,
+      "infection/extension-installer": true,
       "phpstan/extension-installer": true
     },
     "sort-packages": true

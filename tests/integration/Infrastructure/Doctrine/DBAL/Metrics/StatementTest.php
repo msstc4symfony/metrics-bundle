@@ -74,7 +74,7 @@ final class StatementTest extends TestCase
         $collector = new DoctrineConnectionCollector($registry, new MetricRepository([]), 'app', 'cmp');
 
         return new Statement(
-            $this->createMock(StatementInterface::class),
+            self::createStub(StatementInterface::class),
             $collector,
             'default',
             $sql,

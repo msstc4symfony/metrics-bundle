@@ -1,24 +1,31 @@
-check: ## Check code
+PHPSTAN_CONFIG ?= phpstan.dist.neon
+
+check: ## Check code (expects the composer-ci.json install, see install-ci)
 	find ./ -name '*.php' -not -path './vendor/*' | xargs -r php -l
-	vendor/bin/phpstan --memory-limit=512M
+	vendor/bin/phpstan analyse --memory-limit=512M -c $(PHPSTAN_CONFIG)
 	vendor/bin/php-cs-fixer check
+	composer validate --strict --no-check-publish
 	composer audit
 	vendor/bin/rector process -n
+	vendor/bin/deptrac analyse --config-file=deptrac.yaml --no-progress
 
-test: ## Test code (unit suite)
+test: ## Test code (integration tests skip themselves when optional libraries are missing)
+	vendor/bin/phpunit
+
+test-unit: ## Test code (unit suite only)
 	vendor/bin/phpunit --testsuite=unit
 
-test-integration: ## Test code (integration suite — requires composer-integration.json deps)
-	vendor/bin/phpunit -c phpunit-integration.xml.dist
+test-integration: ## Test code (integration suite only, needs the composer-ci.json install)
+	vendor/bin/phpunit --testsuite=integration
 
-test-with-coverage: ## Test code with coverage (unit suite)
-	XDEBUG_MODE=coverage vendor/bin/phpunit --testsuite=unit --coverage-html coverage
+test-with-coverage: ## Test code with coverage
+	XDEBUG_MODE=coverage vendor/bin/phpunit --coverage-html coverage
 
-test-integration-with-coverage: ## Test integration suite with coverage (requires composer-integration.json deps)
-	XDEBUG_MODE=coverage vendor/bin/phpunit -c phpunit-integration.xml.dist --coverage-html coverage
+infection: ## Run mutation testing
+	XDEBUG_MODE=coverage vendor/bin/infection --threads=$(shell nproc) --no-interaction
 
-install-integration: ## Install composer dependencies including optional libs
-	COMPOSER=composer-integration.json composer install --prefer-dist --no-progress --no-interaction
+install-ci: ## Install the CI profile: optional libraries plus CI-only tools
+	COMPOSER=composer-ci.json composer install --prefer-dist --no-progress --no-interaction
 
 regenerate-baseline: ## Regenerate baseline
 	vendor/bin/phpstan analyse --memory-limit=512M -b phpstan-baseline.neon

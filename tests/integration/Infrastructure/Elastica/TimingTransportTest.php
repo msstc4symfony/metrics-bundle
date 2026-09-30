@@ -14,6 +14,7 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
+use Prometheus\MetricFamilySamples;
 use Prometheus\Sample;
 use Prometheus\Storage\InMemory;
 use RuntimeException;
@@ -38,7 +39,7 @@ final class TimingTransportTest extends TestCase
     {
         $request = new Request('/index/_search', Request::POST);
 
-        $response = $this->createMock(Response::class);
+        $response = self::createStub(Response::class);
         $response->method('getQueryTime')->willReturn(0.05);
 
         $inner = $this->createMock(AbstractTransport::class);
@@ -58,7 +59,7 @@ final class TimingTransportTest extends TestCase
     {
         $request = new Request('/index/_search', Request::POST);
 
-        $inner = $this->createMock(AbstractTransport::class);
+        $inner = self::createStub(AbstractTransport::class);
         $inner->method('exec')->willThrowException(new RuntimeException('upstream gone'));
 
         $transport = new TimingTransport()->init($inner, $this->collector);
@@ -104,6 +105,6 @@ final class TimingTransportTest extends TestCase
 
     private function familyExists(string $name): bool
     {
-        return array_any($this->registry->getMetricFamilySamples(), fn ($family): bool => $family->getName() === $name);
+        return array_any($this->registry->getMetricFamilySamples(), fn (MetricFamilySamples $family): bool => $family->getName() === $name);
     }
 }

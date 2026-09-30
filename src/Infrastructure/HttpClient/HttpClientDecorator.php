@@ -28,10 +28,14 @@ final class HttpClientDecorator implements HttpClientInterface
     ) {
     }
 
+    /**
+     * @param array<mixed> $options
+     */
     #[Override]
     public function request(string $method, string $url, array $options = []): ResponseInterface
     {
-        [$metricHost, $metricPath] = $this->processUrl($url, $options);
+        $baseUri = isset($options['base_uri']) && is_string($options['base_uri']) ? $options['base_uri'] : null;
+        [$metricHost, $metricPath] = $this->processUrl($url, $baseUri);
 
         $this->collector->incHTTPConnectionRequest($method, $metricHost, $metricPath);
 
@@ -39,8 +43,8 @@ final class HttpClientDecorator implements HttpClientInterface
 
         $this->collector->incHTTPConnectionResponse($method, $metricHost, $metricPath, $response->getStatusCode());
 
-        $startTime = (float) $response->getInfo()['start_time'];
-        if ($startTime > 0) {
+        $startTime = $response->getInfo('start_time');
+        if ((is_float($startTime) || is_int($startTime)) && $startTime > 0) {
             $this->collector->setHTTPConnectionDuration(
                 $method,
                 $metricHost,
@@ -60,6 +64,9 @@ final class HttpClientDecorator implements HttpClientInterface
         return $this->inner->stream($responses, $timeout);
     }
 
+    /**
+     * @param array<mixed> $options
+     */
     #[Override]
     public function withOptions(array $options): static
     {
@@ -70,13 +77,11 @@ final class HttpClientDecorator implements HttpClientInterface
     }
 
     /**
-     * @param array{base_uri?: ?string} $options
-     *
      * @return array{string, string}
      */
-    private function processUrl(string $url, array $options): array
+    private function processUrl(string $url, ?string $baseUri): array
     {
-        $url = $this->prepareUrl($url, $options);
+        $url = $this->prepareUrl($url, $baseUri);
 
         foreach ($this->urlAssemblers as $urlAssembler) {
             $result = $urlAssembler->assemble($url);
@@ -92,16 +97,13 @@ final class HttpClientDecorator implements HttpClientInterface
         return [$host, $this->sanitizePath ? PathSanitizer::sanitize($path) : $path];
     }
 
-    /**
-     * @param array{base_uri?: ?string} $options
-     */
-    private function prepareUrl(string $url, array $options): string
+    private function prepareUrl(string $url, ?string $baseUri): string
     {
         if (is_string(parse_url($url, PHP_URL_HOST))) {
             return $url;
         }
 
-        $baseUri = $options['base_uri'] ?? $this->baseUri;
+        $baseUri ??= $this->baseUri;
         if ($baseUri === null) {
             return $url;
         }

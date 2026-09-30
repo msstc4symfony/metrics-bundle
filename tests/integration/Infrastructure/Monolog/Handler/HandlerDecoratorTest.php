@@ -12,6 +12,7 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
+use Prometheus\MetricFamilySamples;
 use Prometheus\Sample;
 use Prometheus\Storage\InMemory;
 use Psr\Log\LoggerInterface;
@@ -22,7 +23,7 @@ final class HandlerDecoratorTest extends TestCase
 
     private ErrorCollector $collector;
 
-    private MockObject $inner;
+    private LoggerInterface&MockObject $inner;
 
     protected function setUp(): void
     {
@@ -134,6 +135,6 @@ final class HandlerDecoratorTest extends TestCase
 
     private function familyExists(string $name): bool
     {
-        return array_any($this->registry->getMetricFamilySamples(), fn ($family): bool => $family->getName() === $name);
+        return array_any($this->registry->getMetricFamilySamples(), fn (MetricFamilySamples $family): bool => $family->getName() === $name);
     }
 }

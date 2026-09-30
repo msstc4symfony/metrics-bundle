@@ -10,6 +10,7 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
+use Prometheus\MetricFamilySamples;
 use Prometheus\Sample;
 use Prometheus\Storage\InMemory;
 use Symfony\Component\HttpFoundation\Request;
@@ -127,6 +128,6 @@ final class RequestEventListenerTest extends TestCase
 
     private function familyExists(string $name): bool
     {
-        return array_any($this->registry->getMetricFamilySamples(), fn ($family): bool => $family->getName() === $name);
+        return array_any($this->registry->getMetricFamilySamples(), fn (MetricFamilySamples $family): bool => $family->getName() === $name);
     }
 }

@@ -2,124 +2,45 @@ name: Code Quality Checks
 
 on:
   pull_request:
-    branches:
-      - '**'
+    paths-ignore:
+      - '**/*.md'
+      - LICENSE
   push:
     branches:
       - main
+    paths-ignore:
+      - '**/*.md'
+      - LICENSE
 
-env:
-  CODECOV_ENABLED: 'false'
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  unit:
-    name: Code checks + unit tests (minimal install)
+  standard:
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.4.0
+    with:
+      slug: msstc4symfony/metrics-bundle
+      extensions: 'mbstring, xml, ctype, iconv, intl, redis, apcu, mongodb'
+      ini-values: 'apc.enable_cli=1'
+    secrets:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  # The reusable workflow installs every optional library; this job proves the
+  # class_exists/interface_exists guards hold when none of them is present.
+  minimal:
+    name: Unit tests without optional libraries
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: mbstring, xml, ctype, iconv, intl, xdebug, redis
-          coverage: xdebug
+          extensions: mbstring, xml, ctype, iconv, intl, redis
+          coverage: none
           tools: composer:v2
 
-      - name: Get composer cache directory
-        id: composer-cache
-        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+      - run: composer update --prefer-dist --no-progress --no-interaction
 
-      - name: Cache composer dependencies
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.composer-cache.outputs.dir }}
-          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
-          restore-keys: ${{ runner.os }}-composer-
-
-      - name: Install dependencies
-        run: composer install --prefer-dist --no-progress --no-interaction
-
-      - name: Run checks
-        run: make check
-
-      - name: Run unit tests
-        run: XDEBUG_MODE=coverage vendor/bin/phpunit --testsuite=unit --coverage-clover=coverage.xml --log-junit junit.xml
-
-      - name: Upload coverage to Codecov
-        if: ${{ env.CODECOV_ENABLED == 'true' && !cancelled() }}
-        uses: codecov/codecov-action@v5
-        with:
-          files: ./coverage.xml
-          flags: unit
-          fail_ci_if_error: true
-          slug: msstc4symfony/metrics-bundle
-          token: ${{ secrets.CODECOV_TOKEN }}
-
-      - name: Upload test results to Codecov
-        if: ${{ env.CODECOV_ENABLED == 'true' && !cancelled() }}
-        uses: codecov/codecov-action@v5
-        with:
-          report_type: test_results
-          flags: unit
-          fail_ci_if_error: true
-          slug: msstc4symfony/metrics-bundle
-          token: ${{ secrets.CODECOV_TOKEN }}
-
-  integration:
-    name: Integration tests (with optional libraries)
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.4'
-          extensions: mbstring, xml, ctype, iconv, intl, xdebug, redis, apcu, mongodb
-          ini-values: apc.enable_cli=1
-          coverage: xdebug
-          tools: composer:v2
-
-      - name: Get composer cache directory
-        id: composer-cache
-        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
-
-      - name: Cache composer dependencies
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.composer-cache.outputs.dir }}
-          key: ${{ runner.os }}-composer-integration-${{ hashFiles('composer-integration.json') }}
-          restore-keys: ${{ runner.os }}-composer-integration-
-
-      - name: Install integration dependencies
-        env:
-          COMPOSER: composer-integration.json
-        run: composer install --prefer-dist --no-progress --no-interaction
-
-      - name: Run unit + integration tests
-        run: XDEBUG_MODE=coverage vendor/bin/phpunit -c phpunit-integration.xml.dist --coverage-clover=coverage-integration.xml --log-junit junit-integration.xml
-
-      - name: Upload integration coverage to Codecov
-        if: ${{ env.CODECOV_ENABLED == 'true' && !cancelled() }}
-        uses: codecov/codecov-action@v5
-        with:
-          files: ./coverage-integration.xml
-          flags: integration
-          fail_ci_if_error: true
-          slug: msstc4symfony/metrics-bundle
-          token: ${{ secrets.CODECOV_TOKEN }}
-
-      - name: Upload integration test results to Codecov
-        if: ${{ env.CODECOV_ENABLED == 'true' && !cancelled() }}
-        uses: codecov/codecov-action@v5
-        with:
-          report_type: test_results
-          flags: integration
-          fail_ci_if_error: true
-          slug: msstc4symfony/metrics-bundle
-          token: ${{ secrets.CODECOV_TOKEN }}
+      - run: vendor/bin/phpunit

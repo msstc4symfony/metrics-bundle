@@ -23,12 +23,18 @@ final class Statement extends AbstractStatementMiddleware
         parent::__construct($statement);
     }
 
+    /**
+     * DBAL 3 passes bound values here; DBAL 4 dropped the parameter. Forwarding the
+     * received arguments as-is keeps both majors working.
+     *
+     * @param array<array-key, mixed>|null $params
+     */
     #[Override]
-    public function execute($params = null): ResultInterface
+    public function execute(mixed $params = null): ResultInterface
     {
         $startTime = microtime(true);
 
-        $result = parent::execute($params);
+        $result = parent::execute(...func_get_args());
 
         $type = $this->assembleType($this->sql);
         $table = $this->assembleTableName($this->sql);
