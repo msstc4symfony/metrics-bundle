@@ -8,22 +8,25 @@ Symfony bundle that auto-collects application runtime metrics (HTTP, console, ex
 
 ## Common commands
 
-- `make check` — runs `php -l` on every PHP file, PHPStan (`--memory-limit=512M`), PHP-CS-Fixer in check mode, `composer audit`, and Rector dry-run. This is what CI runs.
-- `make fix` — PHP-CS-Fixer fix + Rector apply.
-- `make test` — PHPUnit.
-- `make test-with-coverage` — PHPUnit with HTML coverage in `./coverage` (sets `XDEBUG_MODE=coverage`).
-- `make regenerate-baseline` — regenerates `phpstan-baseline.neon`.
-- Run a single test: `vendor/bin/phpunit tests/unit/Path/To/SomeTest.php` or `vendor/bin/phpunit --filter testMethodName`.
+Develop against the CI profile — PHPStan, deptrac and the integration suite need it:
 
-PHPUnit is strict: `failOnWarning`, `failOnRisky`, `failOnPhpunitDeprecation`, `beStrictAboutOutputDuringTests` are all on — any new test that emits output, warnings, or deprecations will fail the suite.
+- `make install-ci` — `COMPOSER=composer-ci.json composer install` (optional libraries + CI-only tools).
+- `make check` — `php -l`, PHPStan (level 9, `--memory-limit=512M`), PHP-CS-Fixer check, `composer validate --strict`, `composer audit`, Rector dry-run, deptrac. Run it with `COMPOSER=composer-ci.json` so `composer validate` checks the manifest that is actually installed.
+- `make fix` — PHP-CS-Fixer fix + Rector apply.
+- `make test` — both suites; `make test-unit` / `make test-integration` run one.
+- `make infection` — mutation testing (not part of `make check`).
+- `make regenerate-baseline` — regenerates `phpstan-baseline.neon`.
+- Single test: `vendor/bin/phpunit tests/unit/Path/To/SomeTest.php` or `--filter testMethodName`.
+
+PHPUnit is strict: `failOnWarning`, `failOnRisky`, `failOnPhpunitDeprecation`, `beStrictAboutOutputDuringTests`. A mock without expectations raises a PHPUnit notice — use `createStub()`.
 
 ## Static analysis & style
 
-- **PHPStan**: level 9, `phpVersion: 80300`, baseline in `phpstan-baseline.neon`. Several integration files are excluded from analysis entirely (third-party-shaped wrappers — Doctrine DBAL `Connection`/`Driver`/`Middleware`/`Statement`, Elastica `TimingTransport`, `MetricLabelEnum*`, `HttpClientDecorator`). Prefer fixing new errors over adding to the baseline.
-- **Psalm**: `errorLevel="5"` with `psalm-baseline.xml`. Note Psalm is configured but **not run by `make check`** — CI only runs the Makefile.
-- **PHP-CS-Fixer**: `@Symfony` preset plus project tweaks (see `.php-cs-fixer.dist.php` — `phpdoc_align: left`, `concat_space: one`, post-increment, no Yoda, `global_namespace_import` on). Risky rules allowed.
-- **Rector**: PHP 8.1 set + Doctrine/Symfony/PHPUnit/MongoDB attribute sets + most prepared sets. Several rules are explicitly skipped (notably `ClassPropertyAssignToConstructorPromotionRector`, `PostIncDecToPreIncDecRector`, `ActionSuffixRemoverRector`) — don't reintroduce them.
-- `composer.json` requires PHP `>=8.1` for runtime compatibility; do not raise this without an explicit version bump.
+- **PHPStan**: level 9, `phpVersion: 80400`, analyses `src/`, `tests/unit/`, `tests/integration/` against the CI profile. The only `excludePaths` entry is `Framework/Profiling/.../MetricProcessor.php` — it imports profiling-bundle classes that do not exist yet (fixed in phase A5). The baseline holds 9 pre-existing entries; new code must not add to it.
+- **PHP-CS-Fixer**: config is byte-identical to `bundle-standard/templates/.php-cs-fixer.dist.php` (the verifier enforces it).
+- **Rector**: PHP 8.4 set + Doctrine/Symfony/PHPUnit/MongoDB attribute sets. Skipped rules are listed in `rector.php` — don't reintroduce them.
+- **deptrac**: `deptrac.yaml` records the phase-A status quo of the layers (see `.claude/docs/architecture.md`).
+- No Psalm — the standard uses PHPStan only.
 
 ## Architecture
 
@@ -39,7 +42,7 @@ The bundle is a **classic Symfony bundle** organised in a loose layered shape un
 - **`DependencyInjection/Compiler/`** — four compiler passes wire integrations into the host application:
   - `AddMonologDecoratorCompilerPass` — decorates every `monolog.logger.*` service (except `profiling`, `removal_request`, `deprecation` channels) with `HandlerDecorator` so log levels are counted.
   - `AddDoctrineDBALMonitorPass` — finds `doctrine.dbal.*_connection` services and registers the metrics `Middleware` (autowired).
-  - `AddHttpClientMonitorPass` (priority `-256`, runs late) — wraps `symfony/http-client` services.
+  - `AddHttpClientMonitorPass` (priority `-256`, runs late) — wraps `symfony/http-client` services; URL assemblers are collected by the `AssemblerInterface::TAG` tag.
   - `SaveElasticaClientsListPass` — collects Elastica client service IDs into the `metrics.elastica.clients` parameter; `MetricsBundle::boot()` later wraps each client's connection transport.
 - `MetricsBundle::boot()` also registers the MongoDB driver `TimingSubscriber` via `MongoDB\Driver\Monitoring\addSubscriber`. MongoDB and Elastica wiring is **optional** — guarded by `class_exists` and `NULL_ON_INVALID_REFERENCE`, so the bundle works without those libraries installed.
 
@@ -60,22 +63,25 @@ Service config lives in `src/Resources/config/services.yaml`. The Yaml file is l
 
 ## Tests
 
-Two test suites:
+One `phpunit.xml.dist`, two suites:
 
-- **`tests/unit/`** — testsuite `unit`. Run by `make test`. PSR-4 namespace `Msstc4Symfony\MetricsBundle\Test\Unit\`. Coverage source (in `phpunit.xml.dist`) excludes `MetricsBundle.php` and `Infrastructure/HttpClient/HttpClientDecorator.php` (depends on `symfony/http-client`).
-- **`tests/integration/`** — testsuite `integration`. Run by `make test-integration` (uses separate `phpunit-integration.xml.dist`). PSR-4 namespace `Msstc4Symfony\MetricsBundle\Test\Integration\`. Tests use `markTestSkipped()` in `setUp()` if their optional dependency is missing.
+- **`tests/unit/`** — namespace `Msstc4Symfony\MetricsBundle\Test\Unit\`; runs without optional libraries.
+- **`tests/integration/`** — namespace `Msstc4Symfony\MetricsBundle\Test\Integration\`; each test `markTestSkipped()`s in `setUp()` when its optional dependency is missing.
 
-Optional dependencies for integration tests live in **`composer-integration.json`** (extends `composer.json` with `symfony/http-client`, `doctrine/dbal`, `mongodb/mongodb`, `ruflin/elastica`). Install via `make install-integration` (this replaces `vendor/` with the integration profile — to switch back run `composer install`).
-
-CI has two jobs (`.github/workflows/checks.yml`):
-- **`unit`** — `composer install` + `make check` + unit suite. Verifies the bundle works WITHOUT optional libs (proves `class_exists` guards still hold).
-- **`integration`** — `COMPOSER=composer-integration.json composer install` + integration suite + coverage. Runs with full optional-dep stack and `ext-apcu`, `ext-mongodb` PHP extensions.
-
-PHPStan only analyses `src/` + `tests/unit/` (integration tests reference classes that need the optional libs and would explode static analysis under the minimal install).
+`composer-ci.json` adds `symfony/http-client`, `doctrine/dbal`, `mongodb/mongodb` ^2, `ruflin/elastica` ^7 (8 is unsupported), deptrac, infection and the Roave BC check. It pins `config.platform.ext-mongodb` to the CI runner's extension so `composer-ci.lock` resolves there. APCu tests need `apc.enable_cli=1`.
 
 ## CI
 
-GitHub Actions (`.github/workflows/checks.yml`) runs on PHP 8.1, executes `make check` then PHPUnit with coverage, uploads to Codecov. Both Codecov uploads have `fail_ci_if_error: true`, so a missing/expired `CODECOV_TOKEN` will fail CI.
+`.github/workflows/checks.yml` = the shared `bundle-standard` reusable workflow (pinned tag) with extensions `redis, apcu, mongodb` and `ini-values: apc.enable_cli=1`, plus a local `minimal` job that installs `composer.json` only and runs PHPUnit — it proves the `class_exists`/`interface_exists` guards hold without optional libraries. Codecov is disabled (`run-codecov` defaults to `false`). Details: `.claude/docs/ci.md`.
+
+## Deep references
+
+- `.claude/docs/architecture.md` — layers, wiring points, deptrac rules.
+- `.claude/docs/conventions.md` — naming, guards for optional libraries, typing rules.
+- `.claude/docs/testing.md` — suites, skip guards, stubs vs mocks.
+- `.claude/docs/tooling.md` — two manifests, `make check`, baseline policy.
+- `.claude/docs/ci.md` — reusable workflow inputs, the `minimal` job.
+- `.claude/docs/known-issues.md` — gotchas; **read before chasing a "weird" failure.**
 
 ## Working with `acc` plugin commands
 

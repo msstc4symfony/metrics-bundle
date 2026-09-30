@@ -14,7 +14,7 @@ Out of the box the following are measured:
 - outgoing requests via `symfony/http-client`
 - Doctrine DBAL queries (count, duration, type, table)
 - MongoDB driver commands
-- `ruflin/elastica` requests (versions 1.x–7.x)
+- `ruflin/elastica` 7.x requests (Elastica 8 removed the transport API the bundle hooks into; its requests are not measured)
 - system info (CPU load, memory, OPcache, FPM, filesystem)
 
 The exact list of metrics with labels and histogram buckets is shown by `bin/console metrics:list`.
@@ -23,15 +23,24 @@ The exact list of metrics with labels and histogram buckets is shown by `bin/con
 
 | Bundle | PHP   | Symfony           |
 | ------ | ----- | ----------------- |
-| 1.x    | 8.1+  | 6.4, 7.x, 8.x     |
+| 1.x    | 8.4+  | 6.4, 7.x, 8.x     |
 
 Requires `ext-redis` and a Redis-compatible storage (or APCu / in-memory for tests).
 
 ## Installation
 
+The package lives in a private GitHub repository, so register it as a VCS
+repository first. `no-api` makes Composer clone over SSH instead of calling the
+GitHub API, which would need a token for a private repository:
+
 ```sh
+composer config repositories.msstc4symfony-metrics '{"type": "vcs", "url": "git@github.com:msstc4symfony/metrics-bundle.git", "no-api": true}'
 composer require msstc4symfony/metrics-bundle
 ```
+
+Without a GitHub token Composer cannot download dist archives of a private
+repository; either add one (`composer config github-oauth.github.com <token>`)
+or install from source (`composer require --prefer-source ...`).
 
 Symfony Flex will auto-register the bundle. Otherwise add it to `config/bundles.php`:
 
@@ -158,10 +167,13 @@ Metric state lives in Redis indefinitely (or until `metrics:clear` is run / the 
 ## Local development
 
 ```sh
-make check  # PHPStan + CS-Fixer + Rector + composer audit
-make fix    # CS-Fixer + Rector apply
-make test   # PHPUnit
+make install-ci  # composer-ci.json: optional libraries + CI-only tools
+make check       # lint, PHPStan, CS-Fixer, composer validate/audit, Rector, deptrac
+make fix         # CS-Fixer + Rector apply
+make test        # unit + integration suites (integration skips without optional libraries)
 ```
+
+APCu storage tests need `ext-apcu` with `apc.enable_cli=1`; without it they are skipped.
 
 Run a single test: `vendor/bin/phpunit tests/unit/Path/To/SomeTest.php`.
 
