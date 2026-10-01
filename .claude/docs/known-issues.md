@@ -41,7 +41,7 @@ APCu не шарились между воркерами. Исправлено �
 `ErrorCollector` → `RegistryInterface` → `Adapter` → `Factory`. Контейнер не
 собирался вообще; тесты компилер-пассов на голом `ContainerBuilder` этого не видели.
 Исправлено: `Factory` пишет в свой канал `metrics_bundle` (`#[WithMonologChannel]`), канал
-исключён из декорирования. Ловит `tests/integration/ContainerCompileTest`
+исключён из декорирования. Ловит `tests/Integration/ContainerCompileTest`
 (настоящее ядро: Framework + Monolog + Metrics). `monolog/monolog ^3.5` объявлен явно —
 атрибут и `Monolog\Level` есть только в 3.x.
 
@@ -99,10 +99,10 @@ deprecated, живут до 2.0 ради BC. Мост `msstc4symfony/metrics-bri
 метрику своим enum (через `metrics_bundle.metric_enums`) и в compiler pass снимает с
 `MetricProcessor` тег `EndSpanProcessorInterface` (сервис остаётся для ссылок приложения) —
 иначе span писались бы дважды. Поэтому `MetricRepositoryFactory` схлопывает
-одинаковые имена метрик (первое объявление побеждает). `MetricProcessor` по-прежнему в
-`excludePaths` PHPStan: профилирования в окружении metrics нет.
+одинаковые имена метрик (первое объявление побеждает). `MetricProcessor` анализируется
+PHPStan: profiling-bundle стоит в `composer-ci.json`.
 
-Переход `MetricProcessor` на `getDuration()` в 1.2 покрыт `tests/unit/Framework/Profiling/MetricProcessorTest`.
+Переход `MetricProcessor` на `getDuration()` в 1.2 покрыт `tests/Unit/Framework/Profiling/MetricProcessorTest`.
 Конструктор вызывает `trigger_deprecation` — срабатывает, только если процессор реально
 используется (мост снимает с него тег end-процессора).
 BC-джоб (Roave, неблокирующий) на сравнении 1.2.0 с v1.1.0 красный: базовая ревизия ставится со

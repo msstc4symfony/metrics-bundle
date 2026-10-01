@@ -1,6 +1,6 @@
 ---
 name: metrics-bundle-reviewer
-description: Project-specific reviewer for msstc4symfony/metrics-bundle. Verifies architectural invariants — collector hierarchy, MetricLabelEnum catalog, compiler-pass wiring, storage DSN handling, and PHPStan/Psalm baseline hygiene. Use PROACTIVELY when changes touch src/Infrastructure/Collector, src/Framework, src/DependencyInjection, src/Infrastructure/{Doctrine,Elastica,HttpClient,Monolog}, src/Infrastructure/Storage or MetricLabelEnum.
+description: Project-specific reviewer for msstc4symfony/metrics-bundle. Verifies architectural invariants — collector hierarchy, MetricLabelEnum catalog, compiler-pass wiring, storage DSN handling, and PHPStan baseline hygiene. Use PROACTIVELY when changes touch src/Infrastructure/Collector, src/Framework, src/DependencyInjection, src/Infrastructure/{Doctrine,Elastica,HttpClient,Monolog}, src/Infrastructure/Storage or MetricLabelEnum.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
@@ -37,21 +37,13 @@ Auto-collects runtime metrics (HTTP, console, exceptions, Doctrine DBAL, MongoDB
 - The factory **silently falls back to `InMemory` on any exception**. That's intentional but treacherous: a typo in DSN credentials, an unreachable Redis, or a wrong port produce zero observable error and metrics evaporate on each request. If a PR adds new schemes or changes the parsing, ensure the fallback is preserved AND that the failure is at least logged (currently it isn't — flag this as a known limitation if relevant).
 - `parse_url()` is the only validator. Don't accept user-controlled DSNs without env-level protection.
 
-### 5. Excluded analysis paths
-PHPStan and Psalm explicitly exclude:
-- `src/Infrastructure/Doctrine/DBAL/{Connection,Driver,Middleware,Statement}.php`
-- `src/Infrastructure/Doctrine/ODM/Metrics/TimingSubscriber.php` (Psalm)
-- `src/Infrastructure/Elastica/TimingTransport.php`
-- `src/Infrastructure/HttpClient/HttpClientDecorator.php`
-- `src/Infrastructure/Enum/MetricLabelEnum.php`, `MetricLabelEnumInterface.php` (PHPStan)
-- `src/Framework/Profiling/Processor/EndSpan/MetricProcessor.php` (PHPStan)
-
-These wrap third-party shapes that don't satisfy strict generics. If a PR moves code OUT of these files into analysed paths, that's good — verify it still passes PHPStan L9. If a PR adds new excludes, push back: prefer fixing types over hiding them, and prefer baselining specific errors (`phpstan-baseline.neon`) over excluding whole files.
+### 5. Static analysis scope
+PHPStan level 9 analyses all of `src/` and `tests/` with no `excludePaths` (shared `bundle-standard` template; Psalm is not used). Accepted findings live only in `phpstan-baseline.neon`, each with a reason. If a PR adds an ignore or baseline entry for new code, push back: fix the type at its origin.
 
 ### 6. Tests & coverage
-- Only `tests/unit/` is wired. `Framework/*` and `Infrastructure/{Doctrine,Elastica,HttpClient,Monolog}` are excluded from the coverage source set — they're integration-shaped. Don't add code there without an integration plan (or move logic to a testable helper).
+- Suites `unit` (`tests/Unit/`) and `integration` (`tests/Integration/`, self-skipping without optional libraries). Coverage source is all of `src/` (shared `bundle-standard` phpunit/codecov templates).
 - PHPUnit is strict (`failOnWarning`, `failOnRisky`, `failOnPhpunitDeprecation`, `beStrictAboutOutputDuringTests`). New tests must be silent and warning-free.
-- PSR-4 for tests: `Msstc4Symfony\MetricsBundle\Test\Unit\` → `tests/unit/`.
+- PSR-4 for tests: `Msstc4Symfony\MetricsBundle\Test\` → `tests/`.
 
 ### 7. Symfony/PHP compatibility
 - `composer.json` requires PHP `>=8.1` and Symfony `^6.4|^7.0|^8.0`. PHPStan is at `phpVersion: 80300` and Rector targets `php81`. Don't introduce 8.2+ syntax (readonly classes, DNF types, etc.) without bumping `composer.json`.
@@ -75,5 +67,4 @@ Be terse. Quote file paths with `path:line` so the user can jump.
 ## When NOT to flag
 
 - Generic style/PSR/security/perf issues — those belong to `/acc:audit-*`. Mention them only if they intersect with an invariant above.
-- Issues in already-excluded files (DBAL middleware, Elastica transport, etc.) unless the PR moves the code or weakens a guard.
 - Anything you can't tie to a specific architectural rule in this document.

@@ -2,8 +2,8 @@
 
 ## Два suite в одном `phpunit.xml.dist`
 
-- `unit` (`tests/unit/`) — без опциональных библиотек.
-- `integration` (`tests/integration/`) — каждый тест в `setUp()` вызывает
+- `unit` (`tests/Unit/`) — без опциональных библиотек.
+- `integration` (`tests/Integration/`) — каждый тест в `setUp()` вызывает
   `markTestSkipped()`, если его библиотеки нет. Поэтому `make test` безопасен на
   любой установке, но **пропуск ≠ проход**: смотри счётчик Skipped.
 
@@ -21,7 +21,7 @@ PHPUnit 12+ пишет notice на мок без ожиданий. Нет `expec
 
 ## Тест на настоящем ядре
 
-`tests/integration/ContainerCompileTest` + `Kernel/TestKernel` (Framework + Monolog +
+`tests/Integration/ContainerCompileTest` + `Kernel/TestKernel` (Framework + Monolog +
 Metrics) ловят то, чего не видят тесты пассов на голом `ContainerBuilder`: циклы,
 проводку декораторов, маршрут. HTTP проверяется штатным `framework.http_client.mock_response_factory`: монитор
 декорирует транспорт с приоритетом -20, то есть снаружи мока (-10). Таймаут —

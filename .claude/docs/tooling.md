@@ -24,8 +24,8 @@ dry-run → deptrac. Запускать как `COMPOSER=composer-ci.json make c
 
 ## PHPStan
 
-- Анализируется код на полном профиле; `excludePaths` — только `MetricProcessor`
-  (до A5).
+- Анализируется код на полном профиле, без `excludePaths` (`phpstan.dist.neon` — общий
+  шаблон `bundle-standard`; profiling-bundle в `composer-ci.json`).
 - `phpstan-ci.neon` = шаблон стандарта (`reportUnmatchedIgnoredErrors: false`).
 - `phpstan-ci.neon` глушит только «unmatched ignored» (у CI-профиля другие записи
   baseline не срабатывают). Строгая проверка неиспользованных записей — локальный

@@ -10,7 +10,11 @@
   "type": "symfony-bundle",
   "description": "Metrics bundle (CI profile — installs optional libraries and CI-only tools)",
   "minimum-stability": "stable",
-  "keywords": ["php", "symfony", "metrics"],
+  "keywords": [
+    "php",
+    "symfony",
+    "metrics"
+  ],
   "prefer-stable": true,
   "autoload": {
     "psr-4": {
@@ -19,8 +23,7 @@
   },
   "autoload-dev": {
     "psr-4": {
-      "Msstc4Symfony\\MetricsBundle\\Test\\Unit\\": "tests/unit/",
-      "Msstc4Symfony\\MetricsBundle\\Test\\Integration\\": "tests/integration/"
+      "Msstc4Symfony\\MetricsBundle\\Test\\": "tests/"
     }
   },
   "repositories": [

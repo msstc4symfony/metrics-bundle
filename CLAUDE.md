@@ -16,13 +16,13 @@ Develop against the CI profile — PHPStan, deptrac and the integration suite ne
 - `make test` — both suites; `make test-unit` / `make test-integration` run one.
 - `make infection` — mutation testing (not part of `make check`).
 - `make regenerate-baseline` — regenerates `phpstan-baseline.neon`.
-- Single test: `vendor/bin/phpunit tests/unit/Path/To/SomeTest.php` or `--filter testMethodName`.
+- Single test: `vendor/bin/phpunit tests/Unit/Path/To/SomeTest.php` or `--filter testMethodName`.
 
 PHPUnit is strict: `failOnWarning`, `failOnRisky`, `failOnPhpunitDeprecation`, `beStrictAboutOutputDuringTests`. A mock without expectations raises a PHPUnit notice — use `createStub()`.
 
 ## Static analysis & style
 
-- **PHPStan**: level 9, `phpVersion: 80400`, analyses `src/`, `tests/unit/`, `tests/integration/` against the CI profile. No `excludePaths`: `composer-ci.json` installs `msstc4symfony/profiling-bundle` (vcs repository) so the deprecated `MetricProcessor` is analysed and tested. The baseline holds 9 pre-existing entries; new code must not add to it.
+- **PHPStan**: level 9, `phpVersion: 80400`, analyses `src/` and `tests/` against the CI profile. No `excludePaths`: `composer-ci.json` installs `msstc4symfony/profiling-bundle` (vcs repository) so the deprecated `MetricProcessor` is analysed and tested. The baseline holds 9 pre-existing entries; new code must not add to it.
 - **PHP-CS-Fixer**: config is byte-identical to `bundle-standard/templates/.php-cs-fixer.dist.php` (the verifier enforces it).
 - **Rector**: PHP 8.4 set + Doctrine/Symfony/PHPUnit/MongoDB attribute sets. Skipped rules are listed in `rector.php` — don't reintroduce them.
 - **deptrac**: `deptrac.yaml` records the phase-A status quo of the layers (see `.claude/docs/architecture.md`).
@@ -65,14 +65,14 @@ Service config lives in `src/Resources/config/services.yaml`. The Yaml file is l
 
 One `phpunit.xml.dist`, two suites:
 
-- **`tests/unit/`** — namespace `Msstc4Symfony\MetricsBundle\Test\Unit\`; runs without optional libraries.
-- **`tests/integration/`** — namespace `Msstc4Symfony\MetricsBundle\Test\Integration\`; each test `markTestSkipped()`s in `setUp()` when its optional dependency is missing.
+- **`tests/Unit/`** — namespace `Msstc4Symfony\MetricsBundle\Test\Unit\`; runs without optional libraries.
+- **`tests/Integration/`** — namespace `Msstc4Symfony\MetricsBundle\Test\Integration\`; each test `markTestSkipped()`s in `setUp()` when its optional dependency is missing.
 
 `composer-ci.json` adds `msstc4symfony/profiling-bundle` (from its GitHub repository), `symfony/http-client`, `doctrine/dbal`, `mongodb/mongodb` ^2, `ruflin/elastica` ^7 (8 is unsupported), deptrac, infection and the Roave BC check. It pins `config.platform.ext-mongodb` to the CI runner's extension so `composer-ci.lock` resolves there. APCu tests need `apc.enable_cli=1`.
 
 ## CI
 
-`.github/workflows/checks.yml` = the shared `bundle-standard` reusable workflow (pinned tag) with extensions `redis, apcu, mongodb` and `ini-values: apc.enable_cli=1`, plus a local `minimal` job that installs `composer.json` only and runs PHPUnit — it proves the `class_exists`/`interface_exists` guards hold without optional libraries. Codecov is disabled (`run-codecov` defaults to `false`). Details: `.claude/docs/ci.md`.
+`.github/workflows/checks.yml` = the shared `bundle-standard` reusable workflow (pinned tag) with extensions `redis, apcu, mongodb` and `ini-values: apc.enable_cli=1`. The workflow's `PHPUnit without optional libraries` job installs `composer.json` only and proves the `class_exists`/`interface_exists` guards hold without optional libraries. Codecov is disabled (`run-codecov` defaults to `false`). Details: `.claude/docs/ci.md`.
 
 ## Deep references
 
@@ -80,7 +80,7 @@ One `phpunit.xml.dist`, two suites:
 - `.claude/docs/conventions.md` — naming, guards for optional libraries, typing rules.
 - `.claude/docs/testing.md` — suites, skip guards, stubs vs mocks.
 - `.claude/docs/tooling.md` — two manifests, `make check`, baseline policy.
-- `.claude/docs/ci.md` — reusable workflow inputs, the `minimal` job.
+- `.claude/docs/ci.md` — reusable workflow inputs, the job without optional libraries.
 - `.claude/docs/known-issues.md` — gotchas; **read before chasing a "weird" failure.**
 
 ## Working with `acc` plugin commands

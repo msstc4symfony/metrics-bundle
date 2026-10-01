@@ -198,7 +198,7 @@ make test        # unit + integration suites (integration skips without optional
 
 APCu storage tests need `ext-apcu` with `apc.enable_cli=1`; without it they are skipped.
 
-Run a single test: `vendor/bin/phpunit tests/unit/Path/To/SomeTest.php`.
+Run a single test: `vendor/bin/phpunit tests/Unit/Path/To/SomeTest.php`.
 
 ## License
 
