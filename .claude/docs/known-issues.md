@@ -96,8 +96,9 @@ Job `continue-on-error`. После тега `v1.1.0` сравнение пой�
 
 `MetricProcessor` / `ProfilingCollector` / case `PROFILING_SPAN_DURATION_HISTOGRAM_SECONDS` —
 deprecated, живут до 2.0 ради BC. Мост `msstc4symfony/metrics-bridge-profiling` объявляет ту же
-метрику своим enum (через `metrics_bundle.metric_enums`) и в compiler pass удаляет definition
-`MetricProcessor` — иначе span писались бы дважды. Поэтому `MetricRepositoryFactory` схлопывает
+метрику своим enum (через `metrics_bundle.metric_enums`) и в compiler pass снимает с
+`MetricProcessor` тег `EndSpanProcessorInterface` (сервис остаётся для ссылок приложения) —
+иначе span писались бы дважды. Поэтому `MetricRepositoryFactory` схлопывает
 одинаковые имена метрик (первое объявление побеждает). `MetricProcessor` по-прежнему в
 `excludePaths` PHPStan: профилирования в окружении metrics нет.
 
@@ -105,3 +106,11 @@ deprecated, живут до 2.0 ради BC. Мост `msstc4symfony/metrics-bri
 (файл в `excludePaths`, profiling в dev-окружении metrics нет). Проверяется косвенно мостом.
 Конструктор вызывает `trigger_deprecation` — срабатывает, только если процессор реально
 используется (мост снимает с него тег end-процессора).
+BC-джоб (Roave) красный (неблокирующий) с тех пор, как `MetricProcessor` ссылается на
+`Msstc4Symfony\ProfilingBundle\...\EndSpanProcessorInterface`: в окружении metrics нет
+profiling-bundle, BetterReflection не находит интерфейс. Лечится добавлением profiling-bundle в
+`composer-ci.json` require-dev, когда репозиторий станет публичным (тогда же — тест
+`MetricProcessor` и снятие `excludePaths`).
+`symfony/deprecation-contracts` (для `trigger_deprecation`) не объявлен напрямую: верификатор
+стандарта требует для всех `symfony/*` `^6.4|^7.0|^8.0`, contracts версионируются `^2.5|^3`.
+Гарантирован транзитивно через framework-bundle / console / event-dispatcher.

@@ -64,6 +64,7 @@
     "sort-packages": true
   },
   "conflict": {
+    "msstc4symfony/profiling-bundle": "<1.0",
     "symfony/symfony": "*"
   },
   "extra": {
