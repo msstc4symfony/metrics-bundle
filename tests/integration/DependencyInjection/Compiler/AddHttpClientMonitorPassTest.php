@@ -32,7 +32,7 @@ final class AddHttpClientMonitorPassTest extends TestCase
 
         $decorator = $container->getDefinition(AddHttpClientMonitorPass::DECORATOR_ID);
         self::assertSame(HttpClientDecorator::class, $decorator->getClass());
-        self::assertSame([AddHttpClientMonitorPass::TRANSPORT_ID, null, 0], $decorator->getDecoratedService());
+        self::assertSame([AddHttpClientMonitorPass::TRANSPORT_ID, null, -20], $decorator->getDecoratedService());
         self::assertFalse($container->hasDefinition('http_client.decorator.monitor'));
         self::assertFalse($container->hasDefinition('github.client.decorator.monitor'));
     }

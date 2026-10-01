@@ -23,7 +23,8 @@
    - `AddMonologDecoratorCompilerPass` — декорирует `monolog.logger.*`;
    - `AddDoctrineDBALMonitorPass` — DBAL middleware;
    - `AddHttpClientMonitorPass` (priority -256) — декорирует **только**
-     `http_client.transport`: туда сходятся все клиенты фреймворка (default и scoped)
+     `http_client.transport` (приоритет декорации -20 — снаружи мока
+     `mock_response_factory`, -10): туда сходятся все клиенты фреймворка (default и scoped)
      уже с абсолютным URL, поэтому каждый реальный запрос считается один раз и с
      правильным host. Повторы `retry_failed` — отдельные запросы. Клиенты, созданные
      приложением в обход FrameworkBundle, не мониторятся. URL-ассемблеры — по тегу

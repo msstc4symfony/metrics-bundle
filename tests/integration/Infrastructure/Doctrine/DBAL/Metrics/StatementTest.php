@@ -62,6 +62,8 @@ final class StatementTest extends TestCase
         yield 'SELECT without WHERE' => ['SELECT * FROM users', 'users'];
         yield 'INSERT without column list' => ['INSERT INTO orders VALUES (1)', 'orders'];
         yield 'UPDATE at end of line' => ["UPDATE accounts\nSET balance = 0", 'accounts'];
+        yield 'schema-qualified SELECT' => ['SELECT * FROM public.users WHERE id = 1', 'users'];
+        yield 'schema-qualified UPDATE' => ['UPDATE app.orders SET x = 1', 'orders'];
         yield 'no table' => ['CREATE TABLE foo (id INT)', null];
     }
 

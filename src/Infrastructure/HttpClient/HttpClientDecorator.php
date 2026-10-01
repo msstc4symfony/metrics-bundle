@@ -10,23 +10,24 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\URLAssembler\Assembler
 use Override;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerInterface;
+use SplObjectStorage;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\HttpClient\AsyncDecoratorTrait;
-use Symfony\Component\HttpClient\Response\AsyncContext;
-use Symfony\Component\HttpClient\Response\AsyncResponse;
+use Symfony\Component\HttpClient\DecoratorTrait;
+use Symfony\Component\HttpClient\Response\ResponseStream;
 use Symfony\Contracts\HttpClient\ChunkInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
+use Symfony\Contracts\HttpClient\ResponseStreamInterface;
 use Symfony\Contracts\Service\ResetInterface;
 
 /**
- * Records metrics while the response streams instead of reading it in request():
- * reading the status there would serialize concurrent requests and disable the
+ * Metrics are recorded when the caller reaches the status or the end of the body, never in
+ * request(): reading the status there would serialize concurrent requests and disable the
  * destructor-time status check of unconsumed responses.
  */
 final class HttpClientDecorator implements HttpClientInterface, ResetInterface, LoggerAwareInterface
 {
-    use AsyncDecoratorTrait;
+    use DecoratorTrait;
 
     /**
      * @param iterable<AssemblerInterface> $urlAssemblers
@@ -47,30 +48,43 @@ final class HttpClientDecorator implements HttpClientInterface, ResetInterface, 
     #[Override]
     public function request(string $method, string $url, array $options = []): ResponseInterface
     {
-        $baseUri = isset($options['base_uri']) && is_string($options['base_uri']) ? $options['base_uri'] : null;
-        [$host, $path] = $this->processUrl($url, $baseUri);
+        $response = $this->client->request($method, $url, $options);
+
+        // The inner response knows its resolved URL immediately, including a base_uri set
+        // through withOptions() that this decorator never sees in $options.
+        $resolvedUrl = $response->getInfo('url');
+        [$host, $path] = $this->labels(is_string($resolvedUrl) && $resolvedUrl !== '' ? $resolvedUrl : $url);
 
         $this->collector->incHTTPConnectionRequest($method, $host, $path);
 
-        $passthru = function (ChunkInterface $chunk, AsyncContext $context) use ($method, $host, $path): Generator {
-            // Error chunks throw from isFirst()/isLast(); the error itself reaches the caller unchanged.
-            if ($chunk->getError() === null) {
-                if ($chunk->isFirst()) {
-                    $this->collector->incHTTPConnectionResponse($method, $host, $path, $context->getStatusCode());
-                }
+        return new MonitoredResponse(
+            $response,
+            fn (int $status) => $this->collector->incHTTPConnectionResponse($method, $host, $path, $status),
+            fn (float $seconds) => $this->collector->setHTTPConnectionDuration($method, $host, $path, $seconds),
+        );
+    }
 
-                if ($chunk->isLast()) {
-                    $totalTime = $context->getInfo('total_time');
-                    if (is_float($totalTime) || is_int($totalTime)) {
-                        $this->collector->setHTTPConnectionDuration($method, $host, $path, (float) $totalTime);
-                    }
-                }
+    #[Override]
+    public function stream(ResponseInterface|iterable $responses, ?float $timeout = null): ResponseStreamInterface
+    {
+        if ($responses instanceof ResponseInterface) {
+            $responses = [$responses];
+        }
+
+        /** @var SplObjectStorage<ResponseInterface, MonitoredResponse> $monitored */
+        $monitored = new SplObjectStorage();
+        $inner = [];
+
+        foreach ($responses as $response) {
+            if ($response instanceof MonitoredResponse) {
+                $monitored[$response->inner()] = $response;
+                $response = $response->inner();
             }
 
-            yield $chunk;
-        };
+            $inner[] = $response;
+        }
 
-        return new AsyncResponse($this->client, $method, $url, $options, $passthru);
+        return new ResponseStream($this->observe($this->client->stream($inner, $timeout), $monitored));
     }
 
     #[Override]
@@ -82,12 +96,35 @@ final class HttpClientDecorator implements HttpClientInterface, ResetInterface, 
     }
 
     /**
+     * @param SplObjectStorage<ResponseInterface, MonitoredResponse> $monitored
+     *
+     * @return Generator<ResponseInterface, ChunkInterface, mixed, void>
+     */
+    private function observe(ResponseStreamInterface $stream, SplObjectStorage $monitored): Generator
+    {
+        foreach ($stream as $response => $chunk) {
+            $wrapper = $monitored->offsetExists($response) ? $monitored[$response] : null;
+
+            // Error and timeout chunks throw from isFirst()/isLast(); they reach the caller untouched.
+            if ($wrapper !== null && $chunk->getError() === null) {
+                if ($chunk->isFirst()) {
+                    $wrapper->recordStatus();
+                }
+
+                if ($chunk->isLast()) {
+                    $wrapper->recordCompletion();
+                }
+            }
+
+            yield $wrapper ?? $response => $chunk;
+        }
+    }
+
+    /**
      * @return array{string, string}
      */
-    private function processUrl(string $url, ?string $baseUri): array
+    private function labels(string $url): array
     {
-        $url = $this->prepareUrl($url, $baseUri);
-
         foreach ($this->urlAssemblers as $urlAssembler) {
             $result = $urlAssembler->assemble($url);
             if ($result !== null) {
@@ -100,14 +137,5 @@ final class HttpClientDecorator implements HttpClientInterface, ResetInterface, 
         $path = is_array($parts) && isset($parts['path']) && $parts['path'] !== '' ? $parts['path'] : '/';
 
         return [$host, $this->sanitizePath ? PathSanitizer::sanitize($path) : $path];
-    }
-
-    private function prepareUrl(string $url, ?string $baseUri): string
-    {
-        if ($baseUri === null || is_string(parse_url($url, PHP_URL_HOST))) {
-            return $url;
-        }
-
-        return rtrim($baseUri, '/') . '/' . ltrim($url, '/');
     }
 }

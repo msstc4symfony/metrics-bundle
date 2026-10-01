@@ -9,16 +9,18 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\HttpClientDecorator;
 use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\URLAssembler\AssemblerInterface;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Test\Integration\Infrastructure\HttpClient\Fixture\ResettableClient;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
 use Prometheus\MetricFamilySamples;
 use Prometheus\Sample;
 use Prometheus\Storage\InMemory;
 use Symfony\Component\HttpClient\Exception\TransportException;
+use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
-use Symfony\Contracts\Service\ResetInterface;
+use Throwable;
 
 final class HttpClientDecoratorTest extends TestCase
 {
@@ -134,6 +136,93 @@ final class HttpClientDecoratorTest extends TestCase
         self::assertNotSame($decorator, $decorator->withOptions(['timeout' => 1]));
     }
 
+    public function testTimeoutKeepsTheExceptionClassOfTheBareClient(): void
+    {
+        // A server that accepts the connection and never answers: the real idle-timeout path.
+        $server = stream_socket_server('tcp://127.0.0.1:0');
+        self::assertIsResource($server);
+        $address = stream_socket_get_name($server, false);
+        self::assertIsString($address);
+        $url = 'http://' . $address . '/slow';
+
+        try {
+            self::assertSame(
+                $this->exceptionClassOf(HttpClient::create(), $url),
+                $this->exceptionClassOf($this->decorator(HttpClient::create()), $url),
+            );
+        } finally {
+            fclose($server);
+        }
+    }
+
+    public function testCancelledRequestHasNoDuration(): void
+    {
+        $response = $this->decorator(new MockHttpClient(new MockResponse('ok')))->request('GET', 'https://api.example.com/a');
+        $response->cancel();
+
+        self::assertFalse($this->familyExists(MetricLabelEnum::HTTP_CONNECTION_DURATION_HISTOGRAM_SECONDS));
+    }
+
+    public function testBaseUriFromWithOptionsIsUsedForTheHost(): void
+    {
+        $decorator = $this->decorator(new MockHttpClient(new MockResponse('')))
+            ->withOptions(['base_uri' => 'https://svc.example.com'])
+        ;
+
+        $decorator->request('GET', '/v1/items')->getContent();
+
+        self::assertSame(
+            [[['app', 'cmp', 'GET', 'svc.example.com', '/v1/items'], '1']],
+            $this->samplesOf(MetricLabelEnum::HTTP_CONNECTION_REQUEST),
+        );
+    }
+
+    public function testStreamingRecordsStatusAndDurationOnce(): void
+    {
+        $decorator = $this->decorator(new MockHttpClient(new MockResponse(['a', 'b'])));
+        $response = $decorator->request('GET', 'https://api.example.com/a');
+
+        foreach ($decorator->stream($response) as $streamed => $chunk) {
+            self::assertSame($response, $streamed);
+        }
+
+        $response->getContent();
+
+        self::assertCount(1, $this->samplesOf(MetricLabelEnum::HTTP_CONNECTION_RESPONSE));
+        self::assertSame('1', $this->durationCount());
+    }
+
+    /**
+     * @return class-string<Throwable>|null
+     */
+    private function exceptionClassOf(HttpClientInterface $client, string $url): ?string
+    {
+        try {
+            $client->request('GET', $url, ['timeout' => 0.2])->getStatusCode();
+        } catch (Throwable $e) {
+            return $e::class;
+        }
+
+        return null;
+    }
+
+    private function durationCount(): ?string
+    {
+        foreach ($this->registry->getMetricFamilySamples() as $family) {
+            if ($family->getName() !== 'symfony_' . MetricLabelEnum::HTTP_CONNECTION_DURATION_HISTOGRAM_SECONDS->value) {
+                continue;
+            }
+
+            foreach ($family->getSamples() as $sample) {
+                if (str_ends_with($sample->getName(), '_count')) {
+                    return $sample->getValue();
+                }
+            }
+        }
+
+        return null;
+    }
+
     private function decorator(HttpClientInterface $inner): HttpClientDecorator
     {
         return new HttpClientDecorator($inner, $this->collector, []);
@@ -177,8 +266,4 @@ final class HttpClientDecoratorTest extends TestCase
             static fn (MetricFamilySamples $family): bool => $family->getName() === 'symfony_' . $metric->value,
         );
     }
-}
-
-interface ResettableClient extends HttpClientInterface, ResetInterface
-{
 }

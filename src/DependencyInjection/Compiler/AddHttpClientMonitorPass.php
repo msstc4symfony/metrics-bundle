@@ -25,6 +25,10 @@ final class AddHttpClientMonitorPass implements CompilerPassInterface
 
     public const string DECORATOR_ID = self::TRANSPORT_ID . '.decorator.monitor';
 
+    // Below FrameworkBundle's mock_response_factory decorator (-10): a lower priority is applied
+    // later, i.e. further out, so functional tests with a mocked transport still see metrics.
+    private const int DECORATION_PRIORITY = -20;
+
     #[Override]
     public function process(ContainerBuilder $container): void
     {
@@ -40,7 +44,7 @@ final class AddHttpClientMonitorPass implements CompilerPassInterface
             ->setAutowired(true)
             ->setArgument('$inner', new Reference(self::DECORATOR_ID . '.inner'))
             ->setArgument('$urlAssemblers', new TaggedIteratorArgument(AssemblerInterface::TAG))
-            ->setDecoratedService(self::TRANSPORT_ID)
+            ->setDecoratedService(self::TRANSPORT_ID, null, self::DECORATION_PRIORITY)
         ;
     }
 }

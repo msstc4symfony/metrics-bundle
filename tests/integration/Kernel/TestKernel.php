@@ -9,12 +9,8 @@ use Override;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Bundle\MonologBundle\MonologBundle;
-use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
-use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
-use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\HttpClient\HttpClient;
-use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
 
@@ -45,28 +41,6 @@ final class TestKernel extends Kernel
     }
 
     #[Override]
-    protected function build(ContainerBuilder $container): void
-    {
-        if (!class_exists(HttpClient::class)) {
-            return;
-        }
-
-        // framework.http_client.mock_response_factory wraps the transport from the outside and
-        // would hide the monitor; replacing the transport itself keeps the monitor on top of it.
-        $container->addCompilerPass(new class implements CompilerPassInterface {
-            public function process(ContainerBuilder $container): void
-            {
-                $container->getDefinition('http_client.transport')
-                    ->setClass(MockHttpClient::class)
-                    ->setFactory(null)
-                    ->setArguments([new Reference('test.mock_response')])
-                    ->setMethodCalls([])
-                ;
-            }
-        });
-    }
-
-    #[Override]
     public function getCacheDir(): string
     {
         return self::cacheRoot() . '/cache/' . $this->environment;
@@ -93,6 +67,7 @@ final class TestKernel extends Kernel
 
         if (class_exists(HttpClient::class)) {
             $framework['http_client'] = [
+                'mock_response_factory' => 'test.mock_response',
                 'scoped_clients' => [self::SCOPED_CLIENT => ['base_uri' => 'https://api.github.com']],
             ];
         }

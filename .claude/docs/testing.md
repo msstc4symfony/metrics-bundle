@@ -23,10 +23,11 @@ PHPUnit 12+ пишет notice на мок без ожиданий. Нет `expec
 
 `tests/integration/ContainerCompileTest` + `Kernel/TestKernel` (Framework + Monolog +
 Metrics) ловят то, чего не видят тесты пассов на голом `ContainerBuilder`: циклы,
-проводку декораторов, маршрут. HTTP проверяется через подмену самого
-`http_client.transport` на `MockHttpClient` (в `TestKernel::build()`):
-`framework.http_client.mock_response_factory` встаёт **снаружи** транспорта и
-спрятал бы монитор. Каталог кеша — на процесс (`getmypid()`): infection гоняет
+проводку декораторов, маршрут. HTTP проверяется штатным `framework.http_client.mock_response_factory`: монитор
+декорирует транспорт с приоритетом -20, то есть снаружи мока (-10). Таймаут —
+только настоящим сокетом (`stream_socket_server` без ответа): `MockResponse`
+отдаёт статус сразу и бросает таймаут из деструктора чанка, причём уже в
+следующем тесте. Каталог кеша — на процесс (`getmypid()`): infection гоняет
 PHPUnit параллельно, а `setUp()` чистит каталог.
 
 ## Логгер в тестах

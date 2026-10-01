@@ -13,6 +13,9 @@ use Override;
 
 final class Statement extends AbstractStatementMiddleware
 {
+    // Optional schema prefix is matched but not captured: "public.users" labels as "users".
+    private const string TABLE = '(?:\w+\.)?(\w+)';
+
     /** @internal This statement can be only instantiated by its connection. */
     public function __construct(
         StatementInterface $statement,
@@ -56,10 +59,10 @@ final class Statement extends AbstractStatementMiddleware
     private function assembleTableName(string $sql): ?string
     {
         $pattern = '/(?:'
-            . 'SELECT\s+.+\s+FROM\s+(\w+)\b'
-            . '|INSERT\s+INTO\s+(\w+)\b'
-            . '|DELETE\s+FROM\s+(\w+)\b'
-            . '|UPDATE\s+(\w+)\b'
+            . 'SELECT\s+.+\s+FROM\s+' . self::TABLE
+            . '|INSERT\s+INTO\s+' . self::TABLE
+            . '|DELETE\s+FROM\s+' . self::TABLE
+            . '|UPDATE\s+' . self::TABLE
             . ')/Sis';
 
         if (preg_match($pattern, $sql, $match) !== 1) {
