@@ -5,7 +5,7 @@
 ```yaml
 jobs:
   standard:
-    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.5.1
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.6.0
     with:
       slug: msstc4symfony/metrics-bundle
       extensions: 'mbstring, xml, ctype, iconv, intl, redis, apcu, mongodb'
