@@ -11,6 +11,7 @@ use Symfony\Component\HttpClient\Response\StreamWrapper;
 use Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
+use Throwable;
 
 /**
  * Transparent wrapper in the spirit of TraceableResponse: every call is forwarded as-is, so
@@ -49,12 +50,24 @@ final class MonitoredResponse implements ResponseInterface, StreamableInterface
                 $this->inner->__destruct();
             }
         } catch (HttpExceptionInterface $e) {
-            $this->recordStatus();
+            $this->recordStatusSafely();
 
             throw $e;
         }
 
-        $this->recordStatus();
+        $this->recordStatusSafely();
+    }
+
+    /**
+     * A destructor runs at an arbitrary point of the caller's code: a metrics storage failure
+     * (e.g. Redis down) must not surface there for a request the caller never touched.
+     */
+    private function recordStatusSafely(): void
+    {
+        try {
+            $this->recordStatus();
+        } catch (Throwable) {
+        }
     }
 
     public function inner(): ResponseInterface
@@ -149,9 +162,15 @@ final class MonitoredResponse implements ResponseInterface, StreamableInterface
             $this->getHeaders();
         }
 
-        // Reading through the decorating client routes the body via its stream(), which records
-        // completion; the inner toStream() would bypass it (Psr18Client/HttplugClient use this).
-        return StreamWrapper::createResource($this, $this->client);
+        $stream = $this->inner instanceof StreamableInterface
+            ? $this->inner->toStream(false)
+            : StreamWrapper::createResource($this->inner, $this->client);
+
+        // The inner stream stays buffered and rewindable (Psr18Client/HttplugClient seek it);
+        // the filter reports the end of the body, which bypasses this wrapper otherwise.
+        CompletionStreamFilter::attach($stream, $this->recordCompletion(...));
+
+        return $stream;
     }
 
     /**

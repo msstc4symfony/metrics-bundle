@@ -214,6 +214,42 @@ final class HttpClientDecoratorTest extends TestCase
         self::assertSame('1', $this->durationCount());
     }
 
+    public function testToStreamAfterGetContentStillHoldsTheBody(): void
+    {
+        $response = $this->decorator(new MockHttpClient(new MockResponse(['a', 'b'])))->request('GET', 'https://api.example.com/a');
+        self::assertInstanceOf(StreamableInterface::class, $response);
+
+        $response->getContent();
+
+        self::assertSame('ab', stream_get_contents($response->toStream()));
+    }
+
+    public function testToStreamIsRewindable(): void
+    {
+        $response = $this->decorator(new MockHttpClient(new MockResponse(['a', 'b'])))->request('GET', 'https://api.example.com/a');
+        self::assertInstanceOf(StreamableInterface::class, $response);
+        $stream = $response->toStream();
+
+        self::assertSame('ab', stream_get_contents($stream));
+        self::assertTrue(rewind($stream));
+        self::assertSame('ab', stream_get_contents($stream));
+        self::assertSame('1', $this->durationCount());
+    }
+
+    public function testEachResponseIsRecordedOnceAcrossReadsAndDestruction(): void
+    {
+        $response = $this->decorator(new MockHttpClient(new MockResponse('ok')))->request('GET', 'https://api.example.com/a');
+        $response->getStatusCode();
+        $response->getContent();
+        unset($response);
+
+        self::assertSame(
+            [[['app', 'cmp', 'GET', 'api.example.com', '/a', '200'], '1']],
+            $this->samplesOf(MetricLabelEnum::HTTP_CONNECTION_RESPONSE),
+        );
+        self::assertSame('1', $this->durationCount());
+    }
+
     public function testCancelledRequestHasNoDuration(): void
     {
         $response = $this->decorator(new MockHttpClient(new MockResponse('ok')))->request('GET', 'https://api.example.com/a');
