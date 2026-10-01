@@ -36,18 +36,12 @@ Requires `ext-redis` and a Redis-compatible storage (or APCu / in-memory for tes
 
 ## Installation
 
-The package lives in a private GitHub repository, so register it as a VCS
-repository first. `no-api` makes Composer clone over SSH instead of calling the
-GitHub API, which would need a token for a private repository:
+The package is not on Packagist yet, so register its GitHub repository first:
 
 ```sh
-composer config repositories.msstc4symfony-metrics '{"type": "vcs", "url": "git@github.com:msstc4symfony/metrics-bundle.git", "no-api": true}'
+composer config repositories.msstc4symfony-metrics vcs https://github.com/msstc4symfony/metrics-bundle
 composer require msstc4symfony/metrics-bundle
 ```
-
-Without a GitHub token Composer cannot download dist archives of a private
-repository; either add one (`composer config github-oauth.github.com <token>`)
-or install from source (`composer require --prefer-source ...`).
 
 Symfony Flex will auto-register the bundle. Otherwise add it to `config/bundles.php`:
 
