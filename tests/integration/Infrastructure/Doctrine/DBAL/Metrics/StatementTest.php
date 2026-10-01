@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Test\Integration\Infrastructure\Doctrine\DBAL\Metrics;
 
+use Doctrine\DBAL\Driver\Result;
 use Doctrine\DBAL\Driver\Statement as StatementInterface;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\DoctrineConnectionCollector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\Statement;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\DoctrineQueryTypeEnum;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -57,6 +59,9 @@ final class StatementTest extends TestCase
         yield 'DELETE FROM' => ['DELETE FROM products WHERE id = 1', 'products'];
         yield 'UPDATE' => ['UPDATE accounts SET balance = 0 WHERE id = 1', 'accounts'];
         yield 'underscores' => ['SELECT * FROM user_logs WHERE id = 1', 'user_logs'];
+        yield 'SELECT without WHERE' => ['SELECT * FROM users', 'users'];
+        yield 'INSERT without column list' => ['INSERT INTO orders VALUES (1)', 'orders'];
+        yield 'UPDATE at end of line' => ["UPDATE accounts\nSET balance = 0", 'accounts'];
         yield 'no table' => ['CREATE TABLE foo (id INT)', null];
     }
 
@@ -66,6 +71,29 @@ final class StatementTest extends TestCase
         $method = new ReflectionMethod(Statement::class, 'assembleTableName');
 
         self::assertSame($expected, $method->invoke($this->buildStatement($sql), $sql));
+    }
+
+    public function testExecuteForwardsToInnerStatementAndRecordsTheQuery(): void
+    {
+        $result = self::createStub(Result::class);
+        $inner = $this->createMock(StatementInterface::class);
+        $inner->expects(self::once())->method('execute')->willReturn($result);
+
+        $registry = new CollectorRegistry(new InMemory());
+        $collector = new DoctrineConnectionCollector($registry, new MetricRepository([]), 'app', 'cmp');
+
+        self::assertSame($result, new Statement($inner, $collector, 'default', 'SELECT * FROM users')->execute());
+
+        $executed = [];
+        foreach ($registry->getMetricFamilySamples() as $family) {
+            if ($family->getName() === 'symfony_' . MetricLabelEnum::DOCTRINE_QUERY_EXECUTE->value) {
+                foreach ($family->getSamples() as $sample) {
+                    $executed[] = $sample->getLabelValues();
+                }
+            }
+        }
+
+        self::assertSame([['app', 'cmp', 'default', 'select', 'users']], $executed);
     }
 
     private function buildStatement(string $sql): Statement

@@ -9,8 +9,12 @@ use Override;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Bundle\MonologBundle\MonologBundle;
+use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
+use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\HttpClient\HttpClient;
+use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
 
@@ -18,9 +22,17 @@ final class TestKernel extends Kernel
 {
     use MicroKernelTrait;
 
-    public const string CACHE_ROOT = '/msstc4symfony-metrics-bundle-test';
-
     public const string HTTP_CLIENT_ALIAS = 'test.http_client';
+
+    public const string SCOPED_CLIENT = 'github.client';
+
+    public const string SCOPED_CLIENT_ALIAS = 'test.github.client';
+
+    // Per process: infection runs PHPUnit in parallel and setUp() wipes this directory.
+    public static function cacheRoot(): string
+    {
+        return sys_get_temp_dir() . '/msstc4symfony-metrics-bundle-test-' . getmypid();
+    }
 
     #[Override]
     public function registerBundles(): iterable
@@ -33,15 +45,37 @@ final class TestKernel extends Kernel
     }
 
     #[Override]
+    protected function build(ContainerBuilder $container): void
+    {
+        if (!class_exists(HttpClient::class)) {
+            return;
+        }
+
+        // framework.http_client.mock_response_factory wraps the transport from the outside and
+        // would hide the monitor; replacing the transport itself keeps the monitor on top of it.
+        $container->addCompilerPass(new class implements CompilerPassInterface {
+            public function process(ContainerBuilder $container): void
+            {
+                $container->getDefinition('http_client.transport')
+                    ->setClass(MockHttpClient::class)
+                    ->setFactory(null)
+                    ->setArguments([new Reference('test.mock_response')])
+                    ->setMethodCalls([])
+                ;
+            }
+        });
+    }
+
+    #[Override]
     public function getCacheDir(): string
     {
-        return sys_get_temp_dir() . self::CACHE_ROOT . '/cache/' . $this->environment;
+        return self::cacheRoot() . '/cache/' . $this->environment;
     }
 
     #[Override]
     public function getLogDir(): string
     {
-        return sys_get_temp_dir() . self::CACHE_ROOT . '/log';
+        return self::cacheRoot() . '/log';
     }
 
     protected function configureContainer(ContainerConfigurator $container): void
@@ -58,14 +92,19 @@ final class TestKernel extends Kernel
         ];
 
         if (class_exists(HttpClient::class)) {
-            $framework['http_client'] = [];
+            $framework['http_client'] = [
+                'scoped_clients' => [self::SCOPED_CLIENT => ['base_uri' => 'https://api.github.com']],
+            ];
         }
 
         $container->extension('framework', $framework);
 
         if (class_exists(HttpClient::class)) {
-            // Unused services are removed on compile; the test needs to fetch this one.
-            $container->services()->alias(self::HTTP_CLIENT_ALIAS, 'http_client')->public();
+            $services = $container->services();
+            $services->set('test.mock_response', MockResponseFactory::class);
+            // Unused services are removed on compile; the test needs to fetch these.
+            $services->alias(self::HTTP_CLIENT_ALIAS, 'http_client')->public();
+            $services->alias(self::SCOPED_CLIENT_ALIAS, self::SCOPED_CLIENT)->public();
         }
         $container->extension('monolog', [
             'handlers' => ['main' => ['type' => 'null']],

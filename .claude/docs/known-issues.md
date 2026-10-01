@@ -1,25 +1,34 @@
 # Известные проблемы и находки
 
-## HTTP-мониторинг не работал до `v1.1.0`
+## HTTP-мониторинг не работал до `v1.1.0`, а включённый как был — вредил
 
 `AddHttpClientMonitorPass` проверял `class_exists(HttpClientInterface::class)` —
-для интерфейса всегда `false`, пасс выходил сразу. Под этим сидел второй дефект:
-вызов `tagged_iterator()`, функции, которой нет вне загрузки PHP-конфигов.
-Тег ассемблеров был с опечаткой (`metrics.htp_client...`) — переименован в
-`metrics.http_client.url_assembler` (`AssemblerInterface::TAG`); на старое имя
-никто не мог опираться, фича не работала.
+для интерфейса всегда `false`; под этим сидел вызов незагруженной `tagged_iterator()`.
+Когда пасс заработал, ревью (2026-09-30) нашло, что старый дизайн:
+- декорировал и клиенты, и `http_client.transport` — каждый запрос считался дважды;
+- у scoped-клиентов Symfony 7.4+/8 видел относительный URL — пустой host;
+- читал статус в `request()` — терял конкурентность и проверку статуса в деструкторе;
+- не имел `reset()` — тег `kernel.reset` переезжал на декоратор и терялся.
+Сейчас: только транспорт, `AsyncDecoratorTrait`, метрики по чанкам. Тег ассемблеров
+исправлен с `metrics.htp_client...` на `metrics.http_client.url_assembler`.
 
 ## `apc://`, `apcng://`, `inmemory://` уходили в InMemory
 
 `parse_url('apc://')` === `false` → «malformed DSN» → InMemory, то есть метрики
-APCu не шарились между воркерами. Исправлено разбором схем без хоста.
+APCu не шарились между воркерами. Исправлено разбором схем без хоста (в т.ч. `apc:///`,
+`apcng://?prefix=x`). `redis://` без хоста по-прежнему ошибка — осознанно.
+
+## Таблица `unknown` у запросов без `WHERE`
+
+Регулярка `Statement::assembleTableName` требовала пробел после имени таблицы:
+`SELECT * FROM users` давал `unknown`. Теперь граница слова.
 
 ## Бандл не запускался в приложении с Monolog
 
 Цикл: `Storage\Factory` → `LoggerInterface` (задекорирован `HandlerDecorator`) →
 `ErrorCollector` → `RegistryInterface` → `Adapter` → `Factory`. Контейнер не
 собирался вообще; тесты компилер-пассов на голом `ContainerBuilder` этого не видели.
-Исправлено: `Factory` пишет в свой канал `metrics` (`#[WithMonologChannel]`), канал
+Исправлено: `Factory` пишет в свой канал `metrics_bundle` (`#[WithMonologChannel]`), канал
 исключён из декорирования. Ловит `tests/integration/ContainerCompileTest`
 (настоящее ядро: Framework + Monolog + Metrics). `monolog/monolog ^3.5` объявлен явно —
 атрибут и `Monolog\Level` есть только в 3.x.
@@ -50,7 +59,14 @@ APCu не шарились между воркерами. Исправлено �
 ## `Statement::execute()` и DBAL 3/4
 
 DBAL 3 передаёт параметры в `execute($params)`, DBAL 4 параметр убрал. Метод
-принимает `mixed $params = null` и форвардит `func_get_args()` — работает на обоих.
+принимает `mixed $params = null` и форвардит `func_get_args()`. CI-лок держит DBAL 4;
+DBAL 3 (3.10 + Symfony 7.4) проверен вручную 2026-10-01 — весь набор зелёный. На
+Symfony 8 DBAL 3 не ставится (конфликт с `symfony/http-foundation`).
+
+## Elastica: клиенты создаются в `boot()`
+
+`wireElasticaTransports()` достаёт каждый клиент и соединение при загрузке ядра —
+один раз на воркер. Ленивая обёртка — этап B вместе с поддержкой Elastica 8.
 
 ## BC check красный до релиза `v1.1.0`
 

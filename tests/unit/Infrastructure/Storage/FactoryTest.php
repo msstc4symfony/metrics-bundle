@@ -59,6 +59,9 @@ final class FactoryTest extends TestCase
         yield 'apc' => ['apc://'];
         yield 'apcng' => ['apcng://'];
         yield 'inmemory' => ['inmemory://'];
+        yield 'apc with trailing slash' => ['apc:///'];
+        yield 'apcng with query' => ['apcng://?prefix=app'];
+        yield 'inmemory with slash and query' => ['inmemory:///?x=1'];
     }
 
     public function testApcSchemeReturnsApcAdapter(): void

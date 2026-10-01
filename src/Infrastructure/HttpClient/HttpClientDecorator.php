@@ -4,28 +4,41 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient;
 
+use Generator;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ExternalConnectionCollector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\URLAssembler\AssemblerInterface;
 use Override;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpClient\AsyncDecoratorTrait;
+use Symfony\Component\HttpClient\Response\AsyncContext;
+use Symfony\Component\HttpClient\Response\AsyncResponse;
+use Symfony\Contracts\HttpClient\ChunkInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
-use Symfony\Contracts\HttpClient\ResponseStreamInterface;
+use Symfony\Contracts\Service\ResetInterface;
 
-final class HttpClientDecorator implements HttpClientInterface
+/**
+ * Records metrics while the response streams instead of reading it in request():
+ * reading the status there would serialize concurrent requests and disable the
+ * destructor-time status check of unconsumed responses.
+ */
+final class HttpClientDecorator implements HttpClientInterface, ResetInterface, LoggerAwareInterface
 {
+    use AsyncDecoratorTrait;
+
     /**
      * @param iterable<AssemblerInterface> $urlAssemblers
      */
     public function __construct(
-        // not readonly: withOptions() clones $this and reassigns $inner.
-        private HttpClientInterface $inner,
+        HttpClientInterface $inner,
         private readonly ExternalConnectionCollector $collector,
         private readonly iterable $urlAssemblers,
-        private readonly ?string $baseUri = null,
         #[Autowire(param: 'metrics_bundle.httpClientSanitizePath')]
         private readonly bool $sanitizePath = true,
     ) {
+        $this->client = $inner;
     }
 
     /**
@@ -35,45 +48,37 @@ final class HttpClientDecorator implements HttpClientInterface
     public function request(string $method, string $url, array $options = []): ResponseInterface
     {
         $baseUri = isset($options['base_uri']) && is_string($options['base_uri']) ? $options['base_uri'] : null;
-        [$metricHost, $metricPath] = $this->processUrl($url, $baseUri);
+        [$host, $path] = $this->processUrl($url, $baseUri);
 
-        $this->collector->incHTTPConnectionRequest($method, $metricHost, $metricPath);
+        $this->collector->incHTTPConnectionRequest($method, $host, $path);
 
-        $response = $this->inner->request($method, $url, $options);
+        $passthru = function (ChunkInterface $chunk, AsyncContext $context) use ($method, $host, $path): Generator {
+            // Error chunks throw from isFirst()/isLast(); the error itself reaches the caller unchanged.
+            if ($chunk->getError() === null) {
+                if ($chunk->isFirst()) {
+                    $this->collector->incHTTPConnectionResponse($method, $host, $path, $context->getStatusCode());
+                }
 
-        $this->collector->incHTTPConnectionResponse($method, $metricHost, $metricPath, $response->getStatusCode());
+                if ($chunk->isLast()) {
+                    $totalTime = $context->getInfo('total_time');
+                    if (is_float($totalTime) || is_int($totalTime)) {
+                        $this->collector->setHTTPConnectionDuration($method, $host, $path, (float) $totalTime);
+                    }
+                }
+            }
 
-        $startTime = $response->getInfo('start_time');
-        if ((is_float($startTime) || is_int($startTime)) && $startTime > 0) {
-            $this->collector->setHTTPConnectionDuration(
-                $method,
-                $metricHost,
-                $metricPath,
-                microtime(true) - $startTime,
-            );
-        }
+            yield $chunk;
+        };
 
-        return $response;
+        return new AsyncResponse($this->client, $method, $url, $options, $passthru);
     }
 
     #[Override]
-    public function stream(
-        ResponseInterface|iterable $responses,
-        ?float $timeout = null,
-    ): ResponseStreamInterface {
-        return $this->inner->stream($responses, $timeout);
-    }
-
-    /**
-     * @param array<mixed> $options
-     */
-    #[Override]
-    public function withOptions(array $options): static
+    public function setLogger(LoggerInterface $logger): void
     {
-        $clone = clone $this;
-        $clone->inner = $this->inner->withOptions($options);
-
-        return $clone;
+        if ($this->client instanceof LoggerAwareInterface) {
+            $this->client->setLogger($logger);
+        }
     }
 
     /**
@@ -99,12 +104,7 @@ final class HttpClientDecorator implements HttpClientInterface
 
     private function prepareUrl(string $url, ?string $baseUri): string
     {
-        if (is_string(parse_url($url, PHP_URL_HOST))) {
-            return $url;
-        }
-
-        $baseUri ??= $this->baseUri;
-        if ($baseUri === null) {
+        if ($baseUri === null || is_string(parse_url($url, PHP_URL_HOST))) {
             return $url;
         }
 

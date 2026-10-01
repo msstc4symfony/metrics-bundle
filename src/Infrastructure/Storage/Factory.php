@@ -21,7 +21,7 @@ use Throwable;
 #[WithMonologChannel(self::LOG_CHANNEL)]
 final readonly class Factory implements FactoryInterface
 {
-    public const string LOG_CHANNEL = 'metrics';
+    public const string LOG_CHANNEL = 'metrics_bundle';
 
     private const string DEFAULT_REDIS_HOST = '127.0.0.1';
 
@@ -125,13 +125,14 @@ final readonly class Factory implements FactoryInterface
             return $parts;
         }
 
-        foreach (self::HOSTLESS_SCHEMES as $scheme) {
-            if ($dsn === $scheme . '://') {
-                return ['scheme' => $scheme];
-            }
+        $schemes = implode('|', self::HOSTLESS_SCHEMES);
+        if (preg_match('#^(' . $schemes . ')://(?:/)?(?:\?(.*))?$#', $dsn, $match) !== 1) {
+            return false;
         }
 
-        return false;
+        return isset($match[2]) && $match[2] !== ''
+            ? ['scheme' => $match[1], 'query' => $match[2]]
+            : ['scheme' => $match[1]];
     }
 
     /**

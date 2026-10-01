@@ -9,65 +9,50 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\HttpClientDecorator;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
-use Symfony\Component\HttpClient\ScopingHttpClient;
+use Symfony\Component\HttpClient\Response\AsyncResponse;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 final class AddHttpClientMonitorPassTest extends TestCase
 {
     protected function setUp(): void
     {
-        if (!interface_exists(HttpClientInterface::class) || !class_exists(ScopingHttpClient::class)) {
+        if (!class_exists(AsyncResponse::class)) {
             self::markTestSkipped('symfony/http-client not installed');
         }
     }
 
-    public function testDecoratesHttpClientInterfaceDefinition(): void
+    public function testDecoratesOnlyTheSharedTransport(): void
     {
         $container = new ContainerBuilder();
-        $container->setDefinition('app.http_client', new Definition(HttpClientInterface::class, [['base_uri' => 'https://api.example.com']]));
+        $container->setDefinition(AddHttpClientMonitorPass::TRANSPORT_ID, new Definition(HttpClientInterface::class));
+        $container->setDefinition('http_client', new Definition(HttpClientInterface::class));
+        $container->setDefinition('github.client', new Definition(HttpClientInterface::class));
 
         new AddHttpClientMonitorPass()->process($container);
 
-        self::assertTrue($container->hasDefinition('app.http_client.decorator.monitor'));
-        $decorator = $container->getDefinition('app.http_client.decorator.monitor');
+        $decorator = $container->getDefinition(AddHttpClientMonitorPass::DECORATOR_ID);
         self::assertSame(HttpClientDecorator::class, $decorator->getClass());
-        self::assertSame('https://api.example.com', $decorator->getArgument('$baseUri'));
+        self::assertSame([AddHttpClientMonitorPass::TRANSPORT_ID, null, 0], $decorator->getDecoratedService());
+        self::assertFalse($container->hasDefinition('http_client.decorator.monitor'));
+        self::assertFalse($container->hasDefinition('github.client.decorator.monitor'));
     }
 
-    public function testDecoratesScopingHttpClientDefinition(): void
+    public function testDoesNothingWithoutFrameworkHttpClient(): void
     {
         $container = new ContainerBuilder();
-        $container->setDefinition('app.scoped', new Definition(ScopingHttpClient::class, [null, 'https://scoped.example.com']));
 
         new AddHttpClientMonitorPass()->process($container);
 
-        $decorator = $container->getDefinition('app.scoped.decorator.monitor');
-        self::assertSame('https://scoped.example.com', $decorator->getArgument('$baseUri'));
+        self::assertFalse($container->hasDefinition(AddHttpClientMonitorPass::DECORATOR_ID));
     }
 
-    public function testSkipsAlreadyDecoratedDefinitions(): void
+    public function testSkipsAbstractTransport(): void
     {
         $container = new ContainerBuilder();
-        $existing = new Definition(HttpClientInterface::class);
-        $existing->setDecoratedService('some.other.id');
-
-        $container->setDefinition('app.already_decorated', $existing);
+        $container->setDefinition(AddHttpClientMonitorPass::TRANSPORT_ID, new Definition(HttpClientInterface::class)->setAbstract(true));
 
         new AddHttpClientMonitorPass()->process($container);
 
-        self::assertFalse($container->hasDefinition('app.already_decorated.decorator.monitor'));
-    }
-
-    public function testSkipsAbstractDefinitions(): void
-    {
-        $container = new ContainerBuilder();
-        $abstract = new Definition(HttpClientInterface::class);
-        $abstract->setAbstract(true);
-
-        $container->setDefinition('app.abstract', $abstract);
-
-        new AddHttpClientMonitorPass()->process($container);
-
-        self::assertFalse($container->hasDefinition('app.abstract.decorator.monitor'));
+        self::assertFalse($container->hasDefinition(AddHttpClientMonitorPass::DECORATOR_ID));
     }
 }

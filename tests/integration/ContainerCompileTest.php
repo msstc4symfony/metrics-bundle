@@ -4,16 +4,18 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Test\Integration;
 
-use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\HttpClientDecorator;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Monolog\Handler\HandlerDecorator;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Storage\Factory;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\TestKernel;
 use Override;
+use Prometheus\RegistryInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Bundle\MonologBundle\MonologBundle;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * Boots FrameworkBundle + MonologBundle + MetricsBundle. The compiler-pass tests use a
@@ -30,7 +32,7 @@ final class ContainerCompileTest extends KernelTestCase
             self::markTestSkipped('symfony/monolog-bundle not installed');
         }
 
-        new Filesystem()->remove(sys_get_temp_dir() . TestKernel::CACHE_ROOT);
+        new Filesystem()->remove(TestKernel::cacheRoot());
         $_SERVER[self::DSN_ENV] = 'inmemory://';
     }
 
@@ -66,14 +68,42 @@ final class ContainerCompileTest extends KernelTestCase
         self::assertNotInstanceOf(HandlerDecorator::class, $container->get('monolog.logger.' . Factory::LOG_CHANNEL));
     }
 
-    public function testHttpClientIsDecorated(): void
+    public function testEachHttpRequestIsCountedOnceWithItsRealHost(): void
     {
         if (!class_exists(HttpClient::class)) {
             self::markTestSkipped('symfony/http-client not installed');
         }
 
         self::bootKernel();
+        $container = self::getContainer();
 
-        self::assertInstanceOf(HttpClientDecorator::class, self::getContainer()->get(TestKernel::HTTP_CLIENT_ALIAS));
+        $default = $container->get(TestKernel::HTTP_CLIENT_ALIAS);
+        $scoped = $container->get(TestKernel::SCOPED_CLIENT_ALIAS);
+        self::assertInstanceOf(HttpClientInterface::class, $default);
+        self::assertInstanceOf(HttpClientInterface::class, $scoped);
+
+        $default->request('GET', 'https://example.com/a')->getContent();
+        $scoped->request('GET', '/users/1')->getContent();
+
+        $registry = $container->get(RegistryInterface::class);
+        self::assertInstanceOf(RegistryInterface::class, $registry);
+
+        $requests = [];
+        foreach ($registry->getMetricFamilySamples() as $family) {
+            if ($family->getName() !== 'symfony_' . MetricLabelEnum::HTTP_CONNECTION_REQUEST->value) {
+                continue;
+            }
+
+            foreach ($family->getSamples() as $sample) {
+                [, , , $host, $path] = $sample->getLabelValues();
+                self::assertIsString($host);
+                self::assertIsString($path);
+                $requests[$host . $path] = (string) $sample->getValue();
+            }
+        }
+
+        ksort($requests);
+
+        self::assertSame(['api.github.com/users/:id' => '1', 'example.com/a' => '1'], $requests);
     }
 }

@@ -19,6 +19,16 @@ PHPUnit 12+ пишет notice на мок без ожиданий. Нет `expec
 `ResponseInterface::getInfo()` в коде вызывается с ключом
 (`getInfo('start_time')`) — стаб через `willReturnMap`.
 
+## Тест на настоящем ядре
+
+`tests/integration/ContainerCompileTest` + `Kernel/TestKernel` (Framework + Monolog +
+Metrics) ловят то, чего не видят тесты пассов на голом `ContainerBuilder`: циклы,
+проводку декораторов, маршрут. HTTP проверяется через подмену самого
+`http_client.transport` на `MockHttpClient` (в `TestKernel::build()`):
+`framework.http_client.mock_response_factory` встаёт **снаружи** транспорта и
+спрятал бы монитор. Каталог кеша — на процесс (`getmypid()`): infection гоняет
+PHPUnit параллельно, а `setUp()` чистит каталог.
+
 ## Логгер в тестах
 
 Проверять «какие сообщения записаны» удобнее анонимным `AbstractLogger`,

@@ -8,6 +8,12 @@
   (`MetricsBundle::boot()`).
 - Имена тегов DI — константы на интерфейсе (`AssemblerInterface::TAG`), атрибут
   `#[AutoconfigureTag(self::TAG)]` и компилер-пасс ссылаются на одно значение.
+- Декораторы HTTP-клиента — через `AsyncDecoratorTrait` + `AsyncResponse` с passthru:
+  метрики пишутся по чанкам (`isFirst` — статус, `isLast` — `total_time`). Читать
+  статус в `request()` нельзя: это сериализует конкурентные запросы и отключает
+  проверку статуса в деструкторе непрочитанного ответа. `DecoratorTrait` даёт
+  `withOptions()`/`reset()` — без `reset()` в воркерах не сбрасывается curl multi.
+- Свой канал Monolog у бандла — `metrics_bundle`; он исключён из `HandlerDecorator`.
 - В компилер-пассах — `new TaggedIteratorArgument(...)`, а не функция
   `tagged_iterator()`: она определена в файле конфигуратора и вне загрузки
   PHP-конфигов не существует.

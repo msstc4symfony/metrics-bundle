@@ -56,10 +56,10 @@ final class Statement extends AbstractStatementMiddleware
     private function assembleTableName(string $sql): ?string
     {
         $pattern = '/(?:'
-            . 'SELECT\s+.+\s+FROM\s+([\w_]+)\s'
-            . '|INSERT\s+INTO\s+([\w_]+)\s'
-            . '|DELETE\s+FROM\s+([\w_]+)'
-            . '|UPDATE\s+([\w_]+)\s'
+            . 'SELECT\s+.+\s+FROM\s+(\w+)\b'
+            . '|INSERT\s+INTO\s+(\w+)\b'
+            . '|DELETE\s+FROM\s+(\w+)\b'
+            . '|UPDATE\s+(\w+)\b'
             . ')/Sis';
 
         if (preg_match($pattern, $sql, $match) !== 1) {

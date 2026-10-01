@@ -14,8 +14,11 @@ use Prometheus\CollectorRegistry;
 use Prometheus\MetricFamilySamples;
 use Prometheus\Sample;
 use Prometheus\Storage\InMemory;
+use Symfony\Component\HttpClient\Exception\TransportException;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
-use Symfony\Contracts\HttpClient\ResponseInterface;
+use Symfony\Contracts\Service\ResetInterface;
 
 final class HttpClientDecoratorTest extends TestCase
 {
@@ -25,71 +28,67 @@ final class HttpClientDecoratorTest extends TestCase
 
     protected function setUp(): void
     {
-        if (!interface_exists(HttpClientInterface::class)) {
-            self::markTestSkipped('symfony/http-client-contracts not installed');
+        if (!class_exists(MockHttpClient::class)) {
+            self::markTestSkipped('symfony/http-client not installed');
         }
 
         $this->registry = new CollectorRegistry(new InMemory());
         $this->collector = new ExternalConnectionCollector($this->registry, new MetricRepository([]), 'app', 'cmp');
     }
 
-    public function testRequestRecordsRequestResponseAndDurationMetrics(): void
+    public function testRecordsRequestResponseAndDurationOnce(): void
     {
-        $response = self::createStub(ResponseInterface::class);
-        $response->method('getStatusCode')->willReturn(200);
-        $response->method('getInfo')->willReturnMap([['start_time', microtime(true) - 0.1]]);
+        $decorator = $this->decorator(new MockHttpClient(new MockResponse('{}', ['http_code' => 201])));
 
-        $inner = $this->createMock(HttpClientInterface::class);
-        $inner->expects(self::once())
-            ->method('request')
-            ->with('GET', 'https://api.example.com/users/42')
-            ->willReturn($response)
-        ;
-
-        $decorator = new HttpClientDecorator($inner, $this->collector, [], sanitizePath: true);
-        $decorator->request('GET', 'https://api.example.com/users/42');
+        $decorator->request('GET', 'https://api.example.com/users/42')->getContent();
 
         self::assertSame(
-            [['app', 'cmp', 'GET', 'api.example.com', '/users/:id']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::HTTP_CONNECTION_REQUEST->value),
+            [[['app', 'cmp', 'GET', 'api.example.com', '/users/:id'], '1']],
+            $this->samplesOf(MetricLabelEnum::HTTP_CONNECTION_REQUEST),
         );
         self::assertSame(
-            [['app', 'cmp', 'GET', 'api.example.com', '/users/:id', '200']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::HTTP_CONNECTION_RESPONSE->value),
+            [[['app', 'cmp', 'GET', 'api.example.com', '/users/:id', '201'], '1']],
+            $this->samplesOf(MetricLabelEnum::HTTP_CONNECTION_RESPONSE),
         );
-        self::assertTrue($this->familyExists('symfony_' . MetricLabelEnum::HTTP_CONNECTION_DURATION_HISTOGRAM_SECONDS->value));
+        self::assertTrue($this->familyExists(MetricLabelEnum::HTTP_CONNECTION_DURATION_HISTOGRAM_SECONDS));
     }
 
-    public function testRequestSkipsDurationWhenStartTimeIsZero(): void
+    public function testResponseIsRecordedOnlyWhenTheCallerReadsIt(): void
     {
-        $response = self::createStub(ResponseInterface::class);
-        $response->method('getStatusCode')->willReturn(204);
-        $response->method('getInfo')->willReturnMap([['start_time', 0.0]]);
+        $response = $this->decorator(new MockHttpClient(new MockResponse('ok')))->request('GET', 'https://api.example.com/a');
 
-        $inner = self::createStub(HttpClientInterface::class);
-        $inner->method('request')->willReturn($response);
+        self::assertSame([], $this->samplesOf(MetricLabelEnum::HTTP_CONNECTION_RESPONSE), 'request() must not wait for the response');
 
-        $decorator = new HttpClientDecorator($inner, $this->collector, []);
-        $decorator->request('GET', 'https://api.example.com/');
+        $response->getStatusCode();
 
-        self::assertFalse($this->familyExists('symfony_' . MetricLabelEnum::HTTP_CONNECTION_DURATION_HISTOGRAM_SECONDS->value));
+        self::assertCount(1, $this->samplesOf(MetricLabelEnum::HTTP_CONNECTION_RESPONSE));
     }
 
-    public function testRequestKeepsRawPathWhenSanitizeDisabled(): void
+    public function testTransportErrorReachesTheCallerWithoutResponseMetric(): void
     {
-        $response = self::createStub(ResponseInterface::class);
-        $response->method('getStatusCode')->willReturn(200);
-        $response->method('getInfo')->willReturnMap([['start_time', 0.0]]);
+        $decorator = $this->decorator(new MockHttpClient(new MockResponse('', ['error' => 'host unreachable'])));
 
-        $inner = self::createStub(HttpClientInterface::class);
-        $inner->method('request')->willReturn($response);
+        $response = $decorator->request('GET', 'https://api.example.com/a');
 
-        $decorator = new HttpClientDecorator($inner, $this->collector, [], sanitizePath: false);
-        $decorator->request('GET', 'https://api.example.com/users/42');
+        try {
+            $response->getContent();
+            self::fail('Transport error was swallowed');
+        } catch (TransportException) {
+        }
+
+        self::assertCount(1, $this->samplesOf(MetricLabelEnum::HTTP_CONNECTION_REQUEST));
+        self::assertSame([], $this->samplesOf(MetricLabelEnum::HTTP_CONNECTION_RESPONSE));
+    }
+
+    public function testKeepsRawPathWhenSanitizeDisabled(): void
+    {
+        $decorator = new HttpClientDecorator(new MockHttpClient(new MockResponse('')), $this->collector, [], sanitizePath: false);
+
+        $decorator->request('GET', 'https://api.example.com/users/42')->getContent();
 
         self::assertSame(
-            [['app', 'cmp', 'GET', 'api.example.com', '/users/42']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::HTTP_CONNECTION_REQUEST->value),
+            [[['app', 'cmp', 'GET', 'api.example.com', '/users/42'], '1']],
+            $this->samplesOf(MetricLabelEnum::HTTP_CONNECTION_REQUEST),
         );
     }
 
@@ -102,76 +101,84 @@ final class HttpClientDecoratorTest extends TestCase
             }
         };
 
-        $response = self::createStub(ResponseInterface::class);
-        $response->method('getStatusCode')->willReturn(200);
-        $response->method('getInfo')->willReturnMap([['start_time', 0.0]]);
-
-        $inner = self::createStub(HttpClientInterface::class);
-        $inner->method('request')->willReturn($response);
-
-        $decorator = new HttpClientDecorator($inner, $this->collector, [$assembler]);
-        $decorator->request('GET', 'https://api.example.com/whatever');
+        $decorator = new HttpClientDecorator(new MockHttpClient(new MockResponse('')), $this->collector, [$assembler]);
+        $decorator->request('GET', 'https://api.example.com/whatever')->getContent();
 
         self::assertSame(
-            [['app', 'cmp', 'GET', 'custom-host', '/custom-path']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::HTTP_CONNECTION_REQUEST->value),
+            [[['app', 'cmp', 'GET', 'custom-host', '/custom-path'], '1']],
+            $this->samplesOf(MetricLabelEnum::HTTP_CONNECTION_REQUEST),
         );
     }
 
-    public function testRelativeUrlIsResolvedAgainstBaseUri(): void
+    public function testRelativeUrlIsResolvedAgainstBaseUriOption(): void
     {
-        $response = self::createStub(ResponseInterface::class);
-        $response->method('getStatusCode')->willReturn(200);
-        $response->method('getInfo')->willReturnMap([['start_time', 0.0]]);
+        $decorator = $this->decorator(new MockHttpClient(new MockResponse('')));
 
-        $inner = self::createStub(HttpClientInterface::class);
-        $inner->method('request')->willReturn($response);
-
-        $decorator = new HttpClientDecorator($inner, $this->collector, [], baseUri: 'https://api.example.com');
-        $decorator->request('GET', '/orders');
+        $decorator->request('GET', '/v1/items', ['base_uri' => 'https://svc.example.com'])->getContent();
 
         self::assertSame(
-            [['app', 'cmp', 'GET', 'api.example.com', '/orders']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::HTTP_CONNECTION_REQUEST->value),
+            [[['app', 'cmp', 'GET', 'svc.example.com', '/v1/items'], '1']],
+            $this->samplesOf(MetricLabelEnum::HTTP_CONNECTION_REQUEST),
         );
     }
 
-    public function testWithOptionsReturnsCloneWithoutMutatingOriginal(): void
+    public function testResetAndWithOptionsAreForwardedToTheInnerClient(): void
     {
-        $inner = $this->createMock(HttpClientInterface::class);
-        $inner->expects(self::once())
-            ->method('withOptions')
-            ->with(['timeout' => 1])
-            ->willReturnSelf()
-        ;
+        $inner = $this->createMock(ResettableClient::class);
+        $inner->expects(self::once())->method('reset');
+        $inner->expects(self::once())->method('withOptions')->with(['timeout' => 1])->willReturnSelf();
 
-        $decorator = new HttpClientDecorator($inner, $this->collector, []);
-        $clone = $decorator->withOptions(['timeout' => 1]);
+        $decorator = $this->decorator($inner);
+        $decorator->reset();
 
-        self::assertNotSame($decorator, $clone);
+        self::assertNotSame($decorator, $decorator->withOptions(['timeout' => 1]));
+    }
+
+    private function decorator(HttpClientInterface $inner): HttpClientDecorator
+    {
+        return new HttpClientDecorator($inner, $this->collector, []);
     }
 
     /**
-     * @return array<array<int, string>>
+     * @return list<array{list<string>, string}>
      */
-    private function labelValuesFor(string $name): array
+    private function samplesOf(MetricLabelEnum $metric): array
     {
         foreach ($this->registry->getMetricFamilySamples() as $family) {
-            if ($family->getName() !== $name) {
-                continue;
+            if ($family->getName() === 'symfony_' . $metric->value) {
+                return array_values(array_map(
+                    static fn (Sample $sample): array => [self::labels($sample), $sample->getValue()],
+                    $family->getSamples(),
+                ));
             }
-
-            return array_map(
-                static fn (Sample $sample): array => $sample->getLabelValues(),
-                $family->getSamples(),
-            );
         }
 
         return [];
     }
 
-    private function familyExists(string $name): bool
+    /**
+     * @return list<string>
+     */
+    private static function labels(Sample $sample): array
     {
-        return array_any($this->registry->getMetricFamilySamples(), fn (MetricFamilySamples $family): bool => $family->getName() === $name);
+        $labels = [];
+        foreach ($sample->getLabelValues() as $value) {
+            self::assertIsString($value);
+            $labels[] = $value;
+        }
+
+        return $labels;
     }
+
+    private function familyExists(MetricLabelEnum $metric): bool
+    {
+        return array_any(
+            $this->registry->getMetricFamilySamples(),
+            static fn (MetricFamilySamples $family): bool => $family->getName() === 'symfony_' . $metric->value,
+        );
+    }
+}
+
+interface ResettableClient extends HttpClientInterface, ResetInterface
+{
 }

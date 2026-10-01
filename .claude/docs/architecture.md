@@ -22,10 +22,12 @@
 2. Компилер-пассы (`MetricsBundle::build()`):
    - `AddMonologDecoratorCompilerPass` — декорирует `monolog.logger.*`;
    - `AddDoctrineDBALMonitorPass` — DBAL middleware;
-   - `AddHttpClientMonitorPass` (priority -256) — оборачивает определения с классом
-     `HttpClientInterface` / `ScopingHttpClient` в `HttpClientDecorator`;
-     URL-ассемблеры собираются по тегу `AssemblerInterface::TAG`
-     (`metrics.http_client.url_assembler`);
+   - `AddHttpClientMonitorPass` (priority -256) — декорирует **только**
+     `http_client.transport`: туда сходятся все клиенты фреймворка (default и scoped)
+     уже с абсолютным URL, поэтому каждый реальный запрос считается один раз и с
+     правильным host. Повторы `retry_failed` — отдельные запросы. Клиенты, созданные
+     приложением в обход FrameworkBundle, не мониторятся. URL-ассемблеры — по тегу
+     `AssemblerInterface::TAG` (`metrics.http_client.url_assembler`);
    - `SaveElasticaClientsListPass` — пишет id клиентов Elastica в параметр
      `metrics.elastica.clients`.
 3. `MetricsBundle::boot()` — то, что нельзя сделать в контейнере:
@@ -44,6 +46,6 @@ MongoDB, Elastica, APCu. Точка проводки молча выключае
 
 `Storage\Factory::create()` выбирает адаптер Prometheus по схеме DSN:
 `redis`, `redisng`, `apc`, `apcng`, `inmemory`. Любая ошибка — откат на
-`InMemory` с записью в лог (только схема DSN, без учётных данных).
+`InMemory` с записью в лог канала `metrics_bundle` (только схема DSN, без учётных данных).
 Схемы без хоста (`apc://`, `apcng://`, `inmemory://`) разбираются отдельно:
 `parse_url()` их отвергает.

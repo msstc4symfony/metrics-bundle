@@ -10,57 +10,37 @@ use Override;
 use Symfony\Component\DependencyInjection\Argument\TaggedIteratorArgument;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
-use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
-use Symfony\Component\HttpClient\ScopingHttpClient;
-use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Component\HttpClient\Response\AsyncResponse;
 
+/**
+ * Every FrameworkBundle client, default and scoped, ends in the shared transport with an
+ * absolute URL. Monitoring that single point counts each real request exactly once;
+ * decorating the client services as well would count it twice and see scoped clients
+ * before their base_uri is applied.
+ */
 final class AddHttpClientMonitorPass implements CompilerPassInterface
 {
+    public const string TRANSPORT_ID = 'http_client.transport';
+
+    public const string DECORATOR_ID = self::TRANSPORT_ID . '.decorator.monitor';
+
     #[Override]
     public function process(ContainerBuilder $container): void
     {
-        if (!interface_exists(HttpClientInterface::class)) {
+        if (!class_exists(AsyncResponse::class) || !$container->hasDefinition(self::TRANSPORT_ID)) {
             return;
         }
 
-        foreach ($container->getDefinitions() as $id => $definition) {
-            if (
-                $definition->getClass() === null
-                || !DefinitionFilter::isDecoratable($definition)
-                || !in_array($definition->getClass(), [ScopingHttpClient::class, HttpClientInterface::class], true)
-            ) {
-                continue;
-            }
-
-            $decoratorId = $id . '.decorator.monitor';
-            $decoratorDefinition = new Definition(HttpClientDecorator::class)
-                ->setAutowired(true)
-                ->setArgument('$inner', new Reference($decoratorId . '.inner'))
-                ->setArgument('$urlAssemblers', new TaggedIteratorArgument(AssemblerInterface::TAG))
-                ->setDecoratedService($id)
-            ;
-
-            switch ($definition->getClass()) {
-                case HttpClientInterface::class:
-                    $arguments = $definition->getArguments();
-                    if (
-                        isset($arguments[0]['base_uri'])
-                        && is_string($arguments[0]['base_uri'])
-                    ) {
-                        $decoratorDefinition->setArgument('$baseUri', $arguments[0]['base_uri']);
-                    }
-                    break;
-
-                case ScopingHttpClient::class:
-                    $arguments = $definition->getArguments();
-                    if (isset($arguments[1]) && is_string($arguments[1])) {
-                        $decoratorDefinition->setArgument('$baseUri', $arguments[1]);
-                    }
-                    break;
-            }
-
-            $container->setDefinition($decoratorId, $decoratorDefinition);
+        if (!DefinitionFilter::isDecoratable($container->getDefinition(self::TRANSPORT_ID))) {
+            return;
         }
+
+        $container->register(self::DECORATOR_ID, HttpClientDecorator::class)
+            ->setAutowired(true)
+            ->setArgument('$inner', new Reference(self::DECORATOR_ID . '.inner'))
+            ->setArgument('$urlAssemblers', new TaggedIteratorArgument(AssemblerInterface::TAG))
+            ->setDecoratedService(self::TRANSPORT_ID)
+        ;
     }
 }
