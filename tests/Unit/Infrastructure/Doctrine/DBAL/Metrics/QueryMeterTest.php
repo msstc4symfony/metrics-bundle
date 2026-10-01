@@ -8,7 +8,7 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\DoctrineConnectionColle
 use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\QueryMeter;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
-use PHPUnit\Framework\Assert;
+use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
@@ -37,9 +37,9 @@ final class QueryMeterTest extends TestCase
     {
         [$registry, $meter] = $this->buildMeter();
 
-        $meter->measure($sql, static fn (): null => null);
+        $meter->measure($sql, static fn (): int => 0);
 
-        [[, , , $type]] = $this->executed($registry);
+        [[, , , $type]] = RegistrySamples::labels($registry, MetricLabelEnum::DOCTRINE_QUERY_EXECUTE);
         self::assertSame($expected, $type);
     }
 
@@ -59,6 +59,22 @@ final class QueryMeterTest extends TestCase
         yield 'schema-qualified SELECT' => ['SELECT * FROM public.users WHERE id = 1', 'users'];
         yield 'schema-qualified UPDATE' => ['UPDATE app.orders SET x = 1', 'orders'];
         yield 'no table' => ['CREATE TABLE foo (id INT)', 'unknown'];
+        yield 'subquery in WHERE labels the outer table' => [
+            'SELECT * FROM users WHERE id IN (SELECT user_id FROM orders)',
+            'users',
+        ];
+        yield 'JOIN labels the first FROM table' => [
+            "SELECT u.id FROM users u\nJOIN orders o ON o.user_id = u.id\nWHERE o.id IN (SELECT id FROM refunds)",
+            'users',
+        ];
+        yield 'FROM beyond the parsed prefix is not searched' => [
+            'SELECT ' . str_repeat('a, ', 6_000) . 'b FROM users',
+            'unknown',
+        ];
+        yield 'long IN list after the table' => [
+            'SELECT * FROM users WHERE id IN (' . implode(', ', range(1, 200_000)) . ')',
+            'users',
+        ];
     }
 
     #[DataProvider('tableNameProvider')]
@@ -66,9 +82,9 @@ final class QueryMeterTest extends TestCase
     {
         [$registry, $meter] = $this->buildMeter();
 
-        $meter->measure($sql, static fn (): null => null);
+        $meter->measure($sql, static fn (): int => 0);
 
-        [[, , , , $table]] = $this->executed($registry);
+        [[, , , , $table]] = RegistrySamples::labels($registry, MetricLabelEnum::DOCTRINE_QUERY_EXECUTE);
         self::assertSame($expected, $table);
     }
 
@@ -78,20 +94,12 @@ final class QueryMeterTest extends TestCase
 
         self::assertSame(42, $meter->measure('SELECT * FROM users', static fn (): int => 42));
 
-        self::assertSame([['app', 'cmp', 'default', 'select', 'users']], $this->executed($registry));
+        self::assertSame([['app', 'cmp', 'default', 'select', 'users']], RegistrySamples::labels($registry, MetricLabelEnum::DOCTRINE_QUERY_EXECUTE));
 
-        $observed = 0;
-        foreach ($registry->getMetricFamilySamples() as $family) {
-            if ($family->getName() === 'symfony_' . MetricLabelEnum::DOCTRINE_QUERY_DURATION_HISTOGRAM_SECONDS->value) {
-                foreach ($family->getSamples() as $sample) {
-                    if (str_ends_with($sample->getName(), '_count')) {
-                        $observed += (int) $sample->getValue();
-                    }
-                }
-            }
-        }
-
-        self::assertSame(1, $observed);
+        self::assertSame(
+            [[['app', 'cmp', 'default', 'select', 'users'], '1']],
+            RegistrySamples::samples($registry, MetricLabelEnum::DOCTRINE_QUERY_DURATION_HISTOGRAM_SECONDS, '_count'),
+        );
     }
 
     public function testFailedQueryIsNotRecorded(): void
@@ -107,7 +115,7 @@ final class QueryMeterTest extends TestCase
 
         self::assertInstanceOf(RuntimeException::class, $caught);
 
-        self::assertSame([], $this->executed($registry));
+        self::assertSame([], RegistrySamples::labels($registry, MetricLabelEnum::DOCTRINE_QUERY_EXECUTE));
     }
 
     /**
@@ -119,28 +127,5 @@ final class QueryMeterTest extends TestCase
         $collector = new DoctrineConnectionCollector($registry, new MetricRepository([]), 'app', 'cmp');
 
         return [$registry, new QueryMeter($collector, 'default')];
-    }
-
-    /**
-     * @return list<list<string>>
-     */
-    private function executed(CollectorRegistry $registry): array
-    {
-        $executed = [];
-        foreach ($registry->getMetricFamilySamples() as $family) {
-            if ($family->getName() === 'symfony_' . MetricLabelEnum::DOCTRINE_QUERY_EXECUTE->value) {
-                foreach ($family->getSamples() as $sample) {
-                    $labels = [];
-                    foreach ($sample->getLabelValues() as $value) {
-                        Assert::assertIsString($value);
-                        $labels[] = $value;
-                    }
-
-                    $executed[] = $labels;
-                }
-            }
-        }
-
-        return $executed;
     }
 }

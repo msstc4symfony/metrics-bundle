@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Test\Integration\Infrastructure\Doctrine\DBAL;
 
-use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
 use Doctrine\DBAL\Connection;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\TestKernel;
+use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Prometheus\RegistryInterface;
@@ -26,8 +26,8 @@ final class DoctrineDbalMetricsTest extends KernelTestCase
     #[Override]
     protected function setUp(): void
     {
-        if (!class_exists(DoctrineBundle::class) || !class_exists(MonologBundle::class)) {
-            self::markTestSkipped('doctrine/doctrine-bundle or symfony/monolog-bundle not installed');
+        if (!TestKernel::hasDoctrine() || !class_exists(MonologBundle::class)) {
+            self::markTestSkipped('doctrine/doctrine-bundle, ext-pdo_sqlite or symfony/monolog-bundle missing');
         }
 
         new Filesystem()->remove(TestKernel::cacheRoot());
@@ -94,28 +94,13 @@ final class DoctrineDbalMetricsTest extends KernelTestCase
     }
 
     /**
-     * @return array<string, string>
+     * @return array<string, string> value by "connection|type|table"
      */
     private function samples(RegistryInterface $registry, MetricLabelEnum $metric, string $suffix = ''): array
     {
-        $name = 'symfony_' . $metric->value;
         $values = [];
-        foreach ($registry->getMetricFamilySamples() as $family) {
-            if ($family->getName() !== $name) {
-                continue;
-            }
-
-            foreach ($family->getSamples() as $sample) {
-                if ($sample->getName() !== $name . $suffix) {
-                    continue;
-                }
-
-                [, , $connection, $type, $table] = $sample->getLabelValues();
-                self::assertIsString($connection);
-                self::assertIsString($type);
-                self::assertIsString($table);
-                $values[$connection . '|' . $type . '|' . $table] = (string) $sample->getValue();
-            }
+        foreach (RegistrySamples::samples($registry, $metric, $suffix) as [[, , $connection, $type, $table], $value]) {
+            $values[$connection . '|' . $type . '|' . $table] = $value;
         }
 
         ksort($values);

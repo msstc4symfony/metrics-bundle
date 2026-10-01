@@ -7,22 +7,17 @@ namespace Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics;
 use Doctrine\DBAL\Driver\Middleware\AbstractStatementMiddleware;
 use Doctrine\DBAL\Driver\Result as ResultInterface;
 use Doctrine\DBAL\Driver\Statement as StatementInterface;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\DoctrineConnectionCollector;
 use Override;
 
 final class Statement extends AbstractStatementMiddleware
 {
-    private readonly QueryMeter $meter;
-
     /** @internal This statement can be only instantiated by its connection. */
     public function __construct(
         StatementInterface $statement,
-        DoctrineConnectionCollector $collector,
-        string $connectionName,
+        private readonly QueryMeter $meter,
         private readonly string $sql,
     ) {
         parent::__construct($statement);
-        $this->meter = new QueryMeter($collector, $connectionName);
     }
 
     /**

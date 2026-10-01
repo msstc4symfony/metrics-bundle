@@ -151,3 +151,17 @@ BC-джоб (Roave, неблокирующий) на сравнении 1.2.0 с
 Тест: `tests/Integration/Infrastructure/Doctrine/DBAL/DoctrineDbalMetricsTest` — настоящее ядро
 (`TestKernel` подключает DoctrineBundle, sqlite in-memory), оба порядка бандлов (env
 `metrics_first` переворачивает порядок). В minimal-профиле самопропускается.
+
+### Дополнения 1.2.2 (2026-10-01 UTC)
+
+- Без DoctrineBundle пасс снова регистрирует `Middleware` (autowire, **без** тега) — как до 1.2.1,
+  для приложений, которые сами подключают его в свои соединения. С DoctrineBundle — с тегом.
+- Разбор таблицы: `SELECT\s+.+?\s+FROM` — ленивый, берётся первый (внешний) `FROM`. Жадный
+  вариант с флагом `s` брал последний `FROM` (подзапрос), а на длинных `IN (...)` упирался в
+  `pcre.backtrack_limit` → `preg_match` возвращал `false` → метка `unknown`. Разбирается только
+  первые 16 KiB SQL (`QueryMeter::MAX_PARSED_SQL_LENGTH`); `FROM` дальше этого порога → `unknown`.
+  Подзапрос в списке колонок (`SELECT (SELECT … FROM a) … FROM b`) по-прежнему даёт `a`.
+- `TestKernel::hasDoctrine()` = DoctrineBundle **и** `ext-pdo_sqlite`; `pdo_sqlite` явно добавлен
+  во вход `extensions` в `.github/workflows/checks.yml` (общий workflow не трогали).
+- Хелпер выборки сэмплов из реестра — `tests/Support/RegistrySamples` (Unit и Integration).
+  Старые тесты коллекторов пока сканируют реестр сами.

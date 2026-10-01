@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.2
+
+### Fixed
+
+- 1.2.1 registered the DBAL `Middleware` service only with DoctrineBundle. Without it the
+  service is registered again (untagged, autowired) whenever doctrine/dbal is installed, so
+  applications wiring it into hand-made connections keep working.
+- The table label of a query with a subquery or several `FROM` clauses was taken from the last
+  `FROM`; it is now the first (outer) table. Long statements (big `IN` lists) no longer hit the
+  PCRE backtrack limit and fall back to `unknown`: only the first 16 KiB of SQL are parsed.
+
+### Changed
+
+- Internal: a prepared statement reuses its connection's `QueryMeter`
+  (`Statement::__construct()` is `@internal`).
+
 ## 1.2.1
 
 ### Fixed

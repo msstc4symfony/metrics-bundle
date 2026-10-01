@@ -28,6 +28,12 @@ final class TestKernel extends Kernel
     // Compiler passes of equal priority run in bundle registration order; this env flips it.
     public const string ENV_METRICS_BUNDLE_FIRST = 'metrics_first';
 
+    // The test connection is sqlite in memory.
+    public static function hasDoctrine(): bool
+    {
+        return class_exists(DoctrineBundle::class) && extension_loaded('pdo_sqlite');
+    }
+
     // Per process: infection runs PHPUnit in parallel and setUp() wipes this directory.
     public static function cacheRoot(): string
     {
@@ -38,7 +44,7 @@ final class TestKernel extends Kernel
     public function registerBundles(): iterable
     {
         $bundles = [new FrameworkBundle(), new MonologBundle()];
-        $doctrine = class_exists(DoctrineBundle::class) ? [new DoctrineBundle()] : [];
+        $doctrine = self::hasDoctrine() ? [new DoctrineBundle()] : [];
 
         return $this->environment === self::ENV_METRICS_BUNDLE_FIRST
             ? [...$bundles, new MetricsBundle(), ...$doctrine]
@@ -86,7 +92,7 @@ final class TestKernel extends Kernel
             $services->alias(self::HTTP_CLIENT_ALIAS, 'http_client')->public();
             $services->alias(self::SCOPED_CLIENT_ALIAS, self::SCOPED_CLIENT)->public();
         }
-        if (class_exists(DoctrineBundle::class)) {
+        if (self::hasDoctrine()) {
             $container->extension('doctrine', [
                 'dbal' => ['driver' => 'pdo_sqlite', 'memory' => true],
             ]);

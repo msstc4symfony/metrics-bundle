@@ -18,8 +18,8 @@ final class Connection extends AbstractConnectionMiddleware
     /** @internal This connection can be only instantiated by its driver. */
     public function __construct(
         ConnectionInterface $connection,
-        private readonly DoctrineConnectionCollector $collector,
-        private readonly string $connectionName,
+        DoctrineConnectionCollector $collector,
+        string $connectionName,
     ) {
         parent::__construct($connection);
         $this->meter = new QueryMeter($collector, $connectionName);
@@ -28,12 +28,7 @@ final class Connection extends AbstractConnectionMiddleware
     #[Override]
     public function prepare(string $sql): DriverStatement
     {
-        return new Statement(
-            parent::prepare($sql),
-            $this->collector,
-            $this->connectionName,
-            $sql,
-        );
+        return new Statement(parent::prepare($sql), $this->meter, $sql);
     }
 
     /** DBAL sends queries without bound parameters here, bypassing prepare(). */
@@ -50,6 +45,8 @@ final class Connection extends AbstractConnectionMiddleware
     #[Override]
     public function exec(string $sql): int
     {
-        return (int) $this->meter->measure($sql, fn (): int|string => parent::exec($sql));
+        $affected = $this->meter->measure($sql, fn (): int|string => parent::exec($sql));
+
+        return is_int($affected) ? $affected : (int) $affected;
     }
 }

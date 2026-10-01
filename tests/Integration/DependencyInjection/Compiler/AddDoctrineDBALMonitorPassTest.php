@@ -9,12 +9,14 @@ use Doctrine\DBAL\Driver\Middleware as DriverMiddleware;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler\AddDoctrineDBALMonitorPass;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\Middleware;
 use Msstc4Symfony\MetricsBundle\MetricsBundle;
+use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 
 final class AddDoctrineDBALMonitorPassTest extends TestCase
 {
+    #[Override]
     protected function setUp(): void
     {
         if (!interface_exists(DriverMiddleware::class)) {
@@ -34,13 +36,16 @@ final class AddDoctrineDBALMonitorPassTest extends TestCase
         self::assertSame([[]], $definition->getTag(AddDoctrineDBALMonitorPass::MIDDLEWARE_TAG));
     }
 
-    public function testSkipsWithoutDoctrineBundleConnections(): void
+    public function testRegistersUntaggedMiddlewareWithoutDoctrineBundleForHandWiredConnections(): void
     {
         $container = new ContainerBuilder();
 
         new AddDoctrineDBALMonitorPass()->process($container);
 
-        self::assertFalse($container->hasDefinition(Middleware::class));
+        self::assertTrue($container->hasDefinition(Middleware::class));
+        $definition = $container->getDefinition(Middleware::class);
+        self::assertTrue($definition->isAutowired());
+        self::assertFalse($definition->hasTag(AddDoctrineDBALMonitorPass::MIDDLEWARE_TAG));
     }
 
     public function testKeepsAnApplicationDefinedMiddleware(): void

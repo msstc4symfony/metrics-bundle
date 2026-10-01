@@ -7,14 +7,19 @@ namespace Msstc4Symfony\MetricsBundle\Test\Integration\Infrastructure\Doctrine\D
 use Doctrine\DBAL\Driver\Result;
 use Doctrine\DBAL\Driver\Statement as StatementInterface;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\DoctrineConnectionCollector;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\QueryMeter;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\Statement;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
+use Override;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
 use Prometheus\Storage\InMemory;
 
 final class StatementTest extends TestCase
 {
+    #[Override]
     protected function setUp(): void
     {
         if (!interface_exists(StatementInterface::class)) {
@@ -31,8 +36,8 @@ final class StatementTest extends TestCase
         $registry = new CollectorRegistry(new InMemory());
         $collector = new DoctrineConnectionCollector($registry, new MetricRepository([]), 'app', 'cmp');
 
-        self::assertSame($result, new Statement($inner, $collector, 'default', 'SELECT * FROM users')->execute());
+        self::assertSame($result, new Statement($inner, new QueryMeter($collector, 'default'), 'SELECT * FROM users')->execute());
 
-        self::assertSame([['app', 'cmp', 'default', 'select', 'users']], DbalMetrics::executed($registry));
+        self::assertSame([['app', 'cmp', 'default', 'select', 'users']], RegistrySamples::labels($registry, MetricLabelEnum::DOCTRINE_QUERY_EXECUTE));
     }
 }

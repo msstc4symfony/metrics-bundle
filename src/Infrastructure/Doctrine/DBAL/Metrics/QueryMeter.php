@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics;
 
 use Closure;
+use Doctrine\DBAL\Driver\Result as ResultInterface;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\DoctrineConnectionCollector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\DoctrineQueryTypeEnum;
 
@@ -14,6 +15,9 @@ final readonly class QueryMeter
     // Optional schema prefix is matched but not captured: "public.users" labels as "users".
     private const string TABLE = '(?:\w+\.)?(\w+)';
 
+    // Bounds regex cost on huge statements (long IN lists, batch inserts); the table name sits near the start.
+    private const int MAX_PARSED_SQL_LENGTH = 16_384;
+
     public function __construct(
         private DoctrineConnectionCollector $collector,
         private string $connectionName,
@@ -21,7 +25,7 @@ final readonly class QueryMeter
     }
 
     /**
-     * @template TResult
+     * @template TResult of ResultInterface|int|string
      *
      * @param Closure(): TResult $query
      *
@@ -52,8 +56,10 @@ final readonly class QueryMeter
 
     private function assembleTableName(string $sql): ?string
     {
+        $sql = substr($sql, 0, self::MAX_PARSED_SQL_LENGTH);
+        // Lazy select list: the first FROM belongs to the outer query, later ones to subqueries.
         $pattern = '/(?:'
-            . 'SELECT\s+.+\s+FROM\s+' . self::TABLE
+            . 'SELECT\s+.+?\s+FROM\s+' . self::TABLE
             . '|INSERT\s+INTO\s+' . self::TABLE
             . '|DELETE\s+FROM\s+' . self::TABLE
             . '|UPDATE\s+' . self::TABLE
