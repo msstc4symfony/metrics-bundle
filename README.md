@@ -163,6 +163,13 @@ redis://user:pass@redis:6379/4?read_timeout=2&persistent_connections=1
 
 3. Write a service that extends `Msstc4Symfony\MetricsBundle\Infrastructure\Collector\AbstractCollector` and exposes the methods you'll call from your code. The base collector takes care of registering the metric, applying the `application`/`component` labels, and catching storage errors.
 
+These extension points are public API and follow semantic versioning within a major:
+`MetricLabelEnumInterface`, `Label`, `MetricLabelTypeEnum`, `MetricTypeEnum`,
+`AbstractCollector` (constructor and protected `incCounter` / `setGauge` / `observeHistogram`)
+and the `metrics_bundle.metric_enums` parameter. Packages such as
+`msstc4symfony/metrics-bridge-profiling` build on them and append their enum in a compiler
+pass. If two enums declare the same metric name, the first declaration is listed.
+
 ## Bundle parameters
 
 | Parameter                                       | Default                             | Description                                              |

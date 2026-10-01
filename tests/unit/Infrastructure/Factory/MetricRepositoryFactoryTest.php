@@ -67,6 +67,19 @@ final class MetricRepositoryFactoryTest extends TestCase
         self::assertCount(\count(MetricLabelEnum::cases()) + 1, $names);
         self::assertSame(array_unique($names), $names);
     }
+
+    public function testTheFirstDeclarationOfAMetricNameWins(): void
+    {
+        $factory = new MetricRepositoryFactory([MetricLabelEnum::class, DuplicateMetricFixture::class]);
+
+        $redefined = array_values(array_filter(
+            $factory->create()->findAll(),
+            static fn (Metric $metric): bool => $metric->name->value === DuplicateMetricFixture::REDEFINED->value,
+        ));
+
+        self::assertCount(1, $redefined);
+        self::assertNotSame(DuplicateMetricFixture::REDEFINED, $redefined[0]->name);
+    }
 }
 
 enum DuplicateMetricFixture: string implements MetricLabelEnumInterface

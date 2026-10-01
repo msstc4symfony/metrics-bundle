@@ -41,6 +41,7 @@ final class ContainerCompileTest extends KernelTestCase
     {
         parent::tearDown();
         unset($_SERVER[self::DSN_ENV]);
+        new Filesystem()->remove(TestKernel::cacheRoot());
     }
 
     #[Override]

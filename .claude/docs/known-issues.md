@@ -100,3 +100,8 @@ deprecated, живут до 2.0 ради BC. Мост `msstc4symfony/metrics-bri
 `MetricProcessor` — иначе span писались бы дважды. Поэтому `MetricRepositoryFactory` схлопывает
 одинаковые имена метрик (первое объявление побеждает). `MetricProcessor` по-прежнему в
 `excludePaths` PHPStan: профилирования в окружении metrics нет.
+
+Переход `MetricProcessor` на `getDuration()` в 1.2 **не проверен** ни тестом, ни PHPStan
+(файл в `excludePaths`, profiling в dev-окружении metrics нет). Проверяется косвенно мостом.
+Конструктор вызывает `trigger_deprecation` — срабатывает, только если процессор реально
+используется (мост снимает с него тег end-процессора).
