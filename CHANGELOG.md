@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.2.0
+
+### Deprecated
+
+- The profiling integration moves to `msstc4symfony/metrics-bridge-profiling`:
+  `MetricProcessor`, `ProfilingCollector` and
+  `MetricLabelEnum::PROFILING_SPAN_DURATION_HISTOGRAM_SECONDS` are deprecated and removed in
+  2.0. Without the bridge they keep working; with it the bridge replaces them and records the
+  same `profiling_span_duration_histogram_seconds` metric.
+
+### Fixed
+
+- Span durations were measured when the processor ran instead of when the span ended; they
+  now use `SpanInterface::getDuration()` (profiling-bundle 1.0).
+- A metric name declared by several `metrics_bundle.metric_enums` entries was listed once per
+  declaration; the first declaration wins.
+
 ## 1.1.0
 
 First release under `msstc4symfony/metrics-bundle` / `Msstc4Symfony\MetricsBundle`

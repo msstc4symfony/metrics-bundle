@@ -8,6 +8,12 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ProfilingCollector;
 use Msstc4Symfony\ProfilingBundle\Framework\Processor\EndSpan\EndSpanProcessorInterface;
 use Msstc4Symfony\ProfilingBundle\Framework\Span\SpanInterface;
 
+/**
+ * Active only while msstc4symfony/metrics-bridge-profiling is not installed; the bridge
+ * replaces it.
+ *
+ * @deprecated since 1.2, use msstc4symfony/metrics-bridge-profiling; removed in 2.0
+ */
 final readonly class MetricProcessor implements EndSpanProcessorInterface
 {
     public function __construct(
@@ -19,7 +25,7 @@ final readonly class MetricProcessor implements EndSpanProcessorInterface
     {
         $this->profilingCollector->setProfilingSpanDuration(
             $span->getMessage(),
-            round(microtime(true) - $span->getStartTime(), 6),
+            round($span->getDuration(), 6),
         );
     }
 }

@@ -36,10 +36,12 @@ final readonly class MetricRepositoryFactory
             }
 
             foreach ($metricsEnumClassName::cases() as $case) {
-                $labels[] = $case;
+                // One Prometheus metric per name: an extension may redefine a metric this
+                // bundle still declares for BC; the first declaration is listed.
+                $labels[$case->value] ??= $case;
             }
         }
 
-        return new MetricRepository($labels);
+        return new MetricRepository(array_values($labels));
     }
 }

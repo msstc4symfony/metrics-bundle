@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Factory;
 
 use Msstc4Symfony\MetricsBundle\Infrastructure\Entity\Label;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Entity\Metric;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelTypeEnum;
@@ -55,6 +56,42 @@ final class MetricRepositoryFactoryTest extends TestCase
             \count(MetricLabelEnum::cases()) + \count(ExtraMetricFixture::cases()),
             $repository->findAll(),
         );
+    }
+
+    public function testCreateListsAMetricNameOnce(): void
+    {
+        $factory = new MetricRepositoryFactory([MetricLabelEnum::class, DuplicateMetricFixture::class]);
+
+        $names = array_map(static fn (Metric $metric): string => (string) $metric->name->value, $factory->create()->findAll());
+
+        self::assertCount(\count(MetricLabelEnum::cases()) + 1, $names);
+        self::assertSame(array_unique($names), $names);
+    }
+}
+
+enum DuplicateMetricFixture: string implements MetricLabelEnumInterface
+{
+    case REDEFINED = 'profiling_span_duration_histogram_seconds';
+    case NEW_ONE = 'duplicate_fixture_new_one';
+
+    public function getType(): MetricTypeEnum
+    {
+        return MetricTypeEnum::HISTOGRAM;
+    }
+
+    public function getDescription(): string
+    {
+        return 'redefined';
+    }
+
+    public function getLabels(): array
+    {
+        return [];
+    }
+
+    public function getBatches(): array
+    {
+        return [];
     }
 }
 

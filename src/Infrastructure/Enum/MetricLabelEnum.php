@@ -58,6 +58,10 @@ enum MetricLabelEnum: string implements MetricLabelEnumInterface
     case INFO_FPM_MAX_LISTEN_QUEUE = 'info_fpm_max_listen_queue';
     case INFO_FPM_LISTEN_QUEUE_SIZE = 'info_fpm_listen_queue_size';
     case INFO_CACHE_WARMUP_TIME = 'info_cache_warmup_time';
+
+    /**
+     * @deprecated since 1.2, declared by msstc4symfony/metrics-bridge-profiling; removed in 2.0
+     */
     case PROFILING_SPAN_DURATION_HISTOGRAM_SECONDS = 'profiling_span_duration_histogram_seconds';
 
     public function getType(): MetricTypeEnum

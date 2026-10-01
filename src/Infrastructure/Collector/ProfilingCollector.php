@@ -6,6 +6,9 @@ namespace Msstc4Symfony\MetricsBundle\Infrastructure\Collector;
 
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 
+/**
+ * @deprecated since 1.2, use msstc4symfony/metrics-bridge-profiling; removed in 2.0
+ */
 final class ProfilingCollector extends AbstractCollector
 {
     public function setProfilingSpanDuration(string $message, float $duration): void

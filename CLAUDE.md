@@ -34,7 +34,7 @@ The bundle is a **classic Symfony bundle** organised in a loose layered shape un
 
 - **`Presentation/`** — `GetMetricsController` (the `GET /_/metrics` endpoint) and console commands `metrics:list` / `metrics:clear`.
 - **`Framework/EventListener/`** — Symfony kernel/console event listeners (`#[AsEventListener]`) that drive measurement timing for HTTP requests, console commands, exceptions, and one-shot info gauges.
-- **`Framework/Profiling/`** — integration with profiling spans → metrics.
+- **`Framework/Profiling/`** — deprecated profiling integration (`MetricProcessor`), kept for BC until 2.0; `msstc4symfony/metrics-bridge-profiling` replaces it and removes this service from the container.
 - **`Infrastructure/Collector/`** — the heart of the bundle. Each collector wraps the Prometheus `RegistryInterface` and exposes domain-specific `inc*`/`set*` methods called from listeners or decorators. All inherit `AbstractCollector`, which automatically prepends two labels (`application`, `component`) to every sample.
 - **`Infrastructure/Doctrine/`**, **`Elastica/`**, **`HttpClient/`**, **`Monolog/`** — integration adapters (middlewares, transports, decorators) that hook into third-party systems and call into the matching collector.
 - **`Infrastructure/Storage/Factory`** — picks a Prometheus storage adapter from a DSN scheme: `redis`, `redisng`, `apc`, `apcng`, `inmemory`. Any failure falls back to `InMemory` silently — be aware when debugging "missing metrics".

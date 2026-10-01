@@ -19,6 +19,13 @@ Out of the box the following are measured:
 
 The exact list of metrics with labels and histogram buckets is shown by `bin/console metrics:list`.
 
+## Profiling spans
+
+Span durations from `msstc4symfony/profiling-bundle` are exported by
+[`msstc4symfony/metrics-bridge-profiling`](https://github.com/msstc4symfony/metrics-bridge-profiling)
+(`profiling_span_duration_histogram_seconds`). The built-in `MetricProcessor` is deprecated
+and is replaced by the bridge once it is installed.
+
 ## Compatibility
 
 | Bundle | PHP   | Symfony           |

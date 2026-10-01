@@ -91,3 +91,12 @@ Job `continue-on-error`. После тега `v1.1.0` сравнение пой�
 (`composer-integration.json` → `composer-ci.json`, `phpunit-integration.xml.dist`
 → `phpunit.xml.dist`, удаление Psalm). Переписать историю `main` не удалось;
 сообщение следующего коммита описывает их корректно.
+
+## Профилирование вынесено в мост (1.2.0, 2026-10-01 UTC)
+
+`MetricProcessor` / `ProfilingCollector` / case `PROFILING_SPAN_DURATION_HISTOGRAM_SECONDS` —
+deprecated, живут до 2.0 ради BC. Мост `msstc4symfony/metrics-bridge-profiling` объявляет ту же
+метрику своим enum (через `metrics_bundle.metric_enums`) и в compiler pass удаляет definition
+`MetricProcessor` — иначе span писались бы дважды. Поэтому `MetricRepositoryFactory` схлопывает
+одинаковые имена метрик (первое объявление побеждает). `MetricProcessor` по-прежнему в
+`excludePaths` PHPStan: профилирования в окружении metrics нет.
