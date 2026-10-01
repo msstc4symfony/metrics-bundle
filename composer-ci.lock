@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "8ae523c6170fd5d7e0de6b883d1146b9",
+    "content-hash": "6aa899c5548b70abe4bed0e644642f05",
     "packages": [
         {
             "name": "monolog/monolog",
@@ -5011,6 +5011,89 @@
                 "persistence"
             ],
             "time": "2026-09-29T12:27:47+00:00"
+        },
+        {
+            "name": "msstc4symfony/profiling-bundle",
+            "version": "v1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/msstc4symfony/profiling-bundle.git",
+                "reference": "c50118626903e6246856c690aba9fd23e3c1c8bb"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/msstc4symfony/profiling-bundle/zipball/c50118626903e6246856c690aba9fd23e3c1c8bb",
+                "reference": "c50118626903e6246856c690aba9fd23e3c1c8bb",
+                "shasum": ""
+            },
+            "require": {
+                "composer-runtime-api": ">=2.2",
+                "monolog/monolog": "^3.5",
+                "php": ">=8.4",
+                "psr/log": "^2.0|^3.0",
+                "symfony/config": "^6.4|^7.0|^8.0",
+                "symfony/console": "^6.4|^7.0|^8.0",
+                "symfony/dependency-injection": "^6.4|^7.0|^8.0",
+                "symfony/event-dispatcher": "^6.4|^7.0|^8.0",
+                "symfony/framework-bundle": "^6.4|^7.0|^8.0",
+                "symfony/http-foundation": "^6.4|^7.0|^8.0",
+                "symfony/http-kernel": "^6.4|^7.0|^8.0"
+            },
+            "conflict": {
+                "symfony/monolog-bundle": "<3.10",
+                "symfony/symfony": "*"
+            },
+            "require-dev": {
+                "friendsofphp/php-cs-fixer": "^3.55",
+                "phpstan/extension-installer": "^1.4",
+                "phpstan/phpstan": "^2.1",
+                "phpstan/phpstan-strict-rules": "^2.0",
+                "phpstan/phpstan-symfony": "^2.0",
+                "phpunit/phpunit": ">=11.0",
+                "rector/rector": "^2.1",
+                "roave/security-advisories": "dev-latest"
+            },
+            "suggest": {
+                "msstc4symfony/metrics-bundle": "To export span durations as Prometheus metrics (MetricProcessor)",
+                "symfony/messenger": "To profile consumed messages (messages option)",
+                "symfony/monolog-bundle": "To write finished spans to the \"profiling\" log channel"
+            },
+            "type": "symfony-bundle",
+            "extra": {
+                "symfony": {
+                    "allow-contrib": false,
+                    "require": "^6.4|^7.0|^8.0"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Msstc4Symfony\\ProfilingBundle\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Msstc4Symfony\\ProfilingBundle\\Test\\": "tests/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Maxim Shamaev",
+                    "email": "maxim.shamaev@gmail.com"
+                }
+            ],
+            "description": "Lightweight span profiling for Symfony: nested timings for requests, commands and code blocks",
+            "keywords": [
+                "php",
+                "profiling",
+                "symfony"
+            ],
+            "support": {
+                "source": "https://github.com/msstc4symfony/profiling-bundle/tree/v1.0.0"
+            },
+            "time": "2026-10-01T08:59:26+00:00"
         },
         {
             "name": "myclabs/deep-copy",

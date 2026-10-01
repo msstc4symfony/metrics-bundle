@@ -23,6 +23,12 @@
       "Msstc4Symfony\\MetricsBundle\\Test\\Integration\\": "tests/integration/"
     }
   },
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/msstc4symfony/profiling-bundle"
+    }
+  ],
   "require": {
     "php": ">=8.4",
     "ext-redis": "*",
@@ -41,6 +47,7 @@
     "friendsofphp/php-cs-fixer": "^3.55",
     "infection/infection": "^0.32",
     "mongodb/mongodb": "^2.1",
+    "msstc4symfony/profiling-bundle": "^1.0",
     "phpstan/extension-installer": "^1.4",
     "phpstan/phpstan": "^2.1",
     "phpstan/phpstan-beberlei-assert": "^2.0",
@@ -48,9 +55,9 @@
     "phpstan/phpstan-strict-rules": "^2.0",
     "phpstan/phpstan-symfony": "^2.0",
     "phpunit/phpunit": ">=10.5",
-    "roave/security-advisories": "dev-latest",
     "rector/rector": "^2.1",
     "roave/backward-compatibility-check": "^8.20",
+    "roave/security-advisories": "dev-latest",
     "ruflin/elastica": "^7.3",
     "spaze/phpstan-disallowed-calls": "^v4.0",
     "symfony/http-client": "^6.4|^7.0|^8.0"

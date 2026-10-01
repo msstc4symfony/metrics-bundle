@@ -102,15 +102,14 @@ deprecated, живут до 2.0 ради BC. Мост `msstc4symfony/metrics-bri
 одинаковые имена метрик (первое объявление побеждает). `MetricProcessor` по-прежнему в
 `excludePaths` PHPStan: профилирования в окружении metrics нет.
 
-Переход `MetricProcessor` на `getDuration()` в 1.2 **не проверен** ни тестом, ни PHPStan
-(файл в `excludePaths`, profiling в dev-окружении metrics нет). Проверяется косвенно мостом.
+Переход `MetricProcessor` на `getDuration()` в 1.2 покрыт `tests/unit/Framework/Profiling/MetricProcessorTest`.
 Конструктор вызывает `trigger_deprecation` — срабатывает, только если процессор реально
 используется (мост снимает с него тег end-процессора).
-BC-джоб (Roave) красный (неблокирующий) с тех пор, как `MetricProcessor` ссылается на
-`Msstc4Symfony\ProfilingBundle\...\EndSpanProcessorInterface`: в окружении metrics нет
-profiling-bundle, BetterReflection не находит интерфейс. Лечится добавлением profiling-bundle в
-`composer-ci.json` require-dev, когда репозиторий станет публичным (тогда же — тест
-`MetricProcessor` и снятие `excludePaths`).
+BC-джоб (Roave, неблокирующий) на сравнении 1.2.0 с v1.1.0 красный: базовая ревизия ставится со
+своим `composer-ci.json` без profiling-bundle, и BetterReflection не находит
+`EndSpanProcessorInterface` (7 × `[BC] SKIPPED`, реальных изменений API нет — проверено локально
+2026-10-01 UTC). С 1.2.0 profiling-bundle в require-dev (vcs-репозиторий в `composer-ci.json`),
+`MetricProcessor` под PHPStan и тестом — сравнения с базой >= v1.2.0 зелёные.
 `symfony/deprecation-contracts` (для `trigger_deprecation`) не объявлен напрямую: верификатор
 стандарта требует для всех `symfony/*` `^6.4|^7.0|^8.0`, contracts версионируются `^2.5|^3`.
 Гарантирован транзитивно через framework-bundle / console / event-dispatcher.

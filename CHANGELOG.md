@@ -13,7 +13,8 @@
 ### Fixed
 
 - Span durations were measured when the processor ran instead of when the span ended; they
-  now use `SpanInterface::getDuration()` (profiling-bundle 1.0).
+  now use `SpanInterface::getDuration()` (profiling-bundle 1.0; older versions conflict).
+  The processor is now analysed and tested against profiling-bundle in CI.
 - A metric name declared by several `metrics_bundle.metric_enums` entries was listed once per
   declaration; the first declaration wins.
 

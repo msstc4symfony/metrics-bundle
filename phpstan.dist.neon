@@ -11,8 +11,6 @@ parameters:
         - src/
         - tests/unit/
         - tests/integration/
-    excludePaths:
-        - src/Framework/Profiling/Processor/EndSpan/MetricProcessor.php
 
 includes:
     - phpstan-baseline.neon

@@ -22,7 +22,7 @@ PHPUnit is strict: `failOnWarning`, `failOnRisky`, `failOnPhpunitDeprecation`, `
 
 ## Static analysis & style
 
-- **PHPStan**: level 9, `phpVersion: 80400`, analyses `src/`, `tests/unit/`, `tests/integration/` against the CI profile. The only `excludePaths` entry is `Framework/Profiling/.../MetricProcessor.php` — it imports profiling-bundle classes that do not exist yet (fixed in phase A5). The baseline holds 9 pre-existing entries; new code must not add to it.
+- **PHPStan**: level 9, `phpVersion: 80400`, analyses `src/`, `tests/unit/`, `tests/integration/` against the CI profile. No `excludePaths`: `composer-ci.json` installs `msstc4symfony/profiling-bundle` (vcs repository) so the deprecated `MetricProcessor` is analysed and tested. The baseline holds 9 pre-existing entries; new code must not add to it.
 - **PHP-CS-Fixer**: config is byte-identical to `bundle-standard/templates/.php-cs-fixer.dist.php` (the verifier enforces it).
 - **Rector**: PHP 8.4 set + Doctrine/Symfony/PHPUnit/MongoDB attribute sets. Skipped rules are listed in `rector.php` — don't reintroduce them.
 - **deptrac**: `deptrac.yaml` records the phase-A status quo of the layers (see `.claude/docs/architecture.md`).
@@ -68,7 +68,7 @@ One `phpunit.xml.dist`, two suites:
 - **`tests/unit/`** — namespace `Msstc4Symfony\MetricsBundle\Test\Unit\`; runs without optional libraries.
 - **`tests/integration/`** — namespace `Msstc4Symfony\MetricsBundle\Test\Integration\`; each test `markTestSkipped()`s in `setUp()` when its optional dependency is missing.
 
-`composer-ci.json` adds `symfony/http-client`, `doctrine/dbal`, `mongodb/mongodb` ^2, `ruflin/elastica` ^7 (8 is unsupported), deptrac, infection and the Roave BC check. It pins `config.platform.ext-mongodb` to the CI runner's extension so `composer-ci.lock` resolves there. APCu tests need `apc.enable_cli=1`.
+`composer-ci.json` adds `msstc4symfony/profiling-bundle` (from its GitHub repository), `symfony/http-client`, `doctrine/dbal`, `mongodb/mongodb` ^2, `ruflin/elastica` ^7 (8 is unsupported), deptrac, infection and the Roave BC check. It pins `config.platform.ext-mongodb` to the CI runner's extension so `composer-ci.lock` resolves there. APCu tests need `apc.enable_cli=1`.
 
 ## CI
 
