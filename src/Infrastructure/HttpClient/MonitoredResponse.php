@@ -8,6 +8,8 @@ use Closure;
 use Override;
 use Symfony\Component\HttpClient\Response\StreamableInterface;
 use Symfony\Component\HttpClient\Response\StreamWrapper;
+use Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 
 /**
@@ -19,6 +21,9 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  */
 final class MonitoredResponse implements ResponseInterface, StreamableInterface
 {
+    // With $throw the inner calls raise HttpExceptionInterface on 4xx/5xx — exactly the
+    // statuses alerting relies on — so those are recorded before rethrowing. Transport
+    // errors carry no response and are not recorded.
     private bool $statusRecorded = false;
 
     private bool $completed = false;
@@ -29,9 +34,27 @@ final class MonitoredResponse implements ResponseInterface, StreamableInterface
      */
     public function __construct(
         private readonly ResponseInterface $inner,
+        private readonly HttpClientInterface $client,
         private readonly Closure $onStatus,
         private readonly Closure $onComplete,
     ) {
+    }
+
+    public function __destruct()
+    {
+        // The inner destructor waits for the headers of an unread response (and throws on
+        // 4xx/5xx), so run it here first: fire-and-forget calls still get their status.
+        try {
+            if (method_exists($this->inner, '__destruct')) {
+                $this->inner->__destruct();
+            }
+        } catch (HttpExceptionInterface $e) {
+            $this->recordStatus();
+
+            throw $e;
+        }
+
+        $this->recordStatus();
     }
 
     public function inner(): ResponseInterface
@@ -54,7 +77,14 @@ final class MonitoredResponse implements ResponseInterface, StreamableInterface
     #[Override]
     public function getHeaders(bool $throw = true): array
     {
-        $headers = $this->inner->getHeaders($throw);
+        try {
+            $headers = $this->inner->getHeaders($throw);
+        } catch (HttpExceptionInterface $e) {
+            $this->recordStatus();
+
+            throw $e;
+        }
+
         $this->recordStatus();
 
         return $headers;
@@ -63,7 +93,14 @@ final class MonitoredResponse implements ResponseInterface, StreamableInterface
     #[Override]
     public function getContent(bool $throw = true): string
     {
-        $content = $this->inner->getContent($throw);
+        try {
+            $content = $this->inner->getContent($throw);
+        } catch (HttpExceptionInterface $e) {
+            $this->recordStatus();
+
+            throw $e;
+        }
+
         $this->recordCompletion();
 
         return $content;
@@ -75,7 +112,14 @@ final class MonitoredResponse implements ResponseInterface, StreamableInterface
     #[Override]
     public function toArray(bool $throw = true): array
     {
-        $data = $this->inner->toArray($throw);
+        try {
+            $data = $this->inner->toArray($throw);
+        } catch (HttpExceptionInterface $e) {
+            $this->recordStatus();
+
+            throw $e;
+        }
+
         $this->recordCompletion();
 
         return $data;
@@ -105,9 +149,9 @@ final class MonitoredResponse implements ResponseInterface, StreamableInterface
             $this->getHeaders();
         }
 
-        return $this->inner instanceof StreamableInterface
-            ? $this->inner->toStream(false)
-            : StreamWrapper::createResource($this->inner);
+        // Reading through the decorating client routes the body via its stream(), which records
+        // completion; the inner toStream() would bypass it (Psr18Client/HttplugClient use this).
+        return StreamWrapper::createResource($this, $this->client);
     }
 
     /**

@@ -59,6 +59,7 @@ final class HttpClientDecorator implements HttpClientInterface, ResetInterface, 
 
         return new MonitoredResponse(
             $response,
+            $this,
             fn (int $status) => $this->collector->incHTTPConnectionResponse($method, $host, $path, $status),
             fn (float $seconds) => $this->collector->setHTTPConnectionDuration($method, $host, $path, $seconds),
         );

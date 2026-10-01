@@ -19,6 +19,9 @@ use Symfony\Component\HttpClient\Exception\TransportException;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Component\HttpClient\Response\StreamableInterface;
+use Symfony\Contracts\HttpClient\Exception\ClientExceptionInterface;
+use Symfony\Contracts\HttpClient\Exception\ServerExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Throwable;
 
@@ -153,6 +156,62 @@ final class HttpClientDecoratorTest extends TestCase
         } finally {
             fclose($server);
         }
+    }
+
+    public function testErrorStatusIsRecordedWhenGetContentThrows(): void
+    {
+        $response = $this->decorator(new MockHttpClient(new MockResponse('', ['http_code' => 404])))
+            ->request('GET', 'https://api.example.com/missing')
+        ;
+
+        try {
+            $response->getContent();
+            self::fail('404 did not throw');
+        } catch (ClientExceptionInterface) {
+        }
+
+        self::assertSame(
+            [[['app', 'cmp', 'GET', 'api.example.com', '/missing', '404'], '1']],
+            $this->samplesOf(MetricLabelEnum::HTTP_CONNECTION_RESPONSE),
+        );
+    }
+
+    public function testErrorStatusIsRecordedWhenToArrayThrows(): void
+    {
+        $response = $this->decorator(new MockHttpClient(new MockResponse('{}', ['http_code' => 500])))
+            ->request('GET', 'https://api.example.com/broken')
+        ;
+
+        try {
+            $response->toArray();
+            self::fail('500 did not throw');
+        } catch (ServerExceptionInterface) {
+        }
+
+        self::assertCount(1, $this->samplesOf(MetricLabelEnum::HTTP_CONNECTION_RESPONSE));
+    }
+
+    public function testUnreadResponseStillRecordsItsStatus(): void
+    {
+        $this->decorator(new MockHttpClient(new MockResponse('ok', ['http_code' => 202])))
+            ->request('POST', 'https://api.example.com/fire-and-forget')
+        ;
+
+        self::assertSame(
+            [[['app', 'cmp', 'POST', 'api.example.com', '/fire-and-forget', '202'], '1']],
+            $this->samplesOf(MetricLabelEnum::HTTP_CONNECTION_RESPONSE),
+        );
+    }
+
+    public function testBodyReadThroughToStreamRecordsDuration(): void
+    {
+        $response = $this->decorator(new MockHttpClient(new MockResponse(['a', 'b'])))
+            ->request('GET', 'https://api.example.com/a')
+        ;
+        self::assertInstanceOf(StreamableInterface::class, $response);
+
+        self::assertSame('ab', stream_get_contents($response->toStream()));
+        self::assertSame('1', $this->durationCount());
     }
 
     public function testCancelledRequestHasNoDuration(): void
