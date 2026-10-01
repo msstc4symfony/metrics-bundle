@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Test\Integration\Kernel;
 
+use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
 use Msstc4Symfony\MetricsBundle\MetricsBundle;
 use Override;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
@@ -24,6 +25,9 @@ final class TestKernel extends Kernel
 
     public const string SCOPED_CLIENT_ALIAS = 'test.github.client';
 
+    // Compiler passes of equal priority run in bundle registration order; this env flips it.
+    public const string ENV_METRICS_BUNDLE_FIRST = 'metrics_first';
+
     // Per process: infection runs PHPUnit in parallel and setUp() wipes this directory.
     public static function cacheRoot(): string
     {
@@ -33,11 +37,12 @@ final class TestKernel extends Kernel
     #[Override]
     public function registerBundles(): iterable
     {
-        return [
-            new FrameworkBundle(),
-            new MonologBundle(),
-            new MetricsBundle(),
-        ];
+        $bundles = [new FrameworkBundle(), new MonologBundle()];
+        $doctrine = class_exists(DoctrineBundle::class) ? [new DoctrineBundle()] : [];
+
+        return $this->environment === self::ENV_METRICS_BUNDLE_FIRST
+            ? [...$bundles, new MetricsBundle(), ...$doctrine]
+            : [...$bundles, ...$doctrine, new MetricsBundle()];
     }
 
     #[Override]
@@ -81,6 +86,12 @@ final class TestKernel extends Kernel
             $services->alias(self::HTTP_CLIENT_ALIAS, 'http_client')->public();
             $services->alias(self::SCOPED_CLIENT_ALIAS, self::SCOPED_CLIENT)->public();
         }
+        if (class_exists(DoctrineBundle::class)) {
+            $container->extension('doctrine', [
+                'dbal' => ['driver' => 'pdo_sqlite', 'memory' => true],
+            ]);
+        }
+
         $container->extension('monolog', [
             'handlers' => ['main' => ['type' => 'null']],
         ]);

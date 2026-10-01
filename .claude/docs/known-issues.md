@@ -113,3 +113,41 @@ BC-джоб (Roave, неблокирующий) на сравнении 1.2.0 с
 `symfony/deprecation-contracts` (для `trigger_deprecation`) не объявлен напрямую: верификатор
 стандарта требует для всех `symfony/*` `^6.4|^7.0|^8.0`, contracts версионируются `^2.5|^3`.
 Гарантирован транзитивно через framework-bundle / console / event-dispatcher.
+
+## DBAL-метрики не собирались с DoctrineBundle (исправлено в 1.2.1, 2026-10-01 UTC)
+
+До 1.2.1 `AddDoctrineDBALMonitorPass` ни разу не срабатывал в реальном приложении. Три причины:
+
+1. DoctrineBundle объявляет соединения как `ChildDefinition('doctrine.dbal.connection')` **без
+   класса** (`setClass()` — только при `wrapper_class`), поэтому фильтр
+   `getClass() !== null && is_a(..., Connection::class)` их не находил.
+2. Даже если бы нашёл — `Middleware` регистрировался без тега `doctrine.middleware`. DoctrineBundle
+   применяет только тегированные middleware (`MiddlewaresPass` → `setMiddlewares` на
+   `doctrine.dbal.<name>_connection.configuration`); нетегированный приватный сервис удалялся.
+   Автоконфигурация (`registerForAutoconfiguration(Driver\Middleware)`) тоже не помогала:
+   `Infrastructure/Doctrine/DBAL/` исключён из `services.yaml`, а `ResolveInstanceofConditionalsPass`
+   (priority 100) отрабатывает раньше нашего пасса.
+3. Порядок: оба пасса `TYPE_BEFORE_OPTIMIZATION` с priority 0, при равном приоритете — порядок
+   регистрации бандлов. Flex дописывает новый бандл в конец `bundles.php`, т.е. после
+   DoctrineBundle — тег появился бы уже после того, как `MiddlewaresPass` его прочитал.
+   Проверено тестом: без priority вариант «DoctrineBundle первым» оставался пустым.
+
+Исправление: пасс регистрирует `Middleware` (autowire + тег `doctrine.middleware`, без
+`connection` — на все соединения) при наличии параметра `doctrine.connections`, с
+`priority: AddDoctrineDBALMonitorPass::PRIORITY` (= 1). Определение, заданное приложением
+(тот же id), не перетирается.
+
+Попутно: DBAL отправляет запросы **без параметров** (`executeQuery()`/`executeStatement()` с
+пустым `$params`) в `Driver\Connection::query()`/`exec()`, минуя `prepare()`. Middleware
+оборачивал только `prepare()` → такие запросы не считались. Теперь замер вынесен в
+`QueryMeter` (@internal), им пользуются `Statement::execute()` и `Connection::query()/exec()`.
+`exec()` объявлен с возвратом `int` (DBAL 3 — `int`, DBAL 4 — `int|string`; строка только для
+числа строк > PHP_INT_MAX, приводится `(int)`).
+
+Метка `connection` по-прежнему `host:dbname` (для sqlite in-memory — `localhost:db`), а не имя
+соединения DoctrineBundle. Можно перейти на `ConnectionNameAwareInterface` DoctrineBundle, но это
+меняет значения меток — отдельное решение.
+
+Тест: `tests/Integration/Infrastructure/Doctrine/DBAL/DoctrineDbalMetricsTest` — настоящее ядро
+(`TestKernel` подключает DoctrineBundle, sqlite in-memory), оба порядка бандлов (env
+`metrics_first` переворачивает порядок). В minimal-профиле самопропускается.

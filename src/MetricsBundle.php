@@ -39,7 +39,7 @@ final class MetricsBundle extends Bundle
 
         $container->addCompilerPass(new AddMonologDecoratorCompilerPass());
         $container->addCompilerPass(new AddHttpClientMonitorPass(), priority: -256);
-        $container->addCompilerPass(new AddDoctrineDBALMonitorPass());
+        $container->addCompilerPass(new AddDoctrineDBALMonitorPass(), priority: AddDoctrineDBALMonitorPass::PRIORITY);
         $container->addCompilerPass(new SaveElasticaClientsListPass());
     }
 

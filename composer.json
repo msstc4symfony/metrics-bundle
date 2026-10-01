@@ -53,6 +53,7 @@
   },
   "suggest": {
     "doctrine/dbal": "To collect Doctrine DBAL query metrics",
+    "doctrine/doctrine-bundle": "To register the DBAL query metrics middleware on its connections",
     "ext-apcu": "To store metrics in APCu (apc:// and apcng:// storage DSNs)",
     "ext-mongodb": "To collect MongoDB driver command metrics",
     "mongodb/mongodb": "To use MongoDB ODM TimingSubscriber",

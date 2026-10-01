@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.2.1
+
+### Fixed
+
+- Doctrine DBAL query metrics were never recorded with DoctrineBundle: the compiler pass
+  looked for connection definitions with a `Doctrine\DBAL\Connection` class (DoctrineBundle
+  defines them as class-less child definitions) and registered the middleware without the
+  `doctrine.middleware` tag. The middleware is now tagged whenever DoctrineBundle configured
+  connections, and the pass runs before DoctrineBundle's `MiddlewaresPass` whatever the bundle
+  order.
+- Queries without bound parameters (`Connection::query()` / `exec()`, which bypass
+  `prepare()`) are now counted too.
+
 ## 1.2.0
 
 ### Deprecated

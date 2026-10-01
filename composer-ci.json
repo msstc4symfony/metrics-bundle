@@ -47,6 +47,7 @@
   "require-dev": {
     "deptrac/deptrac": "^4.6",
     "doctrine/dbal": "^3.0|^4.0",
+    "doctrine/doctrine-bundle": "^2.13|^3.0",
     "friendsofphp/php-cs-fixer": "^3.55",
     "infection/infection": "^0.32",
     "mongodb/mongodb": "^2.1",
@@ -67,6 +68,7 @@
   },
   "suggest": {
     "doctrine/dbal": "To collect Doctrine DBAL query metrics",
+    "doctrine/doctrine-bundle": "To register the DBAL query metrics middleware on its connections",
     "ext-apcu": "To store metrics in APCu (apc:// and apcng:// storage DSNs)",
     "ext-mongodb": "To collect MongoDB driver command metrics",
     "mongodb/mongodb": "To use MongoDB ODM TimingSubscriber",

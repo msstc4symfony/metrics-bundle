@@ -21,7 +21,9 @@
    `symfony/yaml` в `require` обязателен.
 2. Компилер-пассы (`MetricsBundle::build()`):
    - `AddMonologDecoratorCompilerPass` — декорирует `monolog.logger.*`;
-   - `AddDoctrineDBALMonitorPass` — DBAL middleware;
+   - `AddDoctrineDBALMonitorPass` (priority 1, раньше `MiddlewaresPass` DoctrineBundle) —
+     регистрирует DBAL middleware с тегом `doctrine.middleware`, если есть параметр
+     `doctrine.connections`;
    - `AddHttpClientMonitorPass` (priority -256) — декорирует **только**
      `http_client.transport` (приоритет декорации -20 — снаружи мока
      `mock_response_factory`, -10): туда сходятся все клиенты фреймворка (default и scoped)

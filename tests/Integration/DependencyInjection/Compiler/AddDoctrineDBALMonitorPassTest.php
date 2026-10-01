@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Test\Integration\DependencyInjection\Compiler;
 
-use Doctrine\DBAL\Connection;
+use Doctrine\Bundle\DoctrineBundle\DependencyInjection\Compiler\MiddlewaresPass;
+use Doctrine\DBAL\Driver\Middleware as DriverMiddleware;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler\AddDoctrineDBALMonitorPass;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\Middleware;
+use Msstc4Symfony\MetricsBundle\MetricsBundle;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
@@ -15,52 +17,66 @@ final class AddDoctrineDBALMonitorPassTest extends TestCase
 {
     protected function setUp(): void
     {
-        if (!class_exists(Connection::class)) {
+        if (!interface_exists(DriverMiddleware::class)) {
             self::markTestSkipped('doctrine/dbal not installed');
         }
     }
 
-    public function testRegistersMiddlewareWhenDoctrineConnectionFound(): void
+    public function testRegistersTaggedMiddlewareWhenDoctrineBundleConfiguredConnections(): void
     {
-        $container = new ContainerBuilder();
-        $container->setDefinition('doctrine.dbal.default_connection', new Definition(Connection::class));
+        $container = $this->containerWithDoctrineConnections();
 
         new AddDoctrineDBALMonitorPass()->process($container);
 
         self::assertTrue($container->hasDefinition(Middleware::class));
-        self::assertTrue($container->getDefinition(Middleware::class)->isAutowired());
+        $definition = $container->getDefinition(Middleware::class);
+        self::assertTrue($definition->isAutowired());
+        self::assertSame([[]], $definition->getTag(AddDoctrineDBALMonitorPass::MIDDLEWARE_TAG));
     }
 
-    public function testIgnoresAbstractDefinitions(): void
+    public function testSkipsWithoutDoctrineBundleConnections(): void
     {
         $container = new ContainerBuilder();
-        $abstract = new Definition(Connection::class);
-        $abstract->setAbstract(true);
-
-        $container->setDefinition('doctrine.dbal.default_connection', $abstract);
 
         new AddDoctrineDBALMonitorPass()->process($container);
 
         self::assertFalse($container->hasDefinition(Middleware::class));
     }
 
-    public function testIgnoresIdsNotMatchingPattern(): void
+    public function testKeepsAnApplicationDefinedMiddleware(): void
     {
-        $container = new ContainerBuilder();
-        $container->setDefinition('my.custom.dbal_thing', new Definition(Connection::class));
+        $container = $this->containerWithDoctrineConnections();
+        $custom = new Definition(Middleware::class)->addTag(AddDoctrineDBALMonitorPass::MIDDLEWARE_TAG, ['connection' => 'default']);
+        $container->setDefinition(Middleware::class, $custom);
 
         new AddDoctrineDBALMonitorPass()->process($container);
 
-        self::assertFalse($container->hasDefinition(Middleware::class));
+        self::assertSame($custom, $container->getDefinition(Middleware::class));
     }
 
-    public function testIgnoresDefinitionsWithoutClass(): void
+    public function testRunsBeforeDoctrineMiddlewaresPassWhateverTheBundleOrder(): void
+    {
+        if (!class_exists(MiddlewaresPass::class)) {
+            self::markTestSkipped('doctrine/doctrine-bundle not installed');
+        }
+
+        $container = new ContainerBuilder();
+        $container->addCompilerPass(new MiddlewaresPass());
+        new MetricsBundle()->build($container);
+
+        $order = array_map(get_class(...), $container->getCompilerPassConfig()->getBeforeOptimizationPasses());
+
+        self::assertLessThan(
+            array_search(MiddlewaresPass::class, $order, true),
+            array_search(AddDoctrineDBALMonitorPass::class, $order, true),
+        );
+    }
+
+    private function containerWithDoctrineConnections(): ContainerBuilder
     {
         $container = new ContainerBuilder();
-        $container->setDefinition('doctrine.dbal.default_connection', new Definition());
+        $container->setParameter('doctrine.connections', ['default' => 'doctrine.dbal.default_connection']);
 
-        new AddDoctrineDBALMonitorPass()->process($container);
-
-        self::assertFalse($container->hasDefinition(Middleware::class));
+        return $container;
     }
 }
