@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Test\Integration;
 
+use ErrorException;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Monolog\Handler\HandlerDecorator;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Storage\Factory;
@@ -64,6 +65,31 @@ final class ContainerCompileTest extends KernelTestCase
 
         self::assertSame(200, $response->getStatusCode());
         self::assertStringStartsWith('text/plain', (string) $response->headers->get('Content-Type'));
+    }
+
+    public function testUnreachableRedisNeverTurnsRequestsInto500(): void
+    {
+        if (!\extension_loaded('redis')) {
+            self::markTestSkipped('ext-redis required');
+        }
+
+        $_SERVER[self::DSN_ENV] = 'redis://metrics-unresolvable.invalid:6379?database=5';
+        $kernel = self::bootKernel();
+
+        // As Symfony's ErrorHandler with framework.php_errors.throw: PHP warnings become ErrorException.
+        set_error_handler(static function (int $type, string $message, string $file, int $line): never {
+            throw new ErrorException($message, 0, $type, $file, $line);
+        }, \E_WARNING | \E_NOTICE | \E_USER_WARNING | \E_USER_NOTICE);
+
+        try {
+            $page = $kernel->handle(Request::create('/no-such-page'));
+            $metrics = $kernel->handle(Request::create('/_/metrics'));
+        } finally {
+            restore_error_handler();
+        }
+
+        self::assertSame(404, $page->getStatusCode());
+        self::assertSame(503, $metrics->getStatusCode());
     }
 
     /**

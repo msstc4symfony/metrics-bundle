@@ -106,7 +106,7 @@ or behind a reverse proxy / private network.
 
 If the configured adapter cannot be constructed (malformed DSN, unknown scheme, missing extension), the bundle logs a warning/error via PSR-3 and silently falls back to `InMemory`. Watch your logs in production.
 
-The Redis connection is opened lazily on the first metric write or read, so an unreachable Redis does not trigger the fallback: each failed write is logged (`Cannot save metric ...`) and never breaks the request, command or message. Since 1.3.1 the `redis://` and `redisng://` adapters reconnect after a lost connection (Redis restart, network blip): the operation that hits the failure is dropped, the next one opens a fresh connection (database, credentials and read timeout are applied again). Long-running workers (RoadRunner, `messenger:consume`) recover without a restart.
+The Redis connection is opened lazily on the first metric write or read, so an unreachable Redis does not trigger the fallback: each failed write is logged (`Cannot save metric ...`) and never breaks the request, command or message. Since 1.3.1 the `redis://` and `redisng://` adapters reconnect after a lost connection (Redis restart, network blip): the operation that hits the failure is dropped, the next one opens a fresh connection (database, credentials and read timeout are applied again). Long-running workers (RoadRunner, `messenger:consume`) recover without a restart. Since 1.3.2 a failed write never throws (the sample is dropped and logged on the `metrics_bundle` channel), and PHP warnings raised by phpredis while (re)connecting — e.g. `getaddrinfo ... failed` while the Redis container is stopped — never reach the application error handler, so `framework.php_errors.throw` cannot turn them into 500s.
 
 Redis query parameters: `database` (or the DSN path, `redis://host:6379/4`), `read_timeout` (default `1`), `timeout` (default `0.1`), `persistent_connections`, `ssl_verify_peer` (default `true`).
 
@@ -165,7 +165,7 @@ transport × message × status combination — with many message classes, watch 
 
 | Method             | What                                                                |
 | ------------------ | ------------------------------------------------------------------- |
-| `GET /_/metrics`   | Returns all collected metrics in Prometheus text format. Responds with `Cache-Control: no-store, max-age=0` so every scrape sees fresh values. |
+| `GET /_/metrics`   | Returns all collected metrics in Prometheus text format. Responds with `Cache-Control: no-store, max-age=0` so every scrape sees fresh values. While the storage is unreachable it answers `503` (logged on the `metrics_bundle` channel), so Prometheus marks the target `up == 0` instead of seeing an empty scrape. |
 | `bin/console metrics:list`  | Tabular list of every registered metric (name, type, labels, histogram buckets). |
 | `bin/console metrics:clear` | Wipes the storage adapter.                                   |
 

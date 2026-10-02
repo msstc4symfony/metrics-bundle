@@ -294,3 +294,71 @@ README раньше утверждал, что недоступный Redis ув
 адаптера не подключается, откат срабатывает только на ошибке конструирования (DSN, схема, нет класса).
 Опция `ssl_verify_peer` попадает в `$options['ssl']`, но promphp её не использует при `connect()` —
 README теперь так и говорит; поддержка TLS — отдельная задача.
+
+## 1.3.2 (2026-10-02 UTC): регрессия 1.3.1 — 500 при остановленном Redis
+
+Симптом на стенде (showcase, RoadRunner, prod): при остановленном Redis запросы в gateway отдавали 500,
+в логе `ERROR Warning: Redis::connect(): php_network_getaddresses: getaddrinfo for redis failed: Name
+or service not known` (`ErrorException`, `PHPRedis.php:158`).
+
+Механика: в 1.3.0 клиент phpredis после обрыва застревал в FAILED и отвечал «went away» без сетевых
+вызовов. В 1.3.1 каждая операция переподключается, а `connect()` при ошибке DNS **сначала выдаёт PHP
+warning**, потом бросает `RedisException`. Symfony `ErrorHandler` с `framework.php_errors.throw: true`
+(по умолчанию **и в prod**) бросает warning как `ErrorException` прямо из `connect()`. phpredis 6.3 при
+этом всё равно бросает `RedisException` и цепляет `ErrorException` как `previous` (проверено).
+
+Воспроизведено локально:
+- `/_/metrics` → 500 (`StorageException` никто не ловил — так было и до 1.3.1);
+- `ErrorException` доходил до обработчика приложения (интеграционный тест на v1.3.1 падает именно на этом).
+
+Обычный запрос в ядре (`TestKernel`, копия gateway под `php -S` в prod) у меня 500 не дал: коллекторы
+ловят `Throwable`. Точный путь, которым исключение ушло наружу на стенде под RoadRunner, не найден.
+Поэтому исправление закрывает **все** выходы, а не один.
+
+Исправление:
+- `ReconnectingRedisAdapter::guard()` на время вызова ставит свой `set_error_handler` для
+  `E_WARNING|E_NOTICE|E_USER_WARNING|E_USER_NOTICE`. Обработчик запоминает текст и возвращает `true`,
+  поэтому обработчик приложения warning не видит. Предупреждение не превращается в исключение:
+  успешная операция с notice не ломается. Любой `Throwable` оборачивается в `StorageException`
+  (текст warning дописывается в сообщение), соединение сбрасывается только по Redis-исключениям.
+- Запись (`update*`) не бросает **никогда**: сэмпл теряется, ошибка пишется в логгер `Factory` (канал
+  `metrics_bundle`, исключён из `HandlerDecorator`, поэтому рекурсии через `ErrorCollector` нет).
+  Чтение (`collect`, `wipeStorage`) бросает `StorageException`.
+- `GetMetricsController` ловит `Throwable` → `503` text/plain + лог в `metrics_bundle`
+  (`#[WithMonologChannel]`, логгер — необязательный аргумент конструктора, BC).
+- `AbstractCollector::processException` и адаптер глотают исключения самого логгера.
+- Ревью: логи во время простоя ограничены по частоте. Первая ошибка пишется как `error`, дальше
+  раз в 60 с идёт `warning` с числом потерянных сэмплов, при восстановлении — `info`. Часы
+  монотонные (`hrtime`), в тестах подменяются через третий аргумент конструктора. Без этого каждый
+  запрос писал бы несколько ERROR с трейсом.
+- Обработчик в `guard()` ставится на `E_ALL`, а всё, что не warning или notice, передаётся
+  предыдущему обработчику. Если поставить его с маской, PHP отдаёт непойманные типы (deprecation)
+  **встроенному** обработчику, минуя Symfony: на RoadRunner это `display_errors` в STDOUT, то есть
+  порча relay.
+- PHP не отдаёт маску, с которой был зарегистрирован предыдущий обработчик. Поэтому обработчик,
+  поставленный приложением только на `E_WARNING`, теперь получит из `guard()` и `E_USER_DEPRECATED`.
+  Symfony `ErrorHandler` регистрируется на `E_ALL` и фильтрует сам, так что его это не касается.
+  Типы, выключенные в `error_reporting()`, дальше не передаются.
+- Ограничение частоты логов хранится в экземпляре сервиса, то есть в процессе. Работает в
+  долгоживущих воркерах (RoadRunner, `messenger:consume`). Под PHP-FPM / `php -S` контейнер
+  собирается заново на каждый запрос, и каждый запрос во время простоя пишет свой `error`. Если
+  Redis «мигает», каждое мигание даёт пару error + info.
+- Backoff переподключения (пропускать попытки N секунд) снова отклонён. Connection refused и
+  NXDOMAIN отвечают быстро, а одна попытка на операцию — исходное требование. Если DNS на стенде
+  окажется медленным, это первое, что нужно добавить (`hrtime`-окно в `guard()`).
+- Генерик `guard()` с `@template T` (S-1) не взят: с void-замыканиями PHPStan не выводит `T`, а
+  ограниченный шаблон этого не исправляет (пробовали в 1.3.1). `collect()` собирает сэмплы через
+  замыкание по ссылке.
+- `metrics:clear` при `StorageException` выводит сообщение и завершается с кодом 1.
+
+Тесты:
+- `ReconnectingRedisAdapterTest`: глобальный обработчик бросает `ErrorException`, фейк поднимает
+  `E_USER_WARNING`, обработчик должен быть вызван 0 раз;
+- `RedisReconnectTest::testUnreachableRedisNeverReachesTheApplicationErrorHandler`: настоящий phpredis,
+  `metrics-unresolvable.invalid` и закрытый порт;
+- `ContainerCompileTest::testUnreachableRedisNeverTurnsRequestsInto500`: ядро, `/no-such-page` → 404,
+  `/_/metrics` → 503.
+
+Ловушка: `json_encode` в `updateCounter` у promphp результат не проверяет, и невалидный UTF-8 в метке
+уходит в `EVAL` как `false`. `RuntimeException` бросает только `encodeLabelValues` (summary) —
+тест «не-сетевой ошибки» построен на summary.

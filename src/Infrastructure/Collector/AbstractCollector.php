@@ -147,11 +147,17 @@ abstract class AbstractCollector
 
     protected function processException(Throwable $exception, int|string $metricName): void
     {
-        if ($this->logger instanceof LoggerInterface) {
+        if (!$this->logger instanceof LoggerInterface) {
+            return;
+        }
+
+        try {
             $this->logger->error(
                 'Cannot save metric "' . $metricName . '": ' . $exception->getMessage(),
                 ['exception' => $exception],
             );
+        } catch (Throwable) {
+            // Logger failures must not break the application.
         }
     }
 }

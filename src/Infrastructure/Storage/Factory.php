@@ -152,7 +152,7 @@ final readonly class Factory implements FactoryInterface
     {
         $options = $this->buildRedisOptions($parts, $query);
 
-        return new ReconnectingRedisAdapter(static fn (): Redis => new Redis($options));
+        return new ReconnectingRedisAdapter(static fn (): Redis => new Redis($options), $this->logger);
     }
 
     /**
@@ -172,7 +172,7 @@ final readonly class Factory implements FactoryInterface
     {
         $options = $this->buildRedisOptions($parts, $query);
 
-        return new ReconnectingRedisAdapter(static fn (): RedisNg => new RedisNg($options));
+        return new ReconnectingRedisAdapter(static fn (): RedisNg => new RedisNg($options), $this->logger);
     }
 
     /**

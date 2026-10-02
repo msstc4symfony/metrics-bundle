@@ -92,6 +92,10 @@ final class FailingOnceDownRedis extends Redis
      */
     private function send(string $command): void
     {
+        if ($this->server->deprecation !== null) {
+            trigger_error($this->server->deprecation, \E_USER_DEPRECATED);
+        }
+
         if ($this->server->nextError instanceof Throwable) {
             $error = $this->server->nextError;
             $this->server->nextError = null;
@@ -105,8 +109,15 @@ final class FailingOnceDownRedis extends Redis
 
         if (!$this->server->up) {
             $this->failed = true;
+            if ($this->server->warningWhenDown !== null) {
+                trigger_error($this->server->warningWhenDown, \E_USER_WARNING);
+            }
 
             throw new RedisException('Connection lost');
+        }
+
+        if ($this->server->notice !== null) {
+            trigger_error($this->server->notice, \E_USER_NOTICE);
         }
 
         $this->server->commands[] = $command;

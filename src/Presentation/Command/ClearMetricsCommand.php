@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\Presentation\Command;
 
 use Override;
+use Prometheus\Exception\StorageException;
 use Prometheus\Storage\Adapter;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -31,7 +32,14 @@ final class ClearMetricsCommand extends Command
 
         $io->writeln('Clearing storage');
 
-        $this->storage->wipeStorage();
+        try {
+            $this->storage->wipeStorage();
+        } catch (StorageException $exception) {
+            $io->error($exception->getMessage());
+
+            return Command::FAILURE;
+        }
+
         $io->success('The storage was successfully cleared.');
 
         return Command::SUCCESS;

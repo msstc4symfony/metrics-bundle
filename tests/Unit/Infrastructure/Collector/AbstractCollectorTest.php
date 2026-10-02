@@ -72,6 +72,18 @@ final class AbstractCollectorTest extends TestCase
         $collector->callIncCounter(MetricLabelEnum::HTTP_REQUEST);
     }
 
+    public function testStorageFailureIsSwallowedEvenWhenLoggingItFails(): void
+    {
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('error')->willThrowException(new RuntimeException('log handler is down'));
+
+        $collector = $this->fixture(registry: $this->throwingRegistry());
+        $collector->setLogger($logger);
+
+        $this->expectNotToPerformAssertions();
+        $collector->callIncCounter(MetricLabelEnum::HTTP_REQUEST);
+    }
+
     public function testSetGaugeWritesValueWithPrefixedLabels(): void
     {
         $registry = new CollectorRegistry(new InMemory());

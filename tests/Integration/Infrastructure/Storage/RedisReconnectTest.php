@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Test\Integration\Infrastructure\Storage;
 
+use ErrorException;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Storage\Factory;
+use Msstc4Symfony\MetricsBundle\Test\Support\CollectingLogger;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Prometheus\Exception\StorageException;
 use Prometheus\Storage\Adapter;
 use Prometheus\Storage\RedisNg;
-use RedisException;
 use RuntimeException;
 
 /**
@@ -62,14 +63,15 @@ final class RedisReconnectTest extends TestCase
             self::markTestSkipped('promphp/prometheus_client_php without RedisNg');
         }
 
-        $adapter = new Factory()->create(\sprintf('%s://user:secret@127.0.0.1:%d%s', $scheme, $this->port, $dsnTail));
+        $logger = new CollectingLogger();
+        $adapter = new Factory($logger)->create(\sprintf('%s://user:secret@127.0.0.1:%d%s', $scheme, $this->port, $dsnTail));
         $this->startServer();
         $adapter->updateCounter($this->counter());
         self::assertSame([...$handshake, 'EVAL'], $this->loggedCommands());
 
         $this->stopServer();
-        $this->assertFailsWhileDown($adapter);
-        $this->assertFailsWhileDown($adapter);
+        $this->assertDroppedWhileDown($adapter, $logger);
+        $this->assertDroppedWhileDown($adapter, $logger);
 
         $this->startServer();
         $adapter->updateCounter($this->counter());
@@ -88,12 +90,51 @@ final class RedisReconnectTest extends TestCase
         yield 'redis, persistent connection' => ['redis', '?database=5&persistent_connections=1', ['AUTH user secret', 'SELECT 5']];
     }
 
-    private function assertFailsWhileDown(Adapter $adapter): void
+    /**
+     * @param non-empty-string $host
+     */
+    #[DataProvider('provideUnreachableHosts')]
+    public function testUnreachableRedisNeverReachesTheApplicationErrorHandler(string $host): void
     {
+        $logger = new CollectingLogger();
+        $adapter = new Factory($logger)->create(\sprintf('redis://%s:%d?database=5', $host, $this->port));
+
+        $handled = 0;
+        // Symfony's ErrorHandler throws PHP warnings as ErrorException (framework.php_errors.throw).
+        set_error_handler(static function (int $type, string $message, string $file, int $line) use (&$handled): never {
+            $handled++;
+
+            throw new ErrorException($message, 0, $type, $file, $line);
+        });
+
         try {
-            $adapter->updateCounter($this->counter());
-            self::fail('The write must fail while Redis is down.');
-        } catch (RedisException|StorageException) {
+            $this->assertDroppedWhileDown($adapter, $logger);
+            $this->assertDroppedWhileDown($adapter, $logger);
+        } finally {
+            restore_error_handler();
+        }
+
+        self::assertSame(0, $handled);
+    }
+
+    /**
+     * @return iterable<string, array{non-empty-string}>
+     */
+    public static function provideUnreachableHosts(): iterable
+    {
+        yield 'unresolvable host' => ['metrics-unresolvable.invalid'];
+        yield 'closed port' => ['127.0.0.1'];
+    }
+
+    private function assertDroppedWhileDown(Adapter $adapter, CollectingLogger $logger): void
+    {
+        $adapter->updateCounter($this->counter());
+        self::assertNotSame([], $logger->records, 'A write while Redis is down is dropped and logged.');
+
+        try {
+            $adapter->collect();
+            self::fail('A read must report that the storage is unavailable.');
+        } catch (StorageException) {
             $this->addToAssertionCount(1);
         }
     }

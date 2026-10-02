@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.3.2
+
+### Fixed
+
+- Regression from 1.3.1: while Redis was unreachable, the reconnect attempt made phpredis raise a PHP
+  warning (`Redis::connect(): php_network_getaddresses: getaddrinfo for redis failed`). With
+  Symfony's `framework.php_errors.throw` the application error handler turned it into an
+  `ErrorException`, and requests could end in a 500. `ReconnectingRedisAdapter` now handles PHP
+  warnings and notices raised during storage calls itself (they are attached to the logged
+  failure instead of reaching the application handler; deprecations are still passed on to it).
+  A failed write never throws any more: the sample is dropped and logged on the `metrics_bundle`
+  channel — the first failure of an outage at `error`, then one `warning` per minute with the
+  number of dropped samples, and `info` once writes succeed again (the rate limit is per process:
+  it pays off in long-running workers; under PHP-FPM each request logs its own first failure). A failed read (`collect()`,
+  `wipeStorage()`) throws a `StorageException`.
+- `GET /_/metrics` answered 500 while the storage was unreachable; it now answers
+  `503 Service Unavailable` (`text/plain`, `no-store`) and logs the cause, so Prometheus records
+  `up == 0` for the scrape.
+- A collector whose logger throws while reporting a storage failure no longer lets that exception
+  escape.
+- `metrics:clear` prints the storage error and exits with `1` instead of dumping the exception.
+
+### Changed
+
+- For the `redis://` and `redisng://` storages, code that reads the registry directly
+  (`getMetricFamilySamples()`) now gets `Prometheus\Exception\StorageException` (the original
+  `RedisException` is its `previous`) instead of a raw `RedisException`. Collectors no longer log
+  `Cannot save metric ...` for Redis outages; the adapter's rate-limited messages replace them.
+- `GetMetricsController` takes an optional `LoggerInterface` (third constructor argument).
+
 ## 1.3.1
 
 ### Fixed

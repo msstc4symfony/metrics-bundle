@@ -6,7 +6,9 @@ namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Storage;
 
 use Closure;
 use Error;
+use ErrorException;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Storage\ReconnectingRedisAdapter;
+use Msstc4Symfony\MetricsBundle\Test\Support\CollectingLogger;
 use Msstc4Symfony\MetricsBundle\Test\Support\Redis\FailingOnceDownRedis;
 use Msstc4Symfony\MetricsBundle\Test\Support\Redis\FakeRedisServer;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -15,7 +17,7 @@ use Prometheus\Exception\StorageException;
 use Prometheus\Storage\Adapter;
 use Prometheus\Storage\Redis;
 use Prometheus\Storage\RedisClients\RedisClientException;
-use RedisException;
+use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Throwable;
 
@@ -25,6 +27,10 @@ final class ReconnectingRedisAdapterTest extends TestCase
 
     private int $connections = 0;
 
+    private CollectingLogger $logger;
+
+    private float $now = 1000.0;
+
     protected function setUp(): void
     {
         if (version_compare((string) phpversion('redis'), '6.0.0', '<')) {
@@ -33,23 +39,20 @@ final class ReconnectingRedisAdapterTest extends TestCase
 
         $this->server = new FakeRedisServer();
         $this->connections = 0;
+        $this->logger = new CollectingLogger();
     }
 
     /**
      * @param Closure(Adapter): void $operation
      */
     #[DataProvider('provideOperations')]
-    public function testOperationReconnectsAfterRedisWentAway(Closure $operation, string $command): void
+    public function testOperationReconnectsAfterRedisWentAway(Closure $operation, string $command, bool $read): void
     {
-        $adapter = new ReconnectingRedisAdapter($this->connect(...));
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger);
         $operation($adapter);
 
         $this->server->up = false;
-        try {
-            $operation($adapter);
-            self::fail('The operation must fail while Redis is down.');
-        } catch (RedisException) {
-        }
+        $this->runWhileDown($operation, $adapter, $read);
 
         $this->server->up = true;
         $sentBeforeRecovery = \count($this->server->commands);
@@ -60,47 +63,158 @@ final class ReconnectingRedisAdapterTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{Closure(Adapter): void, string}>
+     * @return iterable<string, array{Closure(Adapter): void, string, bool}>
      */
     public static function provideOperations(): iterable
     {
-        yield 'counter' => [static fn (Adapter $adapter) => $adapter->updateCounter(self::counter()), 'EVAL'];
-        yield 'gauge' => [static fn (Adapter $adapter) => $adapter->updateGauge(self::gauge()), 'EVAL'];
-        yield 'histogram' => [static fn (Adapter $adapter) => $adapter->updateHistogram(self::histogram()), 'EVAL'];
+        yield 'counter' => [static fn (Adapter $adapter) => $adapter->updateCounter(self::counter()), 'EVAL', false];
+        yield 'gauge' => [static fn (Adapter $adapter) => $adapter->updateGauge(self::gauge()), 'EVAL', false];
+        yield 'histogram' => [static fn (Adapter $adapter) => $adapter->updateHistogram(self::histogram()), 'EVAL', false];
+        yield 'summary' => [static fn (Adapter $adapter) => $adapter->updateSummary(self::summary()), 'SETNX', false];
         yield 'collect' => [static function (Adapter $adapter): void {
             $adapter->collect();
-        }, 'SMEMBERS'];
-        yield 'summary' => [static fn (Adapter $adapter) => $adapter->updateSummary(self::summary()), 'SETNX'];
-        yield 'wipe storage' => [static fn (Adapter $adapter) => $adapter->wipeStorage(), 'EVAL'];
+        }, 'SMEMBERS', true];
+        yield 'wipe storage' => [static fn (Adapter $adapter) => $adapter->wipeStorage(), 'EVAL', true];
+    }
+
+    /**
+     * @param Closure(Adapter): void $operation
+     */
+    #[DataProvider('provideOperations')]
+    public function testWarningWhileRedisIsDownNeverReachesTheApplicationErrorHandler(Closure $operation, string $command, bool $read): void
+    {
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger);
+        $this->server->up = false;
+        $this->server->warningWhenDown = 'Redis::connect(): php_network_getaddresses: getaddrinfo for redis failed: Name or service not known';
+
+        $handled = 0;
+        set_error_handler(static function (int $type, string $message, string $file, int $line) use (&$handled): never {
+            $handled++;
+
+            throw new ErrorException($message, 0, $type, $file, $line);
+        });
+
+        try {
+            $this->runWhileDown($operation, $adapter, $read);
+        } finally {
+            restore_error_handler();
+        }
+
+        self::assertSame(0, $handled);
+    }
+
+    public function testOutageIsLoggedOnceThenSummarisedAndRecoveryIsLogged(): void
+    {
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger, $this->clock(...));
+        $this->server->up = false;
+
+        $adapter->updateCounter(self::counter());
+        $adapter->updateCounter(self::counter());
+        $this->now += 30;
+        $adapter->updateCounter(self::counter());
+        self::assertCount(1, $this->logger->records, 'Repeated drops within the interval are not logged one by one.');
+        self::assertStringStartsWith('error: ', $this->logger->records[0]);
+
+        $this->now += 31;
+        $adapter->updateCounter(self::counter());
+        self::assertCount(2, $this->logger->records);
+        self::assertStringStartsWith('warning: ', $this->logger->records[1]);
+        self::assertStringContainsString('3 samples dropped', $this->logger->records[1]);
+
+        $this->server->up = true;
+        $adapter->updateCounter(self::counter());
+        self::assertCount(3, $this->logger->records);
+        self::assertStringStartsWith('info: ', $this->logger->records[2]);
+
+        $this->server->up = false;
+        $adapter->updateCounter(self::counter());
+        self::assertCount(4, $this->logger->records, 'A new outage is logged again.');
+        self::assertStringStartsWith('error: ', $this->logger->records[3]);
+    }
+
+    public function testDeprecationDuringAnOperationStillReachesTheApplicationHandler(): void
+    {
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger);
+        $this->server->deprecation = 'Some option is deprecated';
+
+        $seen = [];
+        set_error_handler(static function (int $type, string $message) use (&$seen): bool {
+            $seen[] = $message;
+
+            return true;
+        });
+
+        $reporting = error_reporting(\E_ALL);
+
+        try {
+            $adapter->updateCounter(self::counter());
+        } finally {
+            error_reporting($reporting);
+            restore_error_handler();
+        }
+
+        self::assertSame(['Some option is deprecated'], $seen);
+        self::assertSame(['EVAL'], $this->server->commands);
+        self::assertSame([], $this->logger->records);
+    }
+
+    public function testWarningOnASuccessfulOperationIsLoggedAtDebugOnly(): void
+    {
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger);
+        $this->server->notice = 'Serializer fallback used';
+
+        $handled = 0;
+        set_error_handler(static function () use (&$handled): bool {
+            $handled++;
+
+            return true;
+        });
+
+        try {
+            $adapter->updateCounter(self::counter());
+        } finally {
+            restore_error_handler();
+        }
+
+        self::assertSame(0, $handled);
+        self::assertSame(['EVAL'], $this->server->commands);
+        self::assertCount(1, $this->logger->records);
+        self::assertStringStartsWith('debug: ', $this->logger->records[0]);
+    }
+
+    public function testThrowingLoggerNeverEscapesAWrite(): void
+    {
+        $logger = self::createStub(LoggerInterface::class);
+        $logger->method('log')->willThrowException(new RuntimeException('log handler is down'));
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $logger);
+        $this->server->up = false;
+
+        $this->expectNotToPerformAssertions();
+        $adapter->updateCounter(self::counter());
     }
 
     public function testEveryOperationWhileRedisIsDownTriesOneFreshConnection(): void
     {
-        $adapter = new ReconnectingRedisAdapter($this->connect(...));
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger);
         $this->server->up = false;
 
         for ($i = 0; $i < 3; $i++) {
-            try {
-                $adapter->updateCounter(self::counter());
-            } catch (RedisException) {
-            }
+            $adapter->updateCounter(self::counter());
         }
 
         self::assertSame(3, $this->connections);
     }
 
-    public function testNonConnectionFailureKeepsTheConnection(): void
+    public function testNonConnectionFailureIsDroppedButKeepsTheConnection(): void
     {
-        $adapter = new ReconnectingRedisAdapter($this->connect(...));
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger);
 
-        try {
-            $adapter->updateCounter(['labelNames' => ['l'], 'labelValues' => ["\xB1"]] + self::counter());
-            self::fail('A label value that is not UTF-8 cannot be encoded.');
-        } catch (RuntimeException) {
-        }
-
+        // promphp encodes summary label values with a RuntimeException on invalid UTF-8.
+        $adapter->updateSummary(['labelNames' => ['l'], 'labelValues' => ["\xB1"]] + self::summary());
         $adapter->updateCounter(self::counter());
 
+        self::assertStringStartsWith('error: ', $this->logger->records[0] ?? '');
+        self::assertSame(['SETNX', 'EVAL'], $this->server->commands);
         self::assertSame(1, $this->connections);
     }
 
@@ -110,15 +224,10 @@ final class ReconnectingRedisAdapterTest extends TestCase
     #[DataProvider('provideConnectionErrors')]
     public function testClientLevelConnectionErrorAlsoReconnects(Closure $error): void
     {
-        $adapter = new ReconnectingRedisAdapter($this->connect(...));
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger);
         $this->server->nextError = $error();
 
-        try {
-            $adapter->updateCounter(self::counter());
-            self::fail('The injected error must propagate.');
-        } catch (StorageException|RedisClientException) {
-        }
-
+        $adapter->updateCounter(self::counter());
         $adapter->updateCounter(self::counter());
 
         self::assertSame(2, $this->connections);
@@ -138,6 +247,31 @@ final class ReconnectingRedisAdapterTest extends TestCase
         $this->expectException(Error::class);
 
         new ReconnectingRedisAdapter(static fn (): Redis => throw new Error('Class "Redis" not found'));
+    }
+
+    /**
+     * @param Closure(Adapter): void $operation
+     */
+    private function runWhileDown(Closure $operation, Adapter $adapter, bool $read): void
+    {
+        if (!$read) {
+            $operation($adapter);
+            self::assertNotSame([], $this->logger->records, 'A dropped write must be logged.');
+
+            return;
+        }
+
+        try {
+            $operation($adapter);
+            self::fail('A read must report that the storage is unavailable.');
+        } catch (StorageException $exception) {
+            self::assertNotInstanceOf(ErrorException::class, $exception->getPrevious());
+        }
+    }
+
+    private function clock(): float
+    {
+        return $this->now;
     }
 
     private function connect(): Redis
