@@ -148,9 +148,11 @@ final readonly class Factory implements FactoryInterface
      * } $parts
      * @param array<string, string> $query
      */
-    private function createRedis(array $parts, array $query): Redis
+    private function createRedis(array $parts, array $query): ReconnectingRedisAdapter
     {
-        return new Redis($this->buildRedisOptions($parts, $query));
+        $options = $this->buildRedisOptions($parts, $query);
+
+        return new ReconnectingRedisAdapter(static fn (): Redis => new Redis($options));
     }
 
     /**
@@ -166,9 +168,11 @@ final readonly class Factory implements FactoryInterface
      * } $parts
      * @param array<string, string> $query
      */
-    private function createRedisNg(array $parts, array $query): RedisNg
+    private function createRedisNg(array $parts, array $query): ReconnectingRedisAdapter
     {
-        return new RedisNg($this->buildRedisOptions($parts, $query));
+        $options = $this->buildRedisOptions($parts, $query);
+
+        return new ReconnectingRedisAdapter(static fn (): RedisNg => new RedisNg($options));
     }
 
     /**
@@ -207,8 +211,9 @@ final readonly class Factory implements FactoryInterface
             $options['password'] = $parts['pass'];
         }
 
-        if (isset($parts['path']) && is_numeric($parts['path'])) {
-            $options['database'] = (int) $parts['path'];
+        $path = ltrim($parts['path'] ?? '', '/');
+        if (preg_match('/^\d+\z/', $path) === 1) {
+            $options['database'] = (int) $path;
         }
 
         if (isset($query['read_timeout'])) {

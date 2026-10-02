@@ -231,3 +231,66 @@ check считает добавление кейса в enum BC-break (`[BC] ADD
 
 `AddDoctrineDBALMonitorPass` бросает `LogicException`, если выбран `name`, а DoctrineBundle без
 `ConnectionNameAwareInterface` — в CI-профиле интерфейс всегда есть.
+
+## 1.3.1 (2026-10-02 UTC): Redis-хранилище не восстанавливалось после рестарта Redis
+
+Симптом (Symfony 8.1, RoadRunner + `messenger:consume`, `redis://redis:6379?database=5`): после
+`docker stop/start` Redis (~20 с) воркеры до конца жизни пишут `Redis server redis:6379 went away` и
+`Cannot save metric ...`, счётчики заморожены. (`Failed to fetch key ...` — это лог Symfony Cache
+приложения, не бандла.)
+
+Причина — две вместе:
+1. **phpredis 6** (проверено на 6.3.0): команда, потерявшая соединение, бросает `Connection lost` и
+   переводит сокет в `REDIS_SOCK_STATUS_FAILED`; из этого состояния каждая следующая команда сразу
+   бросает `Redis server host:port went away`, **даже когда сервер уже поднялся** — до явного
+   `connect()`/`pconnect()`. Воспроизведено настоящим phpredis против фейкового RESP-сервера.
+2. **promphp** (`PHPRedis` client / `RedisNg`) вызывает `connect()` один раз: флаг
+   `connectionInitialized` после этого больше не сбрасывается.
+
+Исправление: `ReconnectingRedisAdapter` (см. `architecture.md`). Решения:
+- упавшая операция **не повторяется**: `EVAL` мог дойти до сервера до обрыва (read error) —
+  повтор посчитал бы счётчик дважды. Теряется одна запись на обрыв;
+- пока Redis лежит, каждая операция делает одну попытку подключения (timeout DSN, по умолчанию
+  0.1 с) — как и при старте воркера с недоступным Redis;
+- прочие исключения (например, `RuntimeException` от `json_encode` меток) соединение не сбрасывают;
+- старый `\Redis` освобождается вместе со старым адаптером — утечки на долгоживущем процессе нет;
+  с `persistent_connections=1` новый `\Redis` берёт persistent-сокет через `pconnect()`, PHP
+  проверяет его живость;
+- префикс promphp (`AbstractRedis::setPrefix`) статический — переживает пересоздание;
+- cooldown между попытками (ревью, CR-006) **отклонён**: требование — одна попытка на операцию;
+  connection refused падает мгновенно, а для «чёрной дыры» ограничение даёт `timeout` (0.1 с) —
+  компромисс описан в README. Если понадобится — `hrtime`-окно в `connected()`;
+- конструктор обёртки подключается (строит адаптер) **сразу**: иначе ошибка конструирования
+  (нет ext-redis / `RedisNg`) не дойдёт до `try` в `Factory::create()` и откат на `InMemory`
+  сломается (тест `testConnectsEagerlySoTheFactoryCanFallBackOnConstructionErrors`).
+
+Попутно (найдено ревью): номер БД из пути DSN (`redis://host/4`) **игнорировался** —
+`parse_url()` отдаёт `/4`, `is_numeric('/4') === false`, запись шла в БД 0. Исправлено в 1.3.1
+(`ltrim('/')` + `^\d+$`), интеграционный тест ждёт `SELECT 3`. `?database=` по-прежнему главнее.
+`persistent_connections=1` проверен тем же интеграционным тестом: новый `\Redis` + `pconnect()`
+после рестарта сервера работает (на дефолтных ini phpredis 6.3).
+`FailingOnceDownRedis` повторяет типизированные сигнатуры phpredis 6 — на ext-redis 5 тест
+самопропускается.
+
+Нижняя граница `promphp/prometheus_client_php ^2.6`: в 2.6.0 нет `AbstractRedis`, `RedisNg`,
+`RedisClientException` — поэтому обёртка типизирована `Redis|RedisNg` (не `AbstractRedis`), а `catch`
+по отсутствующему классу безопасен. `redisng://` на 2.6 по-прежнему уходит в `InMemory`
+(`FactoryTest::testRedisngSchemeWithHostReturnsReconnectingAdapter` на `--prefer-lowest` красный —
+так было и до 1.3.1, в CI lowest не гоняется).
+
+Predis бандл не поддерживает (схемы `predis://` нет). Для справки: promphp-клиент `Predis`
+проверяет `isConnected()` в каждом `ensureOpenConnection()`, а Predis после `CommunicationException`
+сам рвёт соединение — он восстановился бы без обёртки. APCu/InMemory соединений не держат.
+
+Тесты: `tests/Unit/Infrastructure/Storage/ReconnectingRedisAdapterTest` (фейк
+`tests/Support/Redis/FailingOnceDownRedis` моделирует FAILED-состояние phpredis) и
+`tests/Integration/Infrastructure/Storage/RedisReconnectTest` — настоящий phpredis против
+`tests/Support/Redis/resp-server.php` (RESP-сервер на PHP, отвечает `+OK`, пишет команды в лог),
+который убивается и поднимается на том же порту; проверяет AUTH + SELECT (из query и из пути DSN,
+а также с `persistent_connections=1`) + `EVAL` до и после рестарта.
+Нужны только `ext-redis` и `proc_open`, реальный Redis не нужен.
+
+README раньше утверждал, что недоступный Redis уводит в `InMemory`: это неверно — конструктор
+адаптера не подключается, откат срабатывает только на ошибке конструирования (DSN, схема, нет класса).
+Опция `ssl_verify_peer` попадает в `$options['ssl']`, но promphp её не использует при `connect()` —
+README теперь так и говорит; поддержка TLS — отдельная задача.

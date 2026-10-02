@@ -5,14 +5,13 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Storage;
 
 use Msstc4Symfony\MetricsBundle\Infrastructure\Storage\Factory;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Storage\ReconnectingRedisAdapter;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Prometheus\Storage\APC;
 use Prometheus\Storage\APCng;
 use Prometheus\Storage\InMemory;
-use Prometheus\Storage\Redis;
-use Prometheus\Storage\RedisNg;
 use Psr\Log\AbstractLogger;
 use Psr\Log\LoggerInterface;
 use Stringable;
@@ -86,18 +85,18 @@ final class FactoryTest extends TestCase
         self::assertInstanceOf(APCng::class, $factory->create('apcng://'));
     }
 
-    public function testRedisSchemeWithHostReturnsRedisAdapter(): void
+    public function testRedisSchemeWithHostReturnsReconnectingAdapter(): void
     {
         $factory = new Factory();
 
-        self::assertInstanceOf(Redis::class, $factory->create('redis://localhost:6379'));
+        self::assertInstanceOf(ReconnectingRedisAdapter::class, $factory->create('redis://localhost:6379'));
     }
 
-    public function testRedisngSchemeWithHostReturnsRedisngAdapter(): void
+    public function testRedisngSchemeWithHostReturnsReconnectingAdapter(): void
     {
         $factory = new Factory();
 
-        self::assertInstanceOf(RedisNg::class, $factory->create('redisng://localhost:6379'));
+        self::assertInstanceOf(ReconnectingRedisAdapter::class, $factory->create('redisng://localhost:6379'));
     }
 
     public function testMalformedRedisDsnFallsBackToInMemoryAndLogsError(): void
@@ -145,7 +144,7 @@ final class FactoryTest extends TestCase
 
         $adapter = $factory->create('redis://user:pass@redis-host:6390/?database=7&timeout=0.5&persistent_connections=1&ssl_verify_peer=1');
 
-        self::assertInstanceOf(Redis::class, $adapter);
+        self::assertInstanceOf(ReconnectingRedisAdapter::class, $adapter);
     }
 
     public function testRedisDatabaseFromPath(): void
@@ -154,7 +153,7 @@ final class FactoryTest extends TestCase
 
         $adapter = $factory->create('redis://localhost/3');
 
-        self::assertInstanceOf(Redis::class, $adapter);
+        self::assertInstanceOf(ReconnectingRedisAdapter::class, $adapter);
     }
 
     public function testDefaultsToInMemoryOnEmptyDsn(): void

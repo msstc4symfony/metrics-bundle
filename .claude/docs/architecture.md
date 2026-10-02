@@ -59,3 +59,8 @@ MongoDB, Elastica, Messenger, APCu. Точка проводки молча вы�
 `InMemory` с записью в лог канала `metrics_bundle` (только схема DSN, без учётных данных).
 Схемы без хоста (`apc://`, `apcng://`, `inmemory://`) разбираются отдельно:
 `parse_url()` их отвергает.
+
+`redis`/`redisng` отдаются обёрнутыми в `ReconnectingRedisAdapter` (@internal): при
+`RedisException`/`StorageException`/`RedisClientException` адаптер выбрасывается, следующая операция
+строит новый (`new Redis($options)`) — новое соединение, AUTH, SELECT, read timeout. Сама упавшая
+операция не повторяется. Подробности — `known-issues.md`, раздел 1.3.1.

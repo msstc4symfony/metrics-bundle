@@ -104,15 +104,17 @@ or behind a reverse proxy / private network.
 | `apcng://`   | `Prometheus\Storage\APCng`    | APCu with sharded counters.                     |
 | `inmemory://`| `Prometheus\Storage\InMemory` | Per-process, lost on shutdown (tests/dev).      |
 
-If the configured adapter cannot be constructed (unreachable Redis, malformed DSN, unknown scheme), the bundle logs a warning/error via PSR-3 and silently falls back to `InMemory`. Watch your logs in production.
+If the configured adapter cannot be constructed (malformed DSN, unknown scheme, missing extension), the bundle logs a warning/error via PSR-3 and silently falls back to `InMemory`. Watch your logs in production.
 
-Redis query parameters: `database`, `read_timeout` (default `1`), `timeout` (default `0.1`), `persistent_connections`, `ssl_verify_peer` (default `true`).
+The Redis connection is opened lazily on the first metric write or read, so an unreachable Redis does not trigger the fallback: each failed write is logged (`Cannot save metric ...`) and never breaks the request, command or message. Since 1.3.1 the `redis://` and `redisng://` adapters reconnect after a lost connection (Redis restart, network blip): the operation that hits the failure is dropped, the next one opens a fresh connection (database, credentials and read timeout are applied again). Long-running workers (RoadRunner, `messenger:consume`) recover without a restart.
+
+Redis query parameters: `database` (or the DSN path, `redis://host:6379/4`), `read_timeout` (default `1`), `timeout` (default `0.1`), `persistent_connections`, `ssl_verify_peer` (default `true`).
 
 ```
 redis://user:pass@redis:6379/4?read_timeout=2&persistent_connections=1
 ```
 
-> **Operational note.** `ssl_verify_peer` defaults to `true`: TLS Redis with a self-signed CA chain will fail to connect and the bundle will silently fall back to `InMemory` (each PHP worker keeps its own metrics, none are exposed to Prometheus). Pass `?ssl_verify_peer=0` in the DSN when intentionally using a private CA. The same silent fallback applies if `read_timeout=1` is too aggressive for the network — increase via the query parameter.
+> **Operational notes.** `ssl_verify_peer` is accepted in the DSN but currently has no effect: `promphp/prometheus_client_php` connects without passing TLS context options to phpredis. If `read_timeout=1` is too aggressive for the network, metric writes fail (logged as `Cannot save metric ...`) — increase it via the query parameter. While Redis is unreachable every metric operation makes one connection attempt bounded by `timeout` (default `0.1` s): a refused connection fails at once, but a host that silently drops packets adds up to `timeout` per metric write, so keep `timeout` small.
 
 ## Configuration
 

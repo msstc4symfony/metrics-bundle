@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.3.1
+
+### Fixed
+
+- `redis://` and `redisng://` storage never recovered after Redis restarted under a long-running
+  process (RoadRunner, `messenger:consume`): phpredis marks a client that lost its connection as
+  failed and answers every later command with `Redis server ... went away`, while the promphp
+  adapter connects only once. The Redis adapters are now wrapped in the internal
+  `ReconnectingRedisAdapter`: a connection failure drops the adapter, and the next metric write or
+  read builds a fresh one, which connects, authenticates, selects the database and applies the
+  read timeout again. The failing operation itself is not retried (a retried `EVAL` could count
+  twice); collectors keep logging it as before, so metrics never break the request or message.
+  While Redis is down every operation makes one connection attempt (`timeout`, default 0.1 s).
+- The database number in the DSN path (`redis://redis:6379/4`, as documented in the README) was
+  ignored: `parse_url()` returns `/4` and the numeric check failed, so metrics went to database 0.
+  It is now applied (`?database=` still wins). Applications that relied on the path form write
+  to the configured database from this release on.
+
+### Changed
+
+- `Storage\Factory::create()` returns `ReconnectingRedisAdapter` instead of
+  `Prometheus\Storage\Redis` / `RedisNg` for the Redis schemes. The service is still typed
+  `Prometheus\Storage\Adapter`; code that checked for the concrete promphp class must not.
+- README: an unreachable Redis never triggered the `InMemory` fallback (the connection is lazy),
+  and `ssl_verify_peer` is not passed to phpredis by promphp; the storage section now says so and
+  describes the per-operation connection attempt while Redis is down.
+
 ## 1.3.0
 
 ### Added
