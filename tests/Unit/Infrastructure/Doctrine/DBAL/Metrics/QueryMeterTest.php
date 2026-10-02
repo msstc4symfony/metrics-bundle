@@ -88,6 +88,9 @@ final class QueryMeterTest extends TestCase
         yield 'double-quoted identifier' => ['SELECT * FROM "public"."user_logs" WHERE id = 1', 'user_logs'];
         yield 'backtick identifier' => ['SELECT * FROM `orders`', 'orders'];
         yield 'quoted INSERT target' => ['INSERT INTO "orders" (id) VALUES (1)', 'orders'];
+        yield 'column whose name starts with "from"' => ['SELECT id, fromage FROM cheeses', 'cheeses'];
+        yield 'column named "from" behind a qualifier' => ['SELECT t.from FROM transfers t', 'transfers'];
+        yield 'FROM right after a closing parenthesis' => ['SELECT COUNT(*)FROM users', 'users'];
         yield 'Postgres column introspection by DBAL' => [self::POSTGRES_COLUMNS_SQL, 'pg_attribute'];
     }
 

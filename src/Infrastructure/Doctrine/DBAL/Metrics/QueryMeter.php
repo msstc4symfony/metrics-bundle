@@ -21,9 +21,12 @@ final readonly class QueryMeter
 
     private const string PARENTHESISED = '/\((?:[^()]++|(?R))*+\)/';
 
+    // A keyword is neither part of a longer word ("fromage") nor a qualified column ("t.from").
+    private const string KEYWORD_START = '(?<![\w.])';
+
     // Group 1 is a derived table's placeholder "(#n)"; every other group is a table name.
-    private const string STATEMENT = '/(?:'
-        . 'SELECT\s.*?\sFROM\s*(?:\(#(\d+)\)|' . self::TABLE . ')'
+    private const string STATEMENT = '/' . self::KEYWORD_START . '(?:'
+        . 'SELECT\b.*?' . self::KEYWORD_START . 'FROM\b\s*(?:\(#(\d+)\)|' . self::TABLE . ')'
         . '|INSERT\s+INTO\s+' . self::TABLE
         . '|DELETE\s+FROM\s+' . self::TABLE
         . '|UPDATE\s+' . self::TABLE
