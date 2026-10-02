@@ -535,3 +535,14 @@ Postgres, оканчивающийся обратным слешем (`'C:\'` п
 7 ошибок `labelValuesFor()` в тестах исчезли вместе с хелперами (переход на `RegistrySamples`).
 Запись baseline `isset.offset` (`sys_getloadavg()` на PHP 8.4 возвращает `array{float,float,float}|false`)
 удалена — проверка стала `=== false`.
+
+### Первый прогон CI 1.4.0: красная lowest-ячейка (run 36996017587)
+
+`ContainerCompileTest::testUnreachableRedisNeverTurnsRequestsInto500` упал с `ErrorException: Caster::castObject():
+Implicitly marking parameter $debugClass as nullable is deprecated` (`symfony/var-dumper` 6.3.0, explicit
+nullable — с 6.4.3). Класс грузится лениво внутри `guard()`, а `guard()` передаёт не-warning типы
+предыдущему обработчику — замыканию теста, которое бросало на **любой** тип. Обработчик Symfony так не
+делает, так что ошибка была в тесте: замыкание теперь возвращает `false` для типов вне своей маски.
+Локально не воспроизводилось из-за OPcache CLI (`opcache.enable_cli=On`): класс уже скомпилирован, и
+deprecation времени компиляции не повторяется. Воспроизведение: `php -d opcache.enable_cli=0
+vendor/bin/phpunit --filter testUnreachableRedisNeverTurnsRequestsInto500` в lowest-копии.

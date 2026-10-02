@@ -78,9 +78,16 @@ final class ContainerCompileTest extends KernelTestCase
         $kernel = self::bootKernel();
 
         // As Symfony's ErrorHandler with framework.php_errors.throw: PHP warnings become ErrorException.
-        set_error_handler(static function (int $type, string $message, string $file, int $line): never {
+        // The bundle's storage guard forwards other types (e.g. a compile-time deprecation of a lazily
+        // loaded class) to this handler; like Symfony's, it must not throw for them.
+        $thrown = \E_WARNING | \E_NOTICE | \E_USER_WARNING | \E_USER_NOTICE;
+        set_error_handler(static function (int $type, string $message, string $file, int $line) use ($thrown): bool {
+            if (($type & $thrown) === 0) {
+                return false;
+            }
+
             throw new ErrorException($message, 0, $type, $file, $line);
-        }, \E_WARNING | \E_NOTICE | \E_USER_WARNING | \E_USER_NOTICE);
+        }, $thrown);
 
         try {
             $page = $kernel->handle(Request::create('/no-such-page'));
