@@ -17,6 +17,7 @@ use Symfony\Bundle\MonologBundle\MonologBundle;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\Kernel;
 use Symfony\Component\Routing\Loader\AttributeServicesLoader;
 use Symfony\Component\Routing\Route;
 use Symfony\Component\Routing\RouterInterface;
@@ -77,8 +78,9 @@ final class ContainerCompileTest extends KernelTestCase
     #[DataProvider('routingControllersProvider')]
     public function testMetricsRouteLoadsOnceThroughRoutingControllers(string $environment): void
     {
-        if (!class_exists(AttributeServicesLoader::class)) {
-            self::markTestSkipped('The "routing.controllers" resource needs symfony/routing 7.4+');
+        // symfony/routing may be newer than FrameworkBundle, which registers the loader only from 7.4.
+        if (!class_exists(AttributeServicesLoader::class) || Kernel::VERSION_ID < 70400) {
+            self::markTestSkipped('The "routing.controllers" resource needs Symfony 7.4+');
         }
 
         $kernel = self::bootKernel(['environment' => $environment]);
