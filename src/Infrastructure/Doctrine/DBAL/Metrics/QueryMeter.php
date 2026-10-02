@@ -12,8 +12,22 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\DoctrineQueryTypeEnum;
 /** @internal Shared by the connection and statement middlewares. */
 final readonly class QueryMeter
 {
+    private const string IDENTIFIER = '(?:\w+|"[^"]+"|`[^`]+`|\[[^\]]+\])';
+
     // Optional schema prefix is matched but not captured: "public.users" labels as "users".
-    private const string TABLE = '(?:\w+\.)?(\w+)';
+    private const string TABLE = '(?:' . self::IDENTIFIER . '\.)?(' . self::IDENTIFIER . ')';
+
+    private const string NOISE = "/'(?:[^'\\\\]|\\\\.|'')*'|--[^\\n]*|\\/\\*.*?(?:\\*\\/|\\z)/s";
+
+    private const string PARENTHESISED = '/\((?:[^()]++|(?R))*+\)/';
+
+    // Group 1 is a derived table's placeholder "(#n)"; every other group is a table name.
+    private const string STATEMENT = '/(?:'
+        . 'SELECT\s.*?\sFROM\s*(?:\(#(\d+)\)|' . self::TABLE . ')'
+        . '|INSERT\s+INTO\s+' . self::TABLE
+        . '|DELETE\s+FROM\s+' . self::TABLE
+        . '|UPDATE\s+' . self::TABLE
+        . ')/Sis';
 
     // Bounds regex cost on huge statements (long IN lists, batch inserts); the table name sits near the start.
     private const int MAX_PARSED_SQL_LENGTH = 16_384;
@@ -56,23 +70,47 @@ final readonly class QueryMeter
 
     private function assembleTableName(string $sql): ?string
     {
-        $sql = substr($sql, 0, self::MAX_PARSED_SQL_LENGTH);
-        // Lazy select list: the first FROM belongs to the outer query, later ones to subqueries.
-        $pattern = '/(?:'
-            . 'SELECT\s+.+?\s+FROM\s+' . self::TABLE
-            . '|INSERT\s+INTO\s+' . self::TABLE
-            . '|DELETE\s+FROM\s+' . self::TABLE
-            . '|UPDATE\s+' . self::TABLE
-            . ')/Sis';
+        // Comments and string literals may contain "from <word>"; they carry no structure.
+        $sql = preg_replace_callback(
+            self::NOISE,
+            static fn (array $match): string => str_starts_with($match[0], "'") ? "''" : ' ',
+            substr($sql, 0, self::MAX_PARSED_SQL_LENGTH),
+        );
 
-        if (preg_match($pattern, $sql, $match) !== 1) {
+        return $sql === null ? null : $this->findTable($sql);
+    }
+
+    /**
+     * Searches the top level only: parenthesised groups (function arguments, subqueries, column lists)
+     * are folded into "(#n)" placeholders, so a FROM inside them is never mistaken for the query's own.
+     * A derived table ("FROM (SELECT ...) t") is searched recursively.
+     */
+    private function findTable(string $sql): ?string
+    {
+        $groups = [];
+        $topLevel = preg_replace_callback(
+            self::PARENTHESISED,
+            static function (array $match) use (&$groups): string {
+                $groups[] = substr($match[0], 1, -1);
+
+                return '(#' . (\count($groups) - 1) . ')';
+            },
+            $sql,
+        );
+
+        if ($topLevel === null || preg_match(self::STATEMENT, $topLevel, $match) !== 1) {
             return null;
         }
 
-        // Alternation: only one capture group will be non-empty; pick the first match.
-        foreach ([1, 2, 3, 4] as $group) {
-            if (isset($match[$group]) && $match[$group] !== '') {
-                return $match[$group];
+        if (isset($match[1]) && $match[1] !== '') {
+            $inner = $groups[(int) $match[1]] ?? null;
+
+            return $inner === null ? null : $this->findTable($inner);
+        }
+
+        foreach (\array_slice($match, 2) as $table) {
+            if ($table !== '') {
+                return trim($table, '"`[]');
             }
         }
 

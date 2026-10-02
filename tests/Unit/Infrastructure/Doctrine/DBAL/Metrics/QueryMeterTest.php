@@ -75,7 +75,42 @@ final class QueryMeterTest extends TestCase
             'SELECT * FROM users WHERE id IN (' . implode(', ', range(1, 200_000)) . ')',
             'users',
         ];
+        yield 'FROM inside a function call' => ['SELECT EXTRACT(EPOCH FROM created_at) FROM events', 'events'];
+        yield 'scalar subquery in the select list labels the outer table' => [
+            'SELECT (SELECT COUNT(*) FROM orders o WHERE o.user_id = u.id) AS n FROM users u',
+            'users',
+        ];
+        yield 'FROM in a line comment' => ["SELECT id -- copied from partitioned tables\nFROM users", 'users'];
+        yield 'FROM in a block comment' => ['SELECT /* from audit */ id FROM users', 'users'];
+        yield 'FROM in a string literal' => ["SELECT 'from audit' AS source, id FROM users", 'users'];
+        yield 'escaped quote in a string literal' => ["SELECT 'it''s from audit' AS s FROM users", 'users'];
+        yield 'derived table labels its inner table' => ['SELECT n FROM (SELECT COUNT(*) AS n FROM orders) t', 'orders'];
+        yield 'double-quoted identifier' => ['SELECT * FROM "public"."user_logs" WHERE id = 1', 'user_logs'];
+        yield 'backtick identifier' => ['SELECT * FROM `orders`', 'orders'];
+        yield 'quoted INSERT target' => ['INSERT INTO "orders" (id) VALUES (1)', 'orders'];
+        yield 'Postgres column introspection by DBAL' => [self::POSTGRES_COLUMNS_SQL, 'pg_attribute'];
     }
+
+    // Shape of PostgreSQLSchemaManager::selectTableColumns() (DBAL 4): a subquery in the select list,
+    // a scalar subquery in a JOIN condition and "from" in a trailing comment.
+    private const string POSTGRES_COLUMNS_SQL = <<<'SQL'
+        SELECT quote_ident(n.nspname) AS schema_name,
+               quote_ident(c.relname) AS table_name,
+               format_type(a.atttypid, a.atttypmod) AS complete_type,
+               (SELECT pg_get_expr(adbin, adrelid)
+                FROM pg_attrdef
+                WHERE c.oid = pg_attrdef.adrelid AND pg_attrdef.adnum = a.attnum) AS "default"
+        FROM pg_attribute a
+                 JOIN pg_class c ON c.oid = a.attrelid
+                 LEFT JOIN pg_depend dep
+                           ON dep.objid = c.oid
+                               AND dep.classid = (SELECT oid FROM pg_class WHERE relname = 'pg_class')
+        WHERE c.relname = ?
+          -- 'r' for regular tables - 'p' for partitioned tables
+          AND c.relkind IN ('r', 'p')
+          -- exclude partitions (tables that inherit from partitioned tables)
+          AND dep.refobjid IS NULL
+        SQL;
 
     #[DataProvider('tableNameProvider')]
     public function testRecordsTableName(string $sql, string $expected): void
