@@ -27,6 +27,10 @@ jobs:
   - **Ячейка `--prefer-lowest`** (PHP 8.4, Symfony 6.4): `composer-ci.json`, `composer update
     --prefer-lowest --prefer-stable` после пина `symfony/*` на `6.4.*`. Почему нужны `conflict`
     вместо патчей в `require` — `tooling.md`. Воспроизведение локально — `testing.md`.
+    **Сознательный пробел покрытия**: CI-only `conflict` в `composer-ci.json` (`symfony/error-handler
+    <6.4.44`, `http-kernel <6.4.13`) строже, чем в `composer.json` (`error-handler <6.4.10`). Поэтому
+    lowest-ячейка ставит error-handler 6.4.44, и диапазон 6.4.10–6.4.43, который пользователям
+    разрешён, CI не проверяет. Причина CI-only конфликтов — risky-тесты (`tooling.md`).
 - `PHPUnit without optional libraries` — job общего workflow: ставит только `composer.json`.
   Расширения — те же `extensions`, проверяется отсутствие *библиотек*, а не расширений.
 - Тег стандарта закреплён точным `vX.Y.Z`; обновление — явная правка строки.

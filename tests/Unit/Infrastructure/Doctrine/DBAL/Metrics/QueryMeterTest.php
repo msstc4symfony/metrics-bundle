@@ -92,6 +92,28 @@ final class QueryMeterTest extends TestCase
         yield 'column named "from" behind a qualifier' => ['SELECT t.from FROM transfers t', 'transfers'];
         yield 'FROM right after a closing parenthesis' => ['SELECT COUNT(*)FROM users', 'users'];
         yield 'Postgres column introspection by DBAL' => [self::POSTGRES_COLUMNS_SQL, 'pg_attribute'];
+        yield 'parenthesised UNION built by DBAL QueryBuilder' => ['(SELECT a FROM t1) UNION (SELECT a FROM t2)', 't1'];
+        yield 'parenthesised UNION with leading whitespace' => ["\n  ((SELECT a FROM t1) UNION ALL (SELECT a FROM t2))", 't1'];
+        yield 'CTE reference labels the CTE body table' => ['WITH x AS (SELECT * FROM orders) SELECT * FROM x', 'orders'];
+        yield 'CTE referencing an earlier CTE' => [
+            'WITH a AS (SELECT * FROM orders), "b" (id) AS MATERIALIZED (SELECT id FROM a) SELECT * FROM b',
+            'orders',
+        ];
+        yield 'recursive CTE does not loop' => [
+            'WITH RECURSIVE n AS (SELECT 1 AS i UNION ALL SELECT i + 1 FROM n WHERE i < 5) SELECT i FROM n',
+            'n',
+        ];
+        yield 'CTE name differing in case' => ['WITH recent AS (SELECT * FROM orders) SELECT * FROM Recent', 'orders'];
+        yield 'table that is not a CTE' => ['WITH x AS (SELECT * FROM orders) SELECT * FROM users JOIN x USING (id)', 'users'];
+        yield 'CTE before INSERT' => ['WITH x AS (SELECT * FROM orders) INSERT INTO archive SELECT * FROM x', 'archive'];
+        yield 'FROM ONLY' => ['SELECT * FROM ONLY parent WHERE id = 1', 'parent'];
+        yield 'UPDATE ONLY' => ['UPDATE ONLY parent SET x = 1', 'parent'];
+        yield 'DELETE FROM ONLY' => ['DELETE FROM ONLY parent WHERE id = 1', 'parent'];
+        yield 'FROM LATERAL' => ['SELECT * FROM LATERAL (SELECT * FROM orders) o', 'orders'];
+        yield 'escaped double quote in an identifier' => ['SELECT * FROM "my""tbl"', 'my"tbl'];
+        yield 'catalog-qualified table' => ['SELECT * FROM db.public.users', 'users'];
+        yield 'bracketed identifiers' => ['SELECT * FROM [dbo].[users]', 'users'];
+        yield 'escaped backtick in an identifier' => ['SELECT * FROM `my``tbl`', 'my`tbl'];
     }
 
     // Shape of PostgreSQLSchemaManager::selectTableColumns() (DBAL 4): a subquery in the select list,
@@ -138,6 +160,26 @@ final class QueryMeterTest extends TestCase
             [[['app', 'cmp', 'default', 'select', 'users'], '1']],
             RegistrySamples::samples($registry, MetricLabelEnum::DOCTRINE_QUERY_DURATION_HISTOGRAM_SECONDS, '_count'),
         );
+    }
+
+    public function testDurationExcludesLabelParsing(): void
+    {
+        [$registry, $meter] = $this->buildMeter();
+        // Without JIT this statement takes the label parser a few hundred milliseconds.
+        $sql = 'SELECT ' . str_repeat('SELECT 1 UNION ', 1_000) . 'SELECT 1';
+        $jit = ini_set('pcre.jit', '0');
+
+        try {
+            $startTime = microtime(true);
+            $meter->measure($sql, static fn (): int => 0);
+            $elapsed = microtime(true) - $startTime;
+        } finally {
+            ini_set('pcre.jit', (string) $jit);
+        }
+
+        [[, $duration]] = RegistrySamples::samples($registry, MetricLabelEnum::DOCTRINE_QUERY_DURATION_HISTOGRAM_SECONDS, '_sum');
+        self::assertGreaterThan(0.05, $elapsed);
+        self::assertLessThan($elapsed / 10, (float) $duration);
     }
 
     public function testFailedQueryIsNotRecorded(): void

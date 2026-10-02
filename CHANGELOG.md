@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.4.1
+
+### Fixed
+
+- `doctrine_query_*` `table` label: a parenthesised `UNION` as built by DBAL's `QueryBuilder` on
+  PostgreSQL and MySQL (`(SELECT ...) UNION (SELECT ...)`) was labelled `unknown` since 1.4.0; it is
+  labelled with the table of its first part again. A common table expression is labelled with the table
+  its body reads (1.4.0 gave the CTE name). `FROM ONLY`, `UPDATE ONLY`, `DELETE FROM ONLY` and
+  `FROM LATERAL` no longer give `ONLY`/`LATERAL`; `"a""b"` and catalog-qualified names (`db.public.users`)
+  are read correctly. Label values of such queries change.
+- `doctrine_query_duration_*` no longer includes the time spent deriving the labels from the SQL.
+
+### Changed
+
+- The labels of a statement are cached (up to 256 statements per connection), so repeated statements
+  are not parsed again.
+
 ## 1.4.0
 
 ### Fixed

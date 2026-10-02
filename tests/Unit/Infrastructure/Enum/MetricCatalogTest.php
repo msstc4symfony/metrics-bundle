@@ -78,9 +78,18 @@ final class MetricCatalogTest extends TestCase
 
     public function testEveryCaseIsPinned(): void
     {
-        $pinned = array_map(static fn (array $row): MetricLabelEnumInterface => $row[0], iterator_to_array(self::catalogProvider(), false));
+        $pinned = array_map(static fn (array $row): string => self::caseId($row[0]), iterator_to_array(self::catalogProvider(), false));
+        $declared = array_map(self::caseId(...), [...MetricLabelEnum::cases(), ...MessengerMetricLabelEnum::cases()]);
 
-        self::assertSame([...MetricLabelEnum::cases(), ...MessengerMetricLabelEnum::cases()], $pinned);
+        // Case order is not part of the contract.
+        sort($pinned);
+        sort($declared);
+        self::assertSame($declared, $pinned);
+    }
+
+    private static function caseId(MetricLabelEnumInterface $case): string
+    {
+        return $case::class . '::' . $case->name;
     }
 
     private function describe(Label $label): string

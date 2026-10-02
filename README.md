@@ -145,11 +145,17 @@ DoctrineBundle the label stays `host:dbname`. If the application defines the
 series, so update dashboards and alerts that filter on `connection`.
 
 The `table` label of the `doctrine_query_*` metrics is the first table of the statement's own `FROM`
-(`SELECT`/`DELETE`), `INSERT INTO` or `UPDATE`, without a schema prefix or identifier quotes. Since 1.4 a
+(`SELECT`/`DELETE`), `INSERT INTO` or `UPDATE`, without schema/catalog prefixes or identifier quotes. Since 1.4 a
 `FROM` inside parentheses (function arguments such as `EXTRACT(EPOCH FROM ...)`, subqueries in the select
 list or in conditions), comments and string literals is ignored, and a derived table
-(`FROM (SELECT ... FROM orders) t`) is labelled with its inner table. Statements without a recognisable
-table, or whose `FROM` lies beyond the first 16 KiB, are labelled `unknown`.
+(`FROM (SELECT ... FROM orders) t`) is labelled with its inner table. Since 1.4.1 the same holds for a
+common table expression (`WITH x AS (SELECT ... FROM orders) SELECT ... FROM x` gives `orders`; a recursive
+CTE that only reads itself gives its own name), a parenthesised `UNION` as built by DBAL's `QueryBuilder`
+on PostgreSQL and MySQL is labelled with the table of its first part, and `ONLY`/`LATERAL` are skipped.
+Statements without a recognisable table, or whose `FROM` lies beyond the first 16 KiB, are labelled
+`unknown`. Known limitations: a table function in `FROM` (`generate_series(...)`, `unnest(...)`) is
+labelled with the function name, and PostgreSQL `E'...'` escapes, dollar-quoted strings and MySQL `#`
+comments are not recognised as literals or comments.
 
 ## Redis restarts in long-running workers
 

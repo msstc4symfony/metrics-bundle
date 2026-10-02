@@ -43,43 +43,23 @@ final readonly class InfoEventListener
             return;
         }
 
-        // CPU load
         $value = $this->getCPULoad();
         if ($value !== null) {
             $this->infoCollector->setMetric(MetricLabelEnum::INFO_CPU_LOAD, $value);
         }
 
-        // Memory usage
         $value = $this->getMemoryUsage();
         if ($value !== null) {
             $this->infoCollector->setMetric(MetricLabelEnum::INFO_MEMORY_USED, $value);
         }
 
-        // Filesystem usage
         $value = $this->getFilesystemUsage();
         if ($value !== null) {
             $this->infoCollector->setMetric(MetricLabelEnum::INFO_FILESYSTEM_USED, $value);
         }
 
         $this->collectOpcache();
-
-        // FPM
-        if (function_exists('fpm_get_status')) {
-            $data = fpm_get_status();
-
-            if (is_array($data)) {
-                $this->infoCollector->setMetric(MetricLabelEnum::INFO_FPM_IDLE_PROCESSES, $data['idle-processes']);
-                $this->infoCollector->setMetric(MetricLabelEnum::INFO_FPM_ACTIVE_PROCESSES, $data['active-processes']);
-                $this->infoCollector->setMetric(MetricLabelEnum::INFO_FPM_TOTAL_PROCESSES, $data['total-processes']);
-                $this->infoCollector->setMetric(
-                    MetricLabelEnum::INFO_FPM_MAX_ACTIVE_PROCESSES,
-                    $data['max-active-processes'],
-                );
-                $this->infoCollector->setMetric(MetricLabelEnum::INFO_FPM_LISTEN_QUEUE, $data['listen-queue']);
-                $this->infoCollector->setMetric(MetricLabelEnum::INFO_FPM_MAX_LISTEN_QUEUE, $data['max-listen-queue']);
-                $this->infoCollector->setMetric(MetricLabelEnum::INFO_FPM_LISTEN_QUEUE_SIZE, $data['listen-queue-len']);
-            }
-        }
+        $this->collectFpm();
     }
 
     private function collectOpcache(): void
@@ -93,42 +73,38 @@ final readonly class InfoEventListener
             return;
         }
 
-        $memory = $status['memory_usage'] ?? null;
-        if (is_array($memory)) {
-            $used = $this->number($memory, 'used_memory');
-            $free = $this->number($memory, 'free_memory');
-            if ($used !== null && $free !== null && $used + $free > 0) {
-                $this->infoCollector->setMetric(MetricLabelEnum::INFO_OPCACHE_MEMORY_USED, round($used / ($used + $free), 4));
-            }
-
-            $wasted = $this->number($memory, 'current_wasted_percentage');
-            if ($wasted !== null) {
-                $this->infoCollector->setMetric(MetricLabelEnum::INFO_OPCACHE_MEMORY_WASTED, round($wasted / 100, 4));
-            }
-        }
-
-        $statistics = $status['opcache_statistics'] ?? null;
-        if (is_array($statistics)) {
-            $cachedScripts = $this->number($statistics, 'num_cached_scripts');
-            if ($cachedScripts !== null) {
-                $this->infoCollector->setMetric(MetricLabelEnum::INFO_OPCACHE_CACHED_SCRIPTS, $cachedScripts);
-            }
-
-            $hitRate = $this->number($statistics, 'opcache_hit_rate');
-            if ($hitRate !== null) {
-                $this->infoCollector->setMetric(MetricLabelEnum::INFO_OPCACHE_HIT_RATE, round($hitRate / 100, 4));
+        $snapshot = OpcacheSnapshot::fromStatus($status);
+        $gauges = [
+            [MetricLabelEnum::INFO_OPCACHE_MEMORY_USED, $snapshot->memoryUsed],
+            [MetricLabelEnum::INFO_OPCACHE_MEMORY_WASTED, $snapshot->memoryWasted],
+            [MetricLabelEnum::INFO_OPCACHE_CACHED_SCRIPTS, $snapshot->cachedScripts],
+            [MetricLabelEnum::INFO_OPCACHE_HIT_RATE, $snapshot->hitRate],
+        ];
+        foreach ($gauges as [$metric, $value]) {
+            if ($value !== null) {
+                $this->infoCollector->setMetric($metric, $value);
             }
         }
     }
 
-    /**
-     * @param array<mixed> $data
-     */
-    private function number(array $data, string $key): int|float|null
+    private function collectFpm(): void
     {
-        $value = $data[$key] ?? null;
+        if (!function_exists('fpm_get_status')) {
+            return;
+        }
 
-        return is_int($value) || is_float($value) ? $value : null;
+        $data = fpm_get_status();
+        if (!is_array($data)) {
+            return;
+        }
+
+        $this->infoCollector->setMetric(MetricLabelEnum::INFO_FPM_IDLE_PROCESSES, $data['idle-processes']);
+        $this->infoCollector->setMetric(MetricLabelEnum::INFO_FPM_ACTIVE_PROCESSES, $data['active-processes']);
+        $this->infoCollector->setMetric(MetricLabelEnum::INFO_FPM_TOTAL_PROCESSES, $data['total-processes']);
+        $this->infoCollector->setMetric(MetricLabelEnum::INFO_FPM_MAX_ACTIVE_PROCESSES, $data['max-active-processes']);
+        $this->infoCollector->setMetric(MetricLabelEnum::INFO_FPM_LISTEN_QUEUE, $data['listen-queue']);
+        $this->infoCollector->setMetric(MetricLabelEnum::INFO_FPM_MAX_LISTEN_QUEUE, $data['max-listen-queue']);
+        $this->infoCollector->setMetric(MetricLabelEnum::INFO_FPM_LISTEN_QUEUE_SIZE, $data['listen-queue-len']);
     }
 
     private function getCPULoad(): ?float
