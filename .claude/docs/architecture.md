@@ -31,16 +31,23 @@
      правильным host. Повторы `retry_failed` — отдельные запросы. Клиенты, созданные
      приложением в обход FrameworkBundle, не мониторятся. URL-ассемблеры — по тегу
      `AssemblerInterface::TAG` (`metrics.http_client.url_assembler`);
+   - `RegisterMessengerMetricsPass` — при установленном Messenger дописывает
+     `MessengerMetricLabelEnum` в `metrics_bundle.metric_enums`;
    - `SaveElasticaClientsListPass` — пишет id клиентов Elastica в параметр
      `metrics.elastica.clients`.
-3. `MetricsBundle::boot()` — то, что нельзя сделать в контейнере:
+3. `MetricsExtension` — грузит `services.yaml`; `messenger.yaml` (`MessengerEventListener`) — только
+   при `class_exists(WorkerMessageReceivedEvent)`. Дерево `Configuration` (корень `metrics:`, с 1.3)
+   пишет `metrics.doctrine.connection_label` в параметр
+   `MetricsExtension::DOCTRINE_CONNECTION_LABEL_PARAMETER` (`metrics_bundle.doctrine.connection_label`),
+   его читает `AddDoctrineDBALMonitorPass`.
+4. `MetricsBundle::boot()` — то, что нельзя сделать в контейнере:
    подписка `TimingSubscriber` на драйвер MongoDB и подмена транспорта у
    соединений Elastica 7 на `TimingTransport`.
 
 ## Опциональные библиотеки
 
 Все интеграции, кроме Redis-хранилища, опциональны: http-client, DBAL,
-MongoDB, Elastica, APCu. Точка проводки молча выключается без своей библиотеки:
+MongoDB, Elastica, Messenger, APCu. Точка проводки молча выключается без своей библиотеки:
 либо явным гардом (`interface_exists` для интерфейсов, `class_exists` для
 классов — http-client, MongoDB, Elastica в `boot()`), либо потому, что без
 библиотеки в контейнере нет подходящих определений (DBAL, список клиентов Elastica). Job `minimal` в CI доказывает, что гарды держат.

@@ -58,7 +58,8 @@
     "ext-mongodb": "To collect MongoDB driver command metrics",
     "mongodb/mongodb": "To use MongoDB ODM TimingSubscriber",
     "ruflin/elastica": "To collect Elastica request metrics",
-    "symfony/http-client": "To collect outbound HTTP request metrics"
+    "symfony/http-client": "To collect outbound HTTP request metrics",
+    "symfony/messenger": "To collect Messenger sent/consumed message metrics"
   },
   "config": {
     "allow-plugins": {

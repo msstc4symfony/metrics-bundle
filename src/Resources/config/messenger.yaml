@@ -1,0 +1,4 @@
+services:
+  Msstc4Symfony\MetricsBundle\Framework\EventListener\MessengerEventListener:
+    autowire: true
+    autoconfigure: true

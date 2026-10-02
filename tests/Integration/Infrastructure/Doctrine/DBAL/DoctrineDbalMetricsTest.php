@@ -93,6 +93,25 @@ final class DoctrineDbalMetricsTest extends KernelTestCase
         );
     }
 
+    public function testConnectionLabelIsTheDoctrineBundleConnectionNameWhenConfigured(): void
+    {
+        self::bootKernel(['environment' => TestKernel::ENV_DOCTRINE_CONNECTION_NAME_LABEL]);
+        $container = self::getContainer();
+
+        $connection = $container->get('doctrine.dbal.default_connection');
+        self::assertInstanceOf(Connection::class, $connection);
+
+        $connection->executeQuery('SELECT 1')->fetchAllAssociative();
+
+        $registry = $container->get(RegistryInterface::class);
+        self::assertInstanceOf(RegistryInterface::class, $registry);
+
+        self::assertSame(
+            ['default|select|unknown' => '1'],
+            $this->samples($registry, MetricLabelEnum::DOCTRINE_QUERY_EXECUTE),
+        );
+    }
+
     /**
      * @return array<string, string> value by "connection|type|table"
      */

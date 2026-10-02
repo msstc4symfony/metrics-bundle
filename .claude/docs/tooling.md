@@ -5,7 +5,7 @@
 - `composer.json` — публикуемый; только обязательные зависимости + базовый dev.
   Опциональные библиотеки — в `suggest`.
 - `composer-ci.json` — тот же runtime + опциональные библиотеки
-  (`symfony/http-client`, `doctrine/dbal`, `doctrine/doctrine-bundle`, `mongodb/mongodb` ^2,
+  (`symfony/http-client`, `symfony/messenger`, `doctrine/dbal`, `doctrine/doctrine-bundle`, `mongodb/mongodb` ^2,
   `ruflin/elastica` ^7) + deptrac, infection, Roave BC check. Лок —
   `composer-ci.lock`, коммитится.
 - `config.platform.ext-mongodb` в `composer-ci.json` = версия расширения на

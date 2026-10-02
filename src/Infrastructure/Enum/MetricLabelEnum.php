@@ -190,7 +190,7 @@ enum MetricLabelEnum: string implements MetricLabelEnumInterface
 
             self::DOCTRINE_QUERY_EXECUTE,
             self::DOCTRINE_QUERY_DURATION_HISTOGRAM_SECONDS => [
-                new Label('connection', MetricLabelTypeEnum::STRING, 'RDBMS host + DB name'),
+                new Label('connection', MetricLabelTypeEnum::STRING, 'host:dbname, or the DoctrineBundle connection name'),
                 new Label('type', MetricLabelTypeEnum::ENUM, 'Query type', self::DOCTRINE_QUERY_TYPES),
                 new Label('table', MetricLabelTypeEnum::STRING, 'Table name'),
             ],

@@ -7,14 +7,19 @@ namespace Msstc4Symfony\MetricsBundle\Test\Integration;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Monolog\Handler\HandlerDecorator;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Storage\Factory;
+use Msstc4Symfony\MetricsBundle\Presentation\Controller\GetMetricsController;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\TestKernel;
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Prometheus\RegistryInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Bundle\MonologBundle\MonologBundle;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Routing\Loader\AttributeServicesLoader;
+use Symfony\Component\Routing\Route;
+use Symfony\Component\Routing\RouterInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -58,6 +63,35 @@ final class ContainerCompileTest extends KernelTestCase
 
         self::assertSame(200, $response->getStatusCode());
         self::assertStringStartsWith('text/plain', (string) $response->headers->get('Content-Type'));
+    }
+
+    /**
+     * @return iterable<string, array{non-empty-string}>
+     */
+    public static function routingControllersProvider(): iterable
+    {
+        yield 'routing.controllers only' => [TestKernel::ENV_ROUTING_CONTROLLERS_ONLY];
+        yield 'routing.controllers and the manual import' => [TestKernel::ENV_ROUTING_CONTROLLERS_AND_MANUAL_IMPORT];
+    }
+
+    #[DataProvider('routingControllersProvider')]
+    public function testMetricsRouteLoadsOnceThroughRoutingControllers(string $environment): void
+    {
+        if (!class_exists(AttributeServicesLoader::class)) {
+            self::markTestSkipped('The "routing.controllers" resource needs symfony/routing 7.4+');
+        }
+
+        $kernel = self::bootKernel(['environment' => $environment]);
+
+        $router = self::getContainer()->get('router');
+        self::assertInstanceOf(RouterInterface::class, $router);
+        $paths = array_map(
+            static fn (Route $route): string => $route->getPath(),
+            $router->getRouteCollection()->all(),
+        );
+
+        self::assertSame([GetMetricsController::ROUTE_NAME => '/_/metrics'], $paths);
+        self::assertSame(200, $kernel->handle(Request::create('/_/metrics'))->getStatusCode());
     }
 
     public function testApplicationLoggerIsDecoratedButStorageChannelIsNot(): void

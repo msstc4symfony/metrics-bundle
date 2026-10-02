@@ -14,6 +14,7 @@ Out of the box the following are measured:
 - outgoing requests via `symfony/http-client`
 - Doctrine DBAL queries (count, duration, type, table)
 - MongoDB driver commands
+- Symfony Messenger messages sent to transports and consumed by workers (count by outcome, handling duration)
 - `ruflin/elastica` 7.x requests (Elastica 8 removed the transport API the bundle hooks into; its requests are not measured)
 - system info (CPU load, memory, OPcache, FPM, filesystem)
 
@@ -60,7 +61,15 @@ APPLICATION_NAME=my-app
 COMPONENT_NAME=http
 ```
 
-Import the endpoint route — bundles cannot add routes on their own:
+### Endpoint route
+
+On Symfony 7.4+ applications whose `config/routes.yaml` imports `routing.controllers` (the
+default recipe since 7.4) the `GET /_/metrics` route is loaded automatically: the bundle's
+controller is an autoconfigured service with a `#[Route]` attribute, the same mechanism that
+loads `msstc4symfony/healthcheck-bundle`'s probes. Nothing to add.
+
+On Symfony 6.4–7.3, or when `config/routes.yaml` imports only `../src/Controller/`, import it
+manually:
 
 ```yaml
 # config/routes/metrics.yaml
@@ -69,7 +78,10 @@ metrics:
     type: attribute
 ```
 
-This adds `GET /_/metrics`. **The endpoint is unauthenticated by default and leaks operational data (route names, table names, outbound hosts, exception classes).** Restrict it in your host app's firewall:
+Keeping this import next to `routing.controllers` is harmless: the route is registered once
+(same name `metrics-get`).
+
+**The endpoint is unauthenticated by default and leaks operational data (route names, table names, outbound hosts, exception classes).** Restrict it in your host app's firewall:
 
 ```yaml
 # config/packages/security.yaml
@@ -101,6 +113,51 @@ redis://user:pass@redis:6379/4?read_timeout=2&persistent_connections=1
 ```
 
 > **Operational note.** `ssl_verify_peer` defaults to `true`: TLS Redis with a self-signed CA chain will fail to connect and the bundle will silently fall back to `InMemory` (each PHP worker keeps its own metrics, none are exposed to Prometheus). Pass `?ssl_verify_peer=0` in the DSN when intentionally using a private CA. The same silent fallback applies if `read_timeout=1` is too aggressive for the network — increase via the query parameter.
+
+## Configuration
+
+Optional, all keys have defaults:
+
+```yaml
+# config/packages/metrics.yaml
+metrics:
+    doctrine:
+        # Value of the "connection" label of the doctrine_query_* metrics:
+        #   host_dbname — "<host>:<dbname>" from the connection parameters (default, 1.x behaviour)
+        #   name        — the DoctrineBundle connection name ("default", "replica", ...)
+        connection_label: host_dbname
+```
+
+`connection_label: name` needs DoctrineBundle (its `ConnectionNameAwareInterface`); without
+DoctrineBundle the label stays `host:dbname`. If the application defines the
+`Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\Middleware` service itself,
+`name` fails the container compilation instead of being silently ignored. Switching it changes the label values of existing
+series, so update dashboards and alerts that filter on `connection`.
+
+## Messenger metrics
+
+With `symfony/messenger` installed the bundle listens to Messenger events (no configuration):
+
+| Metric | Type | Labels | Recorded on |
+| ------ | ---- | ------ | ----------- |
+| `symfony_messenger_message_sent` | counter | `transport`, `message` | `SendMessageToTransportsEvent`, once per transport the message is routed to. Retries and failure-transport re-sends are not counted. |
+| `symfony_messenger_message_handled` | counter | `transport`, `message`, `status` | A worker finished a message: `handled`, `retried` (failed and will be retried) or `failed` (failed for good). |
+| `symfony_messenger_message_handling_duration_histogram_seconds` | histogram | `transport`, `message`, `status` | Same moment; time from `WorkerMessageReceivedEvent` to the outcome (for batch handlers: to the batch acknowledgement). Buckets: 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 180. |
+
+All metrics also carry the `application` and `component` labels. `transport` is the transport
+(receiver) name, `message` the short class name of the message (`App\Message\SendEmail` →
+`SendEmail`; anonymous classes collapse to `class@anonymous`), so same-named classes from
+different namespaces share a series. Messages handled synchronously (no transport) do not go
+through a worker and are not counted by `messenger_message_handled`; messages routed to a
+`sync://` transport are counted as sent only. `messenger_message_sent` is recorded right before
+the transports send, so a send that throws is still counted.
+
+The metrics are declared by `MessengerMetricLabelEnum`, which the bundle appends to
+`metrics_bundle.metric_enums` (also when the application overrides that parameter), so
+`metrics:list` shows them (unless that parameter is an env placeholder resolved at runtime).
+
+Cardinality: the histogram writes 16 series (14 buckets, `_sum`, `_count`) per
+transport × message × status combination — with many message classes, watch the storage size.
 
 ## Endpoints and commands
 
@@ -171,7 +228,7 @@ pass. If two enums declare the same metric name, the first declaration is listed
 | `metrics_bundle.dsn`                            | `redis://127.0.0.1:6379`            | Storage DSN; resolved from `METRICS_STORAGE_DSN`.        |
 | `metrics_bundle.applicationName`                | `unknown`                           | Value of the `application` label; resolved from `APPLICATION_NAME`. |
 | `metrics_bundle.componentName`                  | `unknown`                           | Value of the `component` label; resolved from `COMPONENT_NAME`. |
-| `metrics_bundle.metric_enums`                   | `[MetricLabelEnum::class]`          | List of FQCNs of `MetricLabelEnumInterface` enums to register. |
+| `metrics_bundle.metric_enums`                   | `[MetricLabelEnum::class]`          | List of FQCNs of `MetricLabelEnumInterface` enums to register. With `symfony/messenger` installed a compiler pass appends `MessengerMetricLabelEnum`. |
 | `metrics_bundle.exceptionLabelShortClassName`   | `false`                             | If `true`, the `exception_total` metric labels by short class name instead of FQCN — reduces info leakage. |
 | `metrics_bundle.httpClientSanitizePath`         | `true`                              | Replaces id/uuid/hash segments in outbound HTTP paths (`/users/42` → `/users/:id`) when no `URLAssembler` matched. |
 

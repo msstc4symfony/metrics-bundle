@@ -16,6 +16,7 @@ final class Driver extends AbstractDriverMiddleware
     public function __construct(
         DriverInterface $driver,
         private readonly DoctrineConnectionCollector $collector,
+        private readonly ?string $connectionName = null,
     ) {
         parent::__construct($driver);
     }
@@ -28,7 +29,7 @@ final class Driver extends AbstractDriverMiddleware
         return new Connection(
             parent::connect($params),
             $this->collector,
-            $this->assembleConnectionName($params),
+            $this->connectionName ?? $this->assembleConnectionName($params),
         );
     }
 

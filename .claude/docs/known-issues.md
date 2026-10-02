@@ -45,11 +45,11 @@ APCu не шарились между воркерами. Исправлено �
 (настоящее ядро: Framework + Monolog + Metrics). `monolog/monolog ^3.5` объявлен явно —
 атрибут и `Monolog\Level` есть только в 3.x.
 
-## Маршрут `/_/metrics` не регистрируется сам
+## Маршрут `/_/metrics` не регистрируется сам (Symfony < 7.4)
 
-Бандл не может добавить маршрут; приложение импортирует
-`@MetricsBundle/Presentation/Controller/` (`type: attribute`). README раньше
-утверждал обратное.
+На Symfony 6.4–7.3 бандл не может добавить маршрут; приложение импортирует
+`@MetricsBundle/Presentation/Controller/` (`type: attribute`). На 7.4+ с `routing.controllers`
+маршрут грузится сам — см. раздел 1.3.0 ниже.
 
 ## `symfony/yaml` не был объявлен
 
@@ -165,3 +165,66 @@ BC-джоб (Roave, неблокирующий) на сравнении 1.2.0 с
   во вход `extensions` в `.github/workflows/checks.yml` (общий workflow не трогали).
 - Хелпер выборки сэмплов из реестра — `tests/Support/RegistrySamples` (Unit и Integration).
   Старые тесты коллекторов пока сканируют реестр сами.
+
+## 1.3.0 (2026-10-02 UTC)
+
+### Маршрут `/_/metrics` на Symfony 7.4+ грузится сам
+
+Запись «маршрут не регистрируется сам» верна только для Symfony 6.4–7.3. С 7.4 FrameworkBundle
+тегирует `routing.controller` каждый автоконфигурируемый сервис с `#[Route]`
+(`registerAttributeForAutoconfiguration(Route::class)`), а рецепт `config/routes.yaml` импортирует
+`resource: routing.controllers` (`AttributeServicesLoader`). Healthcheck-bundle «грузит маршруты
+сам» ровно так — своего лоадера у него нет. `GetMetricsController` автоконфигурируется
+(`_defaults.autoconfigure` в `services.yaml`), поэтому механизм работал и у нас; исходники не
+менялись, добавлены тест и README. Двойной импорт (`routing.controllers` + ручной) безопасен:
+`RouteCollection` хранит маршрут по имени `metrics-get`. Ловушка: если когда-нибудь выключить
+автоконфигурацию контроллера, маршрут молча пропадёт у 7.4+-приложений —
+`ContainerCompileTest::testMetricsRouteLoadsOnceThroughRoutingControllers` это ловит (на 6.4
+самопропускается: нет `AttributeServicesLoader`).
+
+### Метка `connection` по имени соединения — opt-in
+
+`metrics.doctrine.connection_label: name` → пасс регистрирует `NamedConnectionMiddleware`
+(тег `doctrine.middleware`), `Middleware` остаётся без тега. `MiddlewaresPass` DoctrineBundle
+клонирует определение на каждое соединение и вызывает `setConnectionName()`, если **класс
+определения** реализует `ConnectionNameAwareInterface` — поэтому класс задаётся явно, а сам
+`Middleware` (`final readonly`, публичный конструктор) не трогали. `Driver` получил
+необязательный `?string $connectionName` (конструктор `@internal`). Если приложение само
+определило сервис `Middleware::class`, режим `name` валит компиляцию (`LogicException`) — раньше
+(до ревью) он молча игнорировался.
+Без DoctrineBundle режим `name` ничего не меняет (имени нет). Определение, исключённое из
+resource-скана, всё равно есть в контейнере с тегом `container.excluded` — в тестах проверять
+и тег, а не только `hasDefinition()`.
+
+### Messenger
+
+Метрики объявлены отдельным `MessengerMetricLabelEnum`, а не кейсами `MetricLabelEnum`: Roave BC
+check считает добавление кейса в enum BC-break (`[BC] ADDED: Case ... was added`, exhaustive
+`match` у приложений). Проверено локально 2026-10-02 UTC. Enum дописывается в
+`metrics_bundle.metric_enums` пассом `RegisterMessengerMetricsPass` после слияния параметров —
+приложение, перечислившее свои enum, иначе потеряло бы его в `metrics:list`.
+`AbstractCollector` находит метрику через `MetricRepository::find()` для любого enum, список
+нужен только `findAll()`.
+
+`MessengerEventListener`: `SendMessageToTransportsEvent` → `messenger_message_sent` по каждому
+ключу `getSenders()` (повторы и отправка в failure-транспорт идут мимо `SendMessageMiddleware` —
+не считаются; событие до `send()`, упавшая отправка тоже считается). Воркер:
+`WorkerMessageReceivedEvent` (priority -1024, последним) запоминает старт, `Handled`/`Failed`
+(priority 0 — после `SendFailedMessageForRetryListener` с 100, который выставляет `willRetry()`)
+пишут счётчик и длительность. Старты — в `WeakMap` по **объекту сообщения**: воркер пересоздаёт
+конверты, но объект сообщения тот же (сам Worker держит `keepalives[$envelope->getMessage()]`).
+Одиночный слот + `kernel.reset` не годится: у batch-обработчиков ack приходит после `Received`
+следующих сообщений и после `ResetServicesListener` (сбрасывает сервисы на каждом не-idle
+`WorkerRunningEvent`) — длительность терялась бы. Запись удаляется на исходе и при
+`shouldHandle() === false`, остальное уходит вместе с объектом (тест на `WeakReference`).
+Синхронно обработанные сообщения воркер не видит.
+Тест на ядре: `tests/Integration/Infrastructure/Messenger/MessengerMetricsTest` — транспорт
+`in-memory://`, `messenger:consume async --limit=1` через `CommandTester`.
+
+Бакеты гистограммы длительности начинаются с 5 мс (обычный обработчик — миллисекунды); менять их
+после 1.3.0 — смена значений `le`, т.е. BC.
+
+### Не покрыто тестом
+
+`AddDoctrineDBALMonitorPass` бросает `LogicException`, если выбран `name`, а DoctrineBundle без
+`ConnectionNameAwareInterface` — в CI-профиле интерфейс всегда есть.

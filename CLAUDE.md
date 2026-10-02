@@ -33,22 +33,23 @@ PHPUnit is strict: `failOnWarning`, `failOnRisky`, `failOnPhpunitDeprecation`, `
 The bundle is a **classic Symfony bundle** organised in a loose layered shape under `src/`:
 
 - **`Presentation/`** — `GetMetricsController` (the `GET /_/metrics` endpoint) and console commands `metrics:list` / `metrics:clear`.
-- **`Framework/EventListener/`** — Symfony kernel/console event listeners (`#[AsEventListener]`) that drive measurement timing for HTTP requests, console commands, exceptions, and one-shot info gauges.
+- **`Framework/EventListener/`** — Symfony kernel/console event listeners (`#[AsEventListener]`) that drive measurement timing for HTTP requests, console commands, exceptions, and one-shot info gauges. `MessengerEventListener` (Messenger send/worker events) is excluded from the resource scan and registered from `messenger.yaml` only when Messenger is installed.
 - **`Framework/Profiling/`** — deprecated profiling integration (`MetricProcessor`), kept for BC until 2.0; `msstc4symfony/metrics-bridge-profiling` replaces it by clearing its end-processor tag (the service stays for application references).
 - **`Infrastructure/Collector/`** — the heart of the bundle. Each collector wraps the Prometheus `RegistryInterface` and exposes domain-specific `inc*`/`set*` methods called from listeners or decorators. All inherit `AbstractCollector`, which automatically prepends two labels (`application`, `component`) to every sample.
 - **`Infrastructure/Doctrine/`**, **`Elastica/`**, **`HttpClient/`**, **`Monolog/`** — integration adapters (middlewares, transports, decorators) that hook into third-party systems and call into the matching collector.
 - **`Infrastructure/Storage/Factory`** — picks a Prometheus storage adapter from a DSN scheme: `redis`, `redisng`, `apc`, `apcng`, `inmemory`. Any failure falls back to `InMemory` silently — be aware when debugging "missing metrics".
 - **`Infrastructure/Enum/MetricLabelEnum`** — the **central catalog** of all metric names. Each enum case has a type (counter/gauge/histogram/summary), description, label set, and histogram buckets. Implements `MetricLabelEnumInterface` (extends `BackedEnum`). `MetricRepositoryFactory` reads the container parameter `metrics_bundle.metric_enums` (list of class-strings) and merges `::cases()` from each — this is the extension point for downstream apps to register their own metrics.
-- **`DependencyInjection/Compiler/`** — four compiler passes wire integrations into the host application:
+- **`DependencyInjection/Compiler/`** — five compiler passes wire integrations into the host application:
   - `AddMonologDecoratorCompilerPass` — decorates every `monolog.logger.*` service (except `profiling`, `removal_request`, `deprecation` channels) with `HandlerDecorator` so log levels are counted.
-  - `AddDoctrineDBALMonitorPass` — finds `doctrine.dbal.*_connection` services and registers the metrics `Middleware` (autowired).
+  - `AddDoctrineDBALMonitorPass` — registers the metrics `Middleware` (autowired; tagged `doctrine.middleware` with DoctrineBundle). With `metrics.doctrine.connection_label: name` it tags `NamedConnectionMiddleware` (DoctrineBundle `ConnectionNameAwareInterface`) instead, so the `connection` label is the connection name.
   - `AddHttpClientMonitorPass` (priority `-256`, runs late) — decorates only `http_client.transport` (all framework clients end there with absolute URLs, so each request is counted once). `HttpClientDecorator` wraps responses in a transparent `MonitoredResponse` (TraceableHttpClient-style) and records metrics when the caller reads the status/body or streams; never read the status in `request()` and do not switch to `AsyncResponse` (it rewrites TimeoutException). URL assemblers are collected by the `AssemblerInterface::TAG` tag.
+  - `RegisterMessengerMetricsPass` — with Messenger installed, appends `MessengerMetricLabelEnum` to `metrics_bundle.metric_enums` (after the application's own value is merged).
   - `SaveElasticaClientsListPass` — collects Elastica client service IDs into the `metrics.elastica.clients` parameter; `MetricsBundle::boot()` later wraps each client's connection transport.
 - `MetricsBundle::boot()` also registers the MongoDB driver `TimingSubscriber` via `MongoDB\Driver\Monitoring\addSubscriber`. MongoDB and Elastica wiring is **optional** — guarded by `class_exists` and `NULL_ON_INVALID_REFERENCE`, so the bundle works without those libraries installed.
 
 ### Adding a new metric
 
-1. Either extend `MetricLabelEnum` (in-bundle) or create a new `string`-backed enum implementing `MetricLabelEnumInterface` in the host app and append its FQCN to the `metrics_bundle.metric_enums` parameter.
+1. Do **not** add cases to `MetricLabelEnum` within major 1: Roave BC check reports added enum cases (exhaustive `match` in applications). Create a new in-bundle enum (as `MessengerMetricLabelEnum`, appended to `metrics_bundle.metric_enums` by `RegisterMessengerMetricsPass`) or create a new `string`-backed enum implementing `MetricLabelEnumInterface` in the host app and append its FQCN to the `metrics_bundle.metric_enums` parameter.
 2. Add a collector method (or extend an existing collector) that calls one of `AbstractCollector`'s helpers (`incCounter`, etc.) — the application/component labels are added for you, so `getLabels()` on the enum should only return the *additional* labels.
 3. Trigger the collector from an event listener, middleware, or decorator depending on where the measurement point lives.
 
@@ -59,7 +60,7 @@ Required env vars (see `doc/.env.dist`):
 - `METRICS_STORAGE_DSN` — e.g. `redis://redis:6379?database=4` (defaults to `redis://127.0.0.1:6379`).
 - `APPLICATION_NAME`, `COMPONENT_NAME` — populate the `application`/`component` labels (default `unknown`).
 
-Service config lives in `src/Resources/config/services.yaml`. The Yaml file is loaded by `MetricsExtension`; there is no Configuration tree / `prependExtension` — settings are passed via container parameters.
+Service config lives in `src/Resources/config/services.yaml` (plus `messenger.yaml`, loaded only when `symfony/messenger` is installed). `MetricsExtension` processes a small `Configuration` tree (root `metrics:`, since 1.3: `doctrine.connection_label: host_dbname|name`) into container parameters; the older settings are still plain container parameters.
 
 ## Tests
 
@@ -68,7 +69,7 @@ One `phpunit.xml.dist`, two suites:
 - **`tests/Unit/`** — namespace `Msstc4Symfony\MetricsBundle\Test\Unit\`; runs without optional libraries.
 - **`tests/Integration/`** — namespace `Msstc4Symfony\MetricsBundle\Test\Integration\`; each test `markTestSkipped()`s in `setUp()` when its optional dependency is missing.
 
-`composer-ci.json` adds `msstc4symfony/profiling-bundle` (from its GitHub repository), `symfony/http-client`, `doctrine/dbal`, `mongodb/mongodb` ^2, `ruflin/elastica` ^7 (8 is unsupported), deptrac, infection and the Roave BC check. It pins `config.platform.ext-mongodb` to the CI runner's extension so `composer-ci.lock` resolves there. APCu tests need `apc.enable_cli=1`.
+`composer-ci.json` adds `msstc4symfony/profiling-bundle` (from its GitHub repository), `symfony/http-client`, `symfony/messenger`, `doctrine/dbal`, `mongodb/mongodb` ^2, `ruflin/elastica` ^7 (8 is unsupported), deptrac, infection and the Roave BC check. It pins `config.platform.ext-mongodb` to the CI runner's extension so `composer-ci.lock` resolves there. APCu tests need `apc.enable_cli=1`.
 
 ## CI
 

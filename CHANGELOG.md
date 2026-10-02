@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.3.0
+
+### Added
+
+- Symfony Messenger metrics, collected when `symfony/messenger` is installed:
+  `messenger_message_sent` (`transport`, `message`), `messenger_message_handled` and
+  `messenger_message_handling_duration_histogram_seconds` (`transport`, `message`,
+  `status` = `handled` | `retried` | `failed`). `message` is the short class name. They are
+  declared by the new `MessengerMetricLabelEnum` (appended to `metrics_bundle.metric_enums`);
+  `MetricLabelEnum` gains no cases, so exhaustive `match` over it keeps compiling.
+- Bundle configuration (`metrics:` root). `metrics.doctrine.connection_label: name` labels
+  Doctrine DBAL query metrics with the DoctrineBundle connection name instead of
+  `host:dbname`. The default `host_dbname` keeps the 1.x label values. With `name`, an
+  application-defined DBAL `Middleware` service fails the compilation instead of being ignored.
+
+### Changed
+
+- README: on Symfony 7.4+ applications importing `routing.controllers` the `/_/metrics` route
+  loads automatically (as before — it is now documented and tested); the manual
+  `@MetricsBundle/Presentation/Controller/` import is only needed on Symfony 6.4–7.3 and can
+  stay next to `routing.controllers` without registering the route twice.
+
 ## 1.2.2
 
 ### Fixed

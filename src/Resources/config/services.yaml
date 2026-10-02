@@ -25,6 +25,7 @@ services:
     resource: '../../'
     exclude:
       - '../../DependencyInjection/'
+      - '../../Framework/EventListener/MessengerEventListener.php'
       - '../../Infrastructure/Doctrine/DBAL/'
       - '../../Infrastructure/HttpClient/HttpClientDecorator.php'
       - '../../Infrastructure/Elastica/'

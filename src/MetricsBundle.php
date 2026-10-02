@@ -10,6 +10,7 @@ use MongoDB\Client;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler\AddDoctrineDBALMonitorPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler\AddHttpClientMonitorPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler\AddMonologDecoratorCompilerPass;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler\RegisterMessengerMetricsPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler\SaveElasticaClientsListPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\MetricsExtension;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ElasticaCollector;
@@ -41,6 +42,7 @@ final class MetricsBundle extends Bundle
         $container->addCompilerPass(new AddHttpClientMonitorPass(), priority: -256);
         $container->addCompilerPass(new AddDoctrineDBALMonitorPass(), priority: AddDoctrineDBALMonitorPass::PRIORITY);
         $container->addCompilerPass(new SaveElasticaClientsListPass());
+        $container->addCompilerPass(new RegisterMessengerMetricsPass());
     }
 
     #[Override]

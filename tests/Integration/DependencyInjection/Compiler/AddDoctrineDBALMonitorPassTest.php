@@ -5,14 +5,18 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\Test\Integration\DependencyInjection\Compiler;
 
 use Doctrine\Bundle\DoctrineBundle\DependencyInjection\Compiler\MiddlewaresPass;
+use Doctrine\Bundle\DoctrineBundle\Middleware\ConnectionNameAwareInterface;
 use Doctrine\DBAL\Driver\Middleware as DriverMiddleware;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler\AddDoctrineDBALMonitorPass;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\MetricsExtension;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\Middleware;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\NamedConnectionMiddleware;
 use Msstc4Symfony\MetricsBundle\MetricsBundle;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
+use Symfony\Component\DependencyInjection\Exception\LogicException;
 
 final class AddDoctrineDBALMonitorPassTest extends TestCase
 {
@@ -46,6 +50,46 @@ final class AddDoctrineDBALMonitorPassTest extends TestCase
         $definition = $container->getDefinition(Middleware::class);
         self::assertTrue($definition->isAutowired());
         self::assertFalse($definition->hasTag(AddDoctrineDBALMonitorPass::MIDDLEWARE_TAG));
+    }
+
+    public function testTagsTheConnectionNameAwareMiddlewareWhenLabellingByConnectionName(): void
+    {
+        if (!interface_exists(ConnectionNameAwareInterface::class)) {
+            self::markTestSkipped('doctrine/doctrine-bundle not installed');
+        }
+
+        $container = $this->containerWithDoctrineConnections();
+        $container->setParameter(MetricsExtension::DOCTRINE_CONNECTION_LABEL_PARAMETER, 'name');
+
+        new AddDoctrineDBALMonitorPass()->process($container);
+
+        $named = $container->getDefinition(NamedConnectionMiddleware::class);
+        self::assertTrue($named->isAutowired());
+        self::assertSame([[]], $named->getTag(AddDoctrineDBALMonitorPass::MIDDLEWARE_TAG));
+        self::assertFalse($container->getDefinition(Middleware::class)->hasTag(AddDoctrineDBALMonitorPass::MIDDLEWARE_TAG));
+    }
+
+    public function testLabelByConnectionNameWithoutDoctrineConnectionsKeepsTheUntaggedMiddleware(): void
+    {
+        $container = new ContainerBuilder();
+        $container->setParameter(MetricsExtension::DOCTRINE_CONNECTION_LABEL_PARAMETER, 'name');
+
+        new AddDoctrineDBALMonitorPass()->process($container);
+
+        self::assertTrue($container->hasDefinition(Middleware::class));
+        self::assertFalse($container->hasDefinition(NamedConnectionMiddleware::class));
+    }
+
+    public function testLabelByConnectionNameRejectsAnApplicationDefinedMiddleware(): void
+    {
+        $container = $this->containerWithDoctrineConnections();
+        $container->setParameter(MetricsExtension::DOCTRINE_CONNECTION_LABEL_PARAMETER, 'name');
+        $container->setDefinition(Middleware::class, new Definition(Middleware::class));
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('connection_label');
+
+        new AddDoctrineDBALMonitorPass()->process($container);
     }
 
     public function testKeepsAnApplicationDefinedMiddleware(): void
