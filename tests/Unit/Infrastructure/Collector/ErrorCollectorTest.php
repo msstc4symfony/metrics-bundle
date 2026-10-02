@@ -8,10 +8,10 @@ use Monolog\Level;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ErrorCollector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
 use Prometheus\RegistryInterface;
-use Prometheus\Sample;
 use Prometheus\Storage\InMemory;
 use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -27,7 +27,7 @@ final class ErrorCollectorTest extends TestCase
 
         self::assertSame(
             [['app', 'cmp', RuntimeException::class]],
-            $this->labelValuesFor($registry, 'symfony_' . MetricLabelEnum::EXCEPTION->value),
+            RegistrySamples::labels($registry, MetricLabelEnum::EXCEPTION),
         );
     }
 
@@ -40,7 +40,7 @@ final class ErrorCollectorTest extends TestCase
 
         self::assertSame(
             [['app', 'cmp', 'RuntimeException']],
-            $this->labelValuesFor($registry, 'symfony_' . MetricLabelEnum::EXCEPTION->value),
+            RegistrySamples::labels($registry, MetricLabelEnum::EXCEPTION),
         );
     }
 
@@ -51,7 +51,7 @@ final class ErrorCollectorTest extends TestCase
 
         $collector->incException(new NotFoundHttpException());
 
-        self::assertSame([], $this->labelValuesFor($registry, 'symfony_' . MetricLabelEnum::EXCEPTION->value));
+        self::assertSame([], RegistrySamples::labels($registry, MetricLabelEnum::EXCEPTION));
     }
 
     public function testIncErrorLabelsByLevelName(): void
@@ -63,7 +63,7 @@ final class ErrorCollectorTest extends TestCase
 
         self::assertSame(
             [['app', 'cmp', 'ERROR']],
-            $this->labelValuesFor($registry, 'symfony_' . MetricLabelEnum::ERROR->value),
+            RegistrySamples::labels($registry, MetricLabelEnum::ERROR),
         );
     }
 
@@ -81,24 +81,5 @@ final class ErrorCollectorTest extends TestCase
     private function build(CollectorRegistry $registry, bool $useShort = false): ErrorCollector
     {
         return new ErrorCollector($registry, new MetricRepository([]), 'app', 'cmp', $useShort);
-    }
-
-    /**
-     * @return array<array<int, string>>
-     */
-    private function labelValuesFor(CollectorRegistry $registry, string $name): array
-    {
-        foreach ($registry->getMetricFamilySamples() as $family) {
-            if ($family->getName() !== $name) {
-                continue;
-            }
-
-            return array_map(
-                static fn (Sample $sample): array => $sample->getLabelValues(),
-                $family->getSamples(),
-            );
-        }
-
-        return [];
     }
 }

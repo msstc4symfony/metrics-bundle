@@ -7,6 +7,7 @@ namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Collector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\RequestCollector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 
 final class RequestCollectorTest extends CollectorTestCase
 {
@@ -16,7 +17,7 @@ final class RequestCollectorTest extends CollectorTestCase
 
         self::assertSame(
             [['app', 'cmp', 'GET', 'order_show']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::HTTP_REQUEST->value),
+            RegistrySamples::labels($this->registry, MetricLabelEnum::HTTP_REQUEST),
         );
     }
 
@@ -26,7 +27,7 @@ final class RequestCollectorTest extends CollectorTestCase
 
         self::assertSame(
             [['app', 'cmp', 'GET', 'unknown']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::HTTP_REQUEST->value),
+            RegistrySamples::labels($this->registry, MetricLabelEnum::HTTP_REQUEST),
         );
     }
 
@@ -36,7 +37,7 @@ final class RequestCollectorTest extends CollectorTestCase
 
         self::assertSame(
             [['app', 'cmp', 'GET', 'order_show', '404']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::HTTP_RESPONSE->value),
+            RegistrySamples::labels($this->registry, MetricLabelEnum::HTTP_RESPONSE),
         );
     }
 
@@ -44,21 +45,21 @@ final class RequestCollectorTest extends CollectorTestCase
     {
         $this->build()->setRequestDuration('GET', 'order_show', 0.12);
 
-        self::assertTrue($this->familyExists('symfony_' . MetricLabelEnum::REQUEST_DURATION_HISTOGRAM_SECONDS->value));
+        self::assertTrue(RegistrySamples::exists($this->registry, MetricLabelEnum::REQUEST_DURATION_HISTOGRAM_SECONDS));
     }
 
     public function testSetRequestDurationSummaryRecorded(): void
     {
         $this->build()->setRequestDurationSummary('GET', 'order_show', 0.18);
 
-        self::assertTrue($this->familyExists('symfony_' . MetricLabelEnum::REQUEST_DURATION_SUMMARY_SECONDS->value));
+        self::assertTrue(RegistrySamples::exists($this->registry, MetricLabelEnum::REQUEST_DURATION_SUMMARY_SECONDS));
     }
 
     public function testSetRequestDurationNullRouteFallsBack(): void
     {
         $this->build()->setRequestDuration('GET', null, 0.1);
 
-        self::assertTrue($this->familyExists('symfony_' . MetricLabelEnum::REQUEST_DURATION_HISTOGRAM_SECONDS->value));
+        self::assertTrue(RegistrySamples::exists($this->registry, MetricLabelEnum::REQUEST_DURATION_HISTOGRAM_SECONDS));
     }
 
     private function build(): RequestCollector

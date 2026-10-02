@@ -10,6 +10,7 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Monolog\Handler\HandlerDecorator;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Storage\Factory;
 use Msstc4Symfony\MetricsBundle\Presentation\Controller\GetMetricsController;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\TestKernel;
+use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Prometheus\RegistryInterface;
@@ -152,17 +153,8 @@ final class ContainerCompileTest extends KernelTestCase
         self::assertInstanceOf(RegistryInterface::class, $registry);
 
         $requests = [];
-        foreach ($registry->getMetricFamilySamples() as $family) {
-            if ($family->getName() !== 'symfony_' . MetricLabelEnum::HTTP_CONNECTION_REQUEST->value) {
-                continue;
-            }
-
-            foreach ($family->getSamples() as $sample) {
-                [, , , $host, $path] = $sample->getLabelValues();
-                self::assertIsString($host);
-                self::assertIsString($path);
-                $requests[$host . $path] = (string) $sample->getValue();
-            }
+        foreach (RegistrySamples::samples($registry, MetricLabelEnum::HTTP_CONNECTION_REQUEST) as [[, , , $host, $path], $count]) {
+            $requests[$host . $path] = $count;
         }
 
         ksort($requests);

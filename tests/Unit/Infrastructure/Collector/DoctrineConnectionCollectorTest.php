@@ -8,6 +8,7 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\DoctrineConnectionColle
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\DoctrineQueryTypeEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 
 final class DoctrineConnectionCollectorTest extends CollectorTestCase
 {
@@ -17,7 +18,7 @@ final class DoctrineConnectionCollectorTest extends CollectorTestCase
 
         self::assertSame(
             [['app', 'cmp', 'default', 'select', 'users']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::DOCTRINE_QUERY_EXECUTE->value),
+            RegistrySamples::labels($this->registry, MetricLabelEnum::DOCTRINE_QUERY_EXECUTE),
         );
     }
 
@@ -27,7 +28,7 @@ final class DoctrineConnectionCollectorTest extends CollectorTestCase
 
         self::assertSame(
             [['app', 'cmp', 'default', 'other', 'unknown']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::DOCTRINE_QUERY_EXECUTE->value),
+            RegistrySamples::labels($this->registry, MetricLabelEnum::DOCTRINE_QUERY_EXECUTE),
         );
     }
 
@@ -35,7 +36,7 @@ final class DoctrineConnectionCollectorTest extends CollectorTestCase
     {
         $this->build()->setQueryExecuteDuration('default', DoctrineQueryTypeEnum::INSERT, 'orders', 0.05);
 
-        self::assertTrue($this->familyExists('symfony_' . MetricLabelEnum::DOCTRINE_QUERY_DURATION_HISTOGRAM_SECONDS->value));
+        self::assertTrue(RegistrySamples::exists($this->registry, MetricLabelEnum::DOCTRINE_QUERY_DURATION_HISTOGRAM_SECONDS));
     }
 
     private function build(): DoctrineConnectionCollector

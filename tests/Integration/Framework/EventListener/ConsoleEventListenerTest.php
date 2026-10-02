@@ -8,9 +8,9 @@ use Msstc4Symfony\MetricsBundle\Framework\EventListener\ConsoleEventListener;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ConsoleCollector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
-use Prometheus\MetricFamilySamples;
 use Prometheus\Storage\InMemory;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Event\ConsoleCommandEvent;
@@ -45,9 +45,9 @@ final class ConsoleEventListenerTest extends TestCase
         $listener->onCommand(new ConsoleCommandEvent($command, $input, $output));
         $listener->onTerminate(new ConsoleTerminateEvent($command, $input, $output, 0));
 
-        self::assertTrue($this->familyExists('symfony_' . MetricLabelEnum::CONSOLE_COMMAND_START->value));
-        self::assertTrue($this->familyExists('symfony_' . MetricLabelEnum::CONSOLE_COMMAND_FINISH->value));
-        self::assertTrue($this->familyExists('symfony_' . MetricLabelEnum::CONSOLE_COMMAND_DURATION_HISTOGRAM_SECONDS->value));
+        self::assertTrue(RegistrySamples::exists($this->registry, MetricLabelEnum::CONSOLE_COMMAND_START));
+        self::assertTrue(RegistrySamples::exists($this->registry, MetricLabelEnum::CONSOLE_COMMAND_FINISH));
+        self::assertTrue(RegistrySamples::exists($this->registry, MetricLabelEnum::CONSOLE_COMMAND_DURATION_HISTOGRAM_SECONDS));
     }
 
     public function testEventWithoutCommandIsIgnored(): void
@@ -59,7 +59,7 @@ final class ConsoleEventListenerTest extends TestCase
 
         $listener->onCommand(new ConsoleCommandEvent(null, $input, $output));
 
-        self::assertFalse($this->familyExists('symfony_' . MetricLabelEnum::CONSOLE_COMMAND_START->value));
+        self::assertFalse(RegistrySamples::exists($this->registry, MetricLabelEnum::CONSOLE_COMMAND_START));
     }
 
     public function testTerminateWithoutPriorStartIsIgnored(): void
@@ -72,11 +72,6 @@ final class ConsoleEventListenerTest extends TestCase
 
         $listener->onTerminate(new ConsoleTerminateEvent($command, $input, $output, 0));
 
-        self::assertFalse($this->familyExists('symfony_' . MetricLabelEnum::CONSOLE_COMMAND_FINISH->value));
-    }
-
-    private function familyExists(string $name): bool
-    {
-        return array_any($this->registry->getMetricFamilySamples(), fn (MetricFamilySamples $family): bool => $family->getName() === $name);
+        self::assertFalse(RegistrySamples::exists($this->registry, MetricLabelEnum::CONSOLE_COMMAND_FINISH));
     }
 }

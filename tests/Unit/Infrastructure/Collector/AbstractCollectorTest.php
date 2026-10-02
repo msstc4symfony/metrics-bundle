@@ -6,11 +6,11 @@ namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Collector;
 
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
 use Prometheus\MetricFamilySamples;
 use Prometheus\RegistryInterface;
-use Prometheus\Sample;
 use Prometheus\Storage\InMemory;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
@@ -93,7 +93,7 @@ final class AbstractCollectorTest extends TestCase
 
         self::assertSame(
             [['app', 'cmp']],
-            $this->labelValuesFor($registry, 'symfony_' . MetricLabelEnum::INFO_CPU_LOAD->value),
+            RegistrySamples::labels($registry, MetricLabelEnum::INFO_CPU_LOAD),
         );
     }
 
@@ -179,24 +179,5 @@ final class AbstractCollectorTest extends TestCase
             static fn (MetricFamilySamples $s): string => $s->getName(),
             $registry->getMetricFamilySamples(),
         );
-    }
-
-    /**
-     * @return array<array<int, string>>
-     */
-    private function labelValuesFor(CollectorRegistry $registry, string $name): array
-    {
-        foreach ($registry->getMetricFamilySamples() as $family) {
-            if ($family->getName() !== $name) {
-                continue;
-            }
-
-            return array_map(
-                static fn (Sample $sample): array => $sample->getLabelValues(),
-                $family->getSamples(),
-            );
-        }
-
-        return [];
     }
 }

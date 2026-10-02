@@ -7,6 +7,7 @@ namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Collector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ProfilingCollector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 
 final class ProfilingCollectorTest extends CollectorTestCase
 {
@@ -14,18 +15,20 @@ final class ProfilingCollectorTest extends CollectorTestCase
     {
         $this->build()->setProfilingSpanDuration('Order Service::process', 0.15);
 
-        $samples = $this->labelValuesFor('symfony_' . MetricLabelEnum::PROFILING_SPAN_DURATION_HISTOGRAM_SECONDS->value);
-        self::assertNotEmpty($samples);
-        self::assertSame(['app', 'cmp', 'order_service_process'], array_slice($samples[0], 0, 3));
+        self::assertSame(
+            [['app', 'cmp', 'order_service_process']],
+            RegistrySamples::labels($this->registry, MetricLabelEnum::PROFILING_SPAN_DURATION_HISTOGRAM_SECONDS, '_count'),
+        );
     }
 
     public function testSetProfilingSpanDurationKeepsAlphaNumericHyphenAndUnderscore(): void
     {
         $this->build()->setProfilingSpanDuration('span-1_v2', 0.05);
 
-        $samples = $this->labelValuesFor('symfony_' . MetricLabelEnum::PROFILING_SPAN_DURATION_HISTOGRAM_SECONDS->value);
-        self::assertNotEmpty($samples);
-        self::assertSame(['app', 'cmp', 'span-1_v2'], array_slice($samples[0], 0, 3));
+        self::assertSame(
+            [['app', 'cmp', 'span-1_v2']],
+            RegistrySamples::labels($this->registry, MetricLabelEnum::PROFILING_SPAN_DURATION_HISTOGRAM_SECONDS, '_count'),
+        );
     }
 
     private function build(): ProfilingCollector

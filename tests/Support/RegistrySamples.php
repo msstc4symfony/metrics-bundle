@@ -6,10 +6,18 @@ namespace Msstc4Symfony\MetricsBundle\Test\Support;
 
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface;
 use PHPUnit\Framework\Assert;
+use Prometheus\MetricFamilySamples;
 use Prometheus\RegistryInterface;
 
 final class RegistrySamples
 {
+    public static function exists(RegistryInterface $registry, MetricLabelEnumInterface $metric): bool
+    {
+        $name = 'symfony_' . $metric->value;
+
+        return array_any($registry->getMetricFamilySamples(), static fn (MetricFamilySamples $family): bool => $family->getName() === $name);
+    }
+
     /**
      * Label values of every sample named after the metric plus the suffix ("_count", "_sum", ...).
      *

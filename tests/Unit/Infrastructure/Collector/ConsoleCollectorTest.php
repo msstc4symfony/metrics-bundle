@@ -7,6 +7,7 @@ namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Collector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ConsoleCollector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 final class ConsoleCollectorTest extends CollectorTestCase
@@ -17,7 +18,7 @@ final class ConsoleCollectorTest extends CollectorTestCase
 
         self::assertSame(
             [['app', 'cmp', 'app:run']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::CONSOLE_COMMAND_START->value),
+            RegistrySamples::labels($this->registry, MetricLabelEnum::CONSOLE_COMMAND_START),
         );
     }
 
@@ -27,7 +28,7 @@ final class ConsoleCollectorTest extends CollectorTestCase
 
         self::assertSame(
             [['app', 'cmp', 'app:run']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::CONSOLE_COMMAND_FINISH->value),
+            RegistrySamples::labels($this->registry, MetricLabelEnum::CONSOLE_COMMAND_FINISH),
         );
     }
 
@@ -35,7 +36,7 @@ final class ConsoleCollectorTest extends CollectorTestCase
     {
         $this->build()->setCommandDuration('app:run', 0.42);
 
-        self::assertTrue($this->familyExists('symfony_' . MetricLabelEnum::CONSOLE_COMMAND_DURATION_HISTOGRAM_SECONDS->value));
+        self::assertTrue(RegistrySamples::exists($this->registry, MetricLabelEnum::CONSOLE_COMMAND_DURATION_HISTOGRAM_SECONDS));
     }
 
     /**
@@ -59,9 +60,9 @@ final class ConsoleCollectorTest extends CollectorTestCase
         $collector->incConsoleCommandFinish($command);
         $collector->setCommandDuration($command, 0.1);
 
-        self::assertFalse($this->familyExists('symfony_' . MetricLabelEnum::CONSOLE_COMMAND_START->value));
-        self::assertFalse($this->familyExists('symfony_' . MetricLabelEnum::CONSOLE_COMMAND_FINISH->value));
-        self::assertFalse($this->familyExists('symfony_' . MetricLabelEnum::CONSOLE_COMMAND_DURATION_HISTOGRAM_SECONDS->value));
+        self::assertFalse(RegistrySamples::exists($this->registry, MetricLabelEnum::CONSOLE_COMMAND_START));
+        self::assertFalse(RegistrySamples::exists($this->registry, MetricLabelEnum::CONSOLE_COMMAND_FINISH));
+        self::assertFalse(RegistrySamples::exists($this->registry, MetricLabelEnum::CONSOLE_COMMAND_DURATION_HISTOGRAM_SECONDS));
     }
 
     private function build(): ConsoleCollector

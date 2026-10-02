@@ -8,10 +8,9 @@ use Msstc4Symfony\MetricsBundle\Framework\EventListener\ExceptionEventListener;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ErrorCollector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
-use Prometheus\MetricFamilySamples;
-use Prometheus\Sample;
 use Prometheus\Storage\InMemory;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Request;
@@ -44,7 +43,7 @@ final class ExceptionEventListenerTest extends TestCase
 
         self::assertSame(
             [['app', 'cmp', RuntimeException::class]],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::EXCEPTION->value),
+            RegistrySamples::labels($this->registry, MetricLabelEnum::EXCEPTION),
         );
     }
 
@@ -55,30 +54,6 @@ final class ExceptionEventListenerTest extends TestCase
 
         $listener->onException(new ExceptionEvent($kernel, Request::create('/'), HttpKernelInterface::MAIN_REQUEST, new NotFoundHttpException()));
 
-        self::assertFalse($this->familyExists('symfony_' . MetricLabelEnum::EXCEPTION->value));
-    }
-
-    /**
-     * @return array<array<int, string>>
-     */
-    private function labelValuesFor(string $name): array
-    {
-        foreach ($this->registry->getMetricFamilySamples() as $family) {
-            if ($family->getName() !== $name) {
-                continue;
-            }
-
-            return array_map(
-                static fn (Sample $sample): array => $sample->getLabelValues(),
-                $family->getSamples(),
-            );
-        }
-
-        return [];
-    }
-
-    private function familyExists(string $name): bool
-    {
-        return array_any($this->registry->getMetricFamilySamples(), fn (MetricFamilySamples $family): bool => $family->getName() === $name);
+        self::assertFalse(RegistrySamples::exists($this->registry, MetricLabelEnum::EXCEPTION));
     }
 }

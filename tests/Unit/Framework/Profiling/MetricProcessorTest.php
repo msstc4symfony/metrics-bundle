@@ -6,7 +6,9 @@ namespace Msstc4Symfony\MetricsBundle\Test\Unit\Framework\Profiling;
 
 use Msstc4Symfony\MetricsBundle\Framework\Profiling\Processor\EndSpan\MetricProcessor;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ProfilingCollector;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use Msstc4Symfony\ProfilingBundle\Framework\Processor\EndSpan\EndSpanProcessorInterface;
 use Msstc4Symfony\ProfilingBundle\Framework\Span\Span;
 use Override;
@@ -42,15 +44,9 @@ final class MetricProcessorTest extends TestCase
      */
     private function sums(CollectorRegistry $registry): array
     {
-        $sums = [];
-        foreach ($registry->getMetricFamilySamples() as $family) {
-            foreach ($family->getSamples() as $sample) {
-                if ($sample->getName() === 'symfony_profiling_span_duration_histogram_seconds_sum') {
-                    $sums[] = [array_values(array_map(static fn (mixed $value): string => is_scalar($value) ? (string) $value : '', $sample->getLabelValues())), (float) $sample->getValue()];
-                }
-            }
-        }
-
-        return $sums;
+        return array_map(
+            static fn (array $sample): array => [$sample[0], (float) $sample[1]],
+            RegistrySamples::samples($registry, MetricLabelEnum::PROFILING_SPAN_DURATION_HISTOGRAM_SECONDS, '_sum'),
+        );
     }
 }

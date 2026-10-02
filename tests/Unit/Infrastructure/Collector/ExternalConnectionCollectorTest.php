@@ -7,6 +7,7 @@ namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Collector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ExternalConnectionCollector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 
 final class ExternalConnectionCollectorTest extends CollectorTestCase
 {
@@ -16,7 +17,7 @@ final class ExternalConnectionCollectorTest extends CollectorTestCase
 
         self::assertSame(
             [['app', 'cmp', 'GET', 'api.example.com', '/v1/orders']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::HTTP_CONNECTION_REQUEST->value),
+            RegistrySamples::labels($this->registry, MetricLabelEnum::HTTP_CONNECTION_REQUEST),
         );
     }
 
@@ -26,7 +27,7 @@ final class ExternalConnectionCollectorTest extends CollectorTestCase
 
         self::assertSame(
             [['app', 'cmp', 'GET', 'api.example.com', '/v1/orders', '502']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::HTTP_CONNECTION_RESPONSE->value),
+            RegistrySamples::labels($this->registry, MetricLabelEnum::HTTP_CONNECTION_RESPONSE),
         );
     }
 
@@ -34,7 +35,7 @@ final class ExternalConnectionCollectorTest extends CollectorTestCase
     {
         $this->build()->setHTTPConnectionDuration('GET', 'api.example.com', '/v1/orders', 0.12);
 
-        self::assertTrue($this->familyExists('symfony_' . MetricLabelEnum::HTTP_CONNECTION_DURATION_HISTOGRAM_SECONDS->value));
+        self::assertTrue(RegistrySamples::exists($this->registry, MetricLabelEnum::HTTP_CONNECTION_DURATION_HISTOGRAM_SECONDS));
     }
 
     private function build(): ExternalConnectionCollector

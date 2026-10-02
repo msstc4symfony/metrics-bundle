@@ -9,11 +9,10 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ErrorCollector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Monolog\Handler\HandlerDecorator;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
-use Prometheus\MetricFamilySamples;
-use Prometheus\Sample;
 use Prometheus\Storage\InMemory;
 use Psr\Log\LoggerInterface;
 
@@ -44,7 +43,7 @@ final class HandlerDecoratorTest extends TestCase
 
         self::assertSame(
             [['app', 'cmp', 'EMERGENCY']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::ERROR->value),
+            RegistrySamples::labels($this->registry, MetricLabelEnum::ERROR),
         );
     }
 
@@ -54,7 +53,7 @@ final class HandlerDecoratorTest extends TestCase
 
         $this->decorator()->info('hello');
 
-        self::assertFalse($this->familyExists('symfony_' . MetricLabelEnum::ERROR->value));
+        self::assertFalse(RegistrySamples::exists($this->registry, MetricLabelEnum::ERROR));
     }
 
     public function testDebugIsForwardedButNotRecorded(): void
@@ -63,7 +62,7 @@ final class HandlerDecoratorTest extends TestCase
 
         $this->decorator()->debug('debug-msg');
 
-        self::assertFalse($this->familyExists('symfony_' . MetricLabelEnum::ERROR->value));
+        self::assertFalse(RegistrySamples::exists($this->registry, MetricLabelEnum::ERROR));
     }
 
     public function testCustomAllowedLevelsRestrictRecording(): void
@@ -78,7 +77,7 @@ final class HandlerDecoratorTest extends TestCase
 
         self::assertSame(
             [['app', 'cmp', 'ERROR']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::ERROR->value),
+            RegistrySamples::labels($this->registry, MetricLabelEnum::ERROR),
         );
     }
 
@@ -91,7 +90,7 @@ final class HandlerDecoratorTest extends TestCase
 
         self::assertSame(
             [['app', 'cmp', 'WARNING']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::ERROR->value),
+            RegistrySamples::labels($this->registry, MetricLabelEnum::ERROR),
         );
     }
 
@@ -101,7 +100,7 @@ final class HandlerDecoratorTest extends TestCase
 
         $this->decorator()->log('not-a-real-level', 'something');
 
-        self::assertFalse($this->familyExists('symfony_' . MetricLabelEnum::ERROR->value));
+        self::assertFalse(RegistrySamples::exists($this->registry, MetricLabelEnum::ERROR));
     }
 
     /**
@@ -112,29 +111,5 @@ final class HandlerDecoratorTest extends TestCase
         return $allowedLevels === null
             ? new HandlerDecorator($this->inner, $this->collector)
             : new HandlerDecorator($this->inner, $this->collector, $allowedLevels);
-    }
-
-    /**
-     * @return array<array<int, string>>
-     */
-    private function labelValuesFor(string $name): array
-    {
-        foreach ($this->registry->getMetricFamilySamples() as $family) {
-            if ($family->getName() !== $name) {
-                continue;
-            }
-
-            return array_map(
-                static fn (Sample $sample): array => $sample->getLabelValues(),
-                $family->getSamples(),
-            );
-        }
-
-        return [];
-    }
-
-    private function familyExists(string $name): bool
-    {
-        return array_any($this->registry->getMetricFamilySamples(), fn (MetricFamilySamples $family): bool => $family->getName() === $name);
     }
 }

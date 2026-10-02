@@ -7,6 +7,7 @@ namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Collector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ElasticaCollector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 
 final class ElasticaCollectorTest extends CollectorTestCase
 {
@@ -16,7 +17,7 @@ final class ElasticaCollectorTest extends CollectorTestCase
 
         self::assertSame(
             [['app', 'cmp', 'POST', '/index/_search']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::ELASTICA_REQUEST_SUCCESS->value),
+            RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_SUCCESS),
         );
     }
 
@@ -26,7 +27,7 @@ final class ElasticaCollectorTest extends CollectorTestCase
 
         self::assertSame(
             [['app', 'cmp', 'POST', '/index/_search']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::ELASTICA_REQUEST_FAILED->value),
+            RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED),
         );
     }
 
@@ -34,7 +35,7 @@ final class ElasticaCollectorTest extends CollectorTestCase
     {
         $this->build()->setRequestDuration('POST', '/index/_search', 0.05);
 
-        self::assertTrue($this->familyExists('symfony_' . MetricLabelEnum::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS->value));
+        self::assertTrue(RegistrySamples::exists($this->registry, MetricLabelEnum::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS));
     }
 
     private function build(): ElasticaCollector

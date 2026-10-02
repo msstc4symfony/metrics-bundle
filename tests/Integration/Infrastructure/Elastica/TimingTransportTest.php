@@ -12,10 +12,9 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ElasticaCollector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Elastica\TimingTransport;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
-use Prometheus\MetricFamilySamples;
-use Prometheus\Sample;
 use Prometheus\Storage\InMemory;
 use RuntimeException;
 
@@ -50,9 +49,9 @@ final class TimingTransportTest extends TestCase
 
         self::assertSame(
             [['app', 'cmp', 'POST', '/index/_search']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::ELASTICA_REQUEST_SUCCESS->value),
+            RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_SUCCESS),
         );
-        self::assertTrue($this->familyExists('symfony_' . MetricLabelEnum::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS->value));
+        self::assertTrue(RegistrySamples::exists($this->registry, MetricLabelEnum::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS));
     }
 
     public function testFailedRequestRecordsFailureAndRethrows(): void
@@ -74,7 +73,7 @@ final class TimingTransportTest extends TestCase
         self::assertNotNull($caught);
         self::assertSame(
             [['app', 'cmp', 'POST', '/index/_search']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::ELASTICA_REQUEST_FAILED->value),
+            RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED),
         );
     }
 
@@ -82,29 +81,5 @@ final class TimingTransportTest extends TestCase
     {
         $this->expectException(LogicException::class);
         new TimingTransport()->exec(new Request('/', Request::GET), []);
-    }
-
-    /**
-     * @return array<array<int, string>>
-     */
-    private function labelValuesFor(string $name): array
-    {
-        foreach ($this->registry->getMetricFamilySamples() as $family) {
-            if ($family->getName() !== $name) {
-                continue;
-            }
-
-            return array_map(
-                static fn (Sample $sample): array => $sample->getLabelValues(),
-                $family->getSamples(),
-            );
-        }
-
-        return [];
-    }
-
-    private function familyExists(string $name): bool
-    {
-        return array_any($this->registry->getMetricFamilySamples(), fn (MetricFamilySamples $family): bool => $family->getName() === $name);
     }
 }

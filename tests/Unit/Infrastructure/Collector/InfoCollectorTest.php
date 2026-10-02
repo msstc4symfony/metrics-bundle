@@ -7,6 +7,7 @@ namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Collector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\InfoCollector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 
 final class InfoCollectorTest extends CollectorTestCase
 {
@@ -18,7 +19,7 @@ final class InfoCollectorTest extends CollectorTestCase
 
         self::assertSame(
             [['app', 'cmp']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::INFO_CPU_LOAD->value),
+            RegistrySamples::labels($this->registry, MetricLabelEnum::INFO_CPU_LOAD),
         );
     }
 
@@ -28,6 +29,6 @@ final class InfoCollectorTest extends CollectorTestCase
 
         $collector->setMetric(MetricLabelEnum::INFO_FPM_TOTAL_PROCESSES, 12);
 
-        self::assertTrue($this->familyExists('symfony_' . MetricLabelEnum::INFO_FPM_TOTAL_PROCESSES->value));
+        self::assertTrue(RegistrySamples::exists($this->registry, MetricLabelEnum::INFO_FPM_TOTAL_PROCESSES));
     }
 }

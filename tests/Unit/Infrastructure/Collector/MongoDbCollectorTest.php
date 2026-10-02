@@ -7,6 +7,7 @@ namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Collector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\MongoDbCollector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 
 final class MongoDbCollectorTest extends CollectorTestCase
 {
@@ -16,7 +17,7 @@ final class MongoDbCollectorTest extends CollectorTestCase
 
         self::assertSame(
             [['app', 'cmp', 'find', 'mongo-1:27017']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::MONGODB_COMMAND_SUCCESS->value),
+            RegistrySamples::labels($this->registry, MetricLabelEnum::MONGODB_COMMAND_SUCCESS),
         );
     }
 
@@ -26,7 +27,7 @@ final class MongoDbCollectorTest extends CollectorTestCase
 
         self::assertSame(
             [['app', 'cmp', 'insert', 'mongo-1:27017']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::MONGODB_COMMAND_FAILED->value),
+            RegistrySamples::labels($this->registry, MetricLabelEnum::MONGODB_COMMAND_FAILED),
         );
     }
 
@@ -34,7 +35,7 @@ final class MongoDbCollectorTest extends CollectorTestCase
     {
         $this->build()->setCommandDuration('find', 'mongo-1:27017', 0.03);
 
-        self::assertTrue($this->familyExists('symfony_' . MetricLabelEnum::MONGODB_COMMAND_DURATION_HISTOGRAM_SECONDS->value));
+        self::assertTrue(RegistrySamples::exists($this->registry, MetricLabelEnum::MONGODB_COMMAND_DURATION_HISTOGRAM_SECONDS));
     }
 
     private function build(): MongoDbCollector

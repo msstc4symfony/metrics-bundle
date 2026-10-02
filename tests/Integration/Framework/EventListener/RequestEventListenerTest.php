@@ -8,10 +8,9 @@ use Msstc4Symfony\MetricsBundle\Framework\EventListener\RequestEventListener;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\RequestCollector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
-use Prometheus\MetricFamilySamples;
-use Prometheus\Sample;
 use Prometheus\Storage\InMemory;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -51,14 +50,14 @@ final class RequestEventListenerTest extends TestCase
 
         self::assertSame(
             [['app', 'cmp', 'GET', 'order_show']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::HTTP_REQUEST->value),
+            RegistrySamples::labels($this->registry, MetricLabelEnum::HTTP_REQUEST),
         );
         self::assertSame(
             [['app', 'cmp', 'GET', 'order_show', '201']],
-            $this->labelValuesFor('symfony_' . MetricLabelEnum::HTTP_RESPONSE->value),
+            RegistrySamples::labels($this->registry, MetricLabelEnum::HTTP_RESPONSE),
         );
-        self::assertTrue($this->familyExists('symfony_' . MetricLabelEnum::REQUEST_DURATION_HISTOGRAM_SECONDS->value));
-        self::assertTrue($this->familyExists('symfony_' . MetricLabelEnum::REQUEST_DURATION_SUMMARY_SECONDS->value));
+        self::assertTrue(RegistrySamples::exists($this->registry, MetricLabelEnum::REQUEST_DURATION_HISTOGRAM_SECONDS));
+        self::assertTrue(RegistrySamples::exists($this->registry, MetricLabelEnum::REQUEST_DURATION_SUMMARY_SECONDS));
     }
 
     public function testSubRequestIsIgnored(): void
@@ -69,7 +68,7 @@ final class RequestEventListenerTest extends TestCase
         $listener->onRequestFirst($this->requestEvent($request, isMain: false));
         $listener->onRequest($this->requestEvent($request, isMain: false));
 
-        self::assertFalse($this->familyExists('symfony_' . MetricLabelEnum::HTTP_REQUEST->value));
+        self::assertFalse(RegistrySamples::exists($this->registry, MetricLabelEnum::HTTP_REQUEST));
     }
 
     public function testOptionsRequestIsIgnored(): void
@@ -80,7 +79,7 @@ final class RequestEventListenerTest extends TestCase
         $listener->onRequestFirst($this->requestEvent($request));
         $listener->onRequest($this->requestEvent($request));
 
-        self::assertFalse($this->familyExists('symfony_' . MetricLabelEnum::HTTP_REQUEST->value));
+        self::assertFalse(RegistrySamples::exists($this->registry, MetricLabelEnum::HTTP_REQUEST));
     }
 
     public function testIgnoredRouteResetsStartedAt(): void
@@ -94,8 +93,8 @@ final class RequestEventListenerTest extends TestCase
         $listener->onRequest($this->requestEvent($request));
         $listener->onTerminate(new TerminateEvent($this->kernel, $request, new Response('', Response::HTTP_OK)));
 
-        self::assertFalse($this->familyExists('symfony_' . MetricLabelEnum::HTTP_REQUEST->value));
-        self::assertFalse($this->familyExists('symfony_' . MetricLabelEnum::HTTP_RESPONSE->value));
+        self::assertFalse(RegistrySamples::exists($this->registry, MetricLabelEnum::HTTP_REQUEST));
+        self::assertFalse(RegistrySamples::exists($this->registry, MetricLabelEnum::HTTP_RESPONSE));
     }
 
     private function requestEvent(Request $request, bool $isMain = true): RequestEvent
@@ -105,29 +104,5 @@ final class RequestEventListenerTest extends TestCase
             $request,
             $isMain ? HttpKernelInterface::MAIN_REQUEST : HttpKernelInterface::SUB_REQUEST,
         );
-    }
-
-    /**
-     * @return array<array<int, string>>
-     */
-    private function labelValuesFor(string $name): array
-    {
-        foreach ($this->registry->getMetricFamilySamples() as $family) {
-            if ($family->getName() !== $name) {
-                continue;
-            }
-
-            return array_map(
-                static fn (Sample $sample): array => $sample->getLabelValues(),
-                $family->getSamples(),
-            );
-        }
-
-        return [];
-    }
-
-    private function familyExists(string $name): bool
-    {
-        return array_any($this->registry->getMetricFamilySamples(), fn (MetricFamilySamples $family): bool => $family->getName() === $name);
     }
 }
