@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Test\Integration\DependencyInjection\Compiler;
 
+use Composer\Autoload\ClassLoader;
 use Doctrine\Bundle\DoctrineBundle\DependencyInjection\Compiler\MiddlewaresPass;
 use Doctrine\Bundle\DoctrineBundle\Middleware\ConnectionNameAwareInterface;
 use Doctrine\DBAL\Driver\Middleware as DriverMiddleware;
@@ -13,6 +14,7 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\Middleware;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\NamedConnectionMiddleware;
 use Msstc4Symfony\MetricsBundle\MetricsBundle;
 use Override;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
@@ -88,6 +90,28 @@ final class AddDoctrineDBALMonitorPassTest extends TestCase
 
         $this->expectException(LogicException::class);
         $this->expectExceptionMessage('connection_label');
+
+        new AddDoctrineDBALMonitorPass()->process($container);
+    }
+
+    #[RunInSeparateProcess]
+    public function testLabelByConnectionNameRequiresADoctrineBundleWithConnectionNameAwareInterface(): void
+    {
+        if (!class_exists(MiddlewaresPass::class)) {
+            self::markTestSkipped('doctrine/doctrine-bundle not installed');
+        }
+
+        // Emulates a DoctrineBundle older than ConnectionNameAwareInterface: a class-map entry to an
+        // empty file wins over PSR-4, so the interface never loads in this process.
+        foreach (ClassLoader::getRegisteredLoaders() as $loader) {
+            $loader->addClassMap([ConnectionNameAwareInterface::class => '/dev/null']);
+        }
+
+        $container = $this->containerWithDoctrineConnections();
+        $container->setParameter(MetricsExtension::DOCTRINE_CONNECTION_LABEL_PARAMETER, 'name');
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('requires a doctrine/doctrine-bundle version with ConnectionNameAwareInterface');
 
         new AddDoctrineDBALMonitorPass()->process($container);
     }
