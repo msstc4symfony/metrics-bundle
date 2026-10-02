@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b1b952068d5211b66924d84e1b129e32",
+    "content-hash": "edf732fd5e62cfd74287fe774b30574c",
     "packages": [
         {
             "name": "monolog/monolog",
@@ -5375,7 +5375,7 @@
             "version": "v1.0.0",
             "source": {
                 "type": "git",
-                "url": "https://github.com/msstc4symfony/profiling-bundle.git",
+                "url": "git@github.com:msstc4symfony/profiling-bundle.git",
                 "reference": "c50118626903e6246856c690aba9fd23e3c1c8bb"
             },
             "dist": {

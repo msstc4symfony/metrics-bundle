@@ -37,8 +37,9 @@
     "ext-redis": "*",
     "composer-runtime-api": ">=2.2",
     "monolog/monolog": "^3.5",
-    "promphp/prometheus_client_php": "^2.6",
+    "promphp/prometheus_client_php": "^2.13",
     "symfony/console": "^6.4|^7.0|^8.0",
+    "symfony/deprecation-contracts": "^2.5|^3",
     "symfony/event-dispatcher": "^6.4|^7.0|^8.0",
     "symfony/framework-bundle": "^6.4|^7.0|^8.0",
     "symfony/monolog-bundle": "^3.11|^4.0",
@@ -58,7 +59,7 @@
     "phpstan/phpstan-doctrine": "^2.0",
     "phpstan/phpstan-strict-rules": "^2.0",
     "phpstan/phpstan-symfony": "^2.0",
-    "phpunit/phpunit": ">=10.5",
+    "phpunit/phpunit": ">=11.4",
     "rector/rector": "^2.1",
     "roave/backward-compatibility-check": "^8.20",
     "roave/security-advisories": "dev-latest",
@@ -90,6 +91,8 @@
   },
   "conflict": {
     "msstc4symfony/profiling-bundle": "<1.0",
+    "symfony/error-handler": "<6.4.44",
+    "symfony/http-kernel": "<6.4.13",
     "symfony/symfony": "*"
   },
   "extra": {

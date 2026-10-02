@@ -220,13 +220,17 @@ final class ReconnectingRedisAdapterTest extends TestCase
     }
 
     /**
-     * @param Closure(): Throwable $error
+     * @param class-string<Throwable> $error
      */
     #[DataProvider('provideConnectionErrors')]
-    public function testClientLevelConnectionErrorAlsoReconnects(Closure $error): void
+    public function testClientLevelConnectionErrorAlsoReconnects(string $error): void
     {
+        if (!class_exists($error)) {
+            self::markTestSkipped($error . ' needs promphp/prometheus_client_php 2.15+');
+        }
+
         $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger, $this->clock(...), backoffSeconds: 0.0);
-        $this->server->nextError = $error();
+        $this->server->nextError = new $error('Connection lost');
 
         $adapter->updateCounter(self::counter());
         $adapter->updateCounter(self::counter());
@@ -235,12 +239,12 @@ final class ReconnectingRedisAdapterTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{Closure(): Throwable}>
+     * @return iterable<string, array{class-string<Throwable>}>
      */
     public static function provideConnectionErrors(): iterable
     {
-        yield 'storage exception' => [static fn (): Throwable => new StorageException("Can't connect to Redis server")];
-        yield 'redis client exception' => [static fn (): Throwable => new RedisClientException('Connection lost')];
+        yield 'storage exception' => [StorageException::class];
+        yield 'redis client exception' => [RedisClientException::class];
     }
 
     public function testNoReconnectAttemptWithinTheBackoffWindow(): void
