@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Test\Support\Redis;
 
+use Closure;
 use Throwable;
 
 final class FakeRedisServer
@@ -21,6 +22,9 @@ final class FakeRedisServer
 
     /** Raised as E_USER_NOTICE by every command that succeeds. */
     public ?string $notice = null;
+
+    /** @var (Closure(): void)|null called before every command is served */
+    public ?Closure $onCommand = null;
 
     /** @var list<string> */
     public array $commands = [];

@@ -6,13 +6,18 @@ namespace Msstc4Symfony\MetricsBundle\Test\Integration\Infrastructure\Storage;
 
 use ErrorException;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Storage\Factory;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Storage\ReconnectingRedisAdapter;
 use Msstc4Symfony\MetricsBundle\Test\Support\CollectingLogger;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Prometheus\Exception\StorageException;
 use Prometheus\Storage\Adapter;
+use Prometheus\Storage\Redis as PrometheusRedis;
 use Prometheus\Storage\RedisNg;
+use Redis;
+use RedisException;
 use RuntimeException;
 
 /**
@@ -64,7 +69,7 @@ final class RedisReconnectTest extends TestCase
         }
 
         $logger = new CollectingLogger();
-        $adapter = new Factory($logger)->create(\sprintf('%s://user:secret@127.0.0.1:%d%s', $scheme, $this->port, $dsnTail));
+        $adapter = new Factory($logger, 0.0)->create(\sprintf('%s://user:secret@127.0.0.1:%d%s', $scheme, $this->port, $dsnTail));
         $this->startServer();
         $adapter->updateCounter($this->counter());
         self::assertSame([...$handshake, 'EVAL'], $this->loggedCommands());
@@ -97,7 +102,7 @@ final class RedisReconnectTest extends TestCase
     public function testUnreachableRedisNeverReachesTheApplicationErrorHandler(string $host): void
     {
         $logger = new CollectingLogger();
-        $adapter = new Factory($logger)->create(\sprintf('redis://%s:%d?database=5', $host, $this->port));
+        $adapter = new Factory($logger, 0.0)->create(\sprintf('redis://%s:%d?database=5', $host, $this->port));
 
         $handled = 0;
         // Symfony's ErrorHandler throws PHP warnings as ErrorException (framework.php_errors.throw).
@@ -115,6 +120,109 @@ final class RedisReconnectTest extends TestCase
         }
 
         self::assertSame(0, $handled);
+    }
+
+    public function testHundredWritesAgainstAnUnresolvableHostStayFast(): void
+    {
+        $adapter = new Factory()->create('redis://metrics-unresolvable.invalid:6379?database=5');
+        // The one lookup that opens the breaker depends on the runner's resolver; the rest must not repeat it.
+        $adapter->updateCounter($this->counter());
+
+        $started = hrtime(true);
+        for ($i = 0; $i < 99; $i++) {
+            $adapter->updateCounter($this->counter());
+        }
+
+        self::assertLessThan(0.5, (hrtime(true) - $started) / 1e9);
+    }
+
+    /**
+     * Regression guard: the adapter must not share or reuse the application's connections (no
+     * persistent ids, no global phpredis options, error handler restored).
+     */
+    public function testMetricsAdapterLeavesTheApplicationsOwnRedisClientsAlone(): void
+    {
+        $this->startServer();
+        $idle = $this->plainClient();
+        $adapter = new Factory(new CollectingLogger(), 0.0)->create('redis://127.0.0.1:' . $this->port . '?database=1');
+        $adapter->updateCounter($this->counter());
+
+        $this->stopServer();
+        $adapter->updateCounter($this->counter());
+        $this->startServer();
+        $adapter->updateCounter($this->counter());
+
+        self::assertTrue($idle->ping(), 'An application client idle during the outage reconnects by itself.');
+    }
+
+    /**
+     * Characterisation of phpredis 6, with no metrics adapter in play: a client whose command hit the
+     * outage stays failed after Redis is back. Applications must rebuild such clients themselves.
+     */
+    #[Group('characterisation')]
+    public function testPhpredisClientThatHitTheOutageStaysFailedWithoutAnyMetricsAdapter(): void
+    {
+        $this->startServer();
+        $client = $this->plainClient();
+
+        $this->stopServer();
+        try {
+            $client->ping();
+        } catch (RedisException) {
+        }
+
+        $this->startServer();
+
+        $this->expectException(RedisException::class);
+        $client->ping();
+    }
+
+    public function testHundredWritesAgainstAHangingRedisCostOneReadTimeout(): void
+    {
+        // Accepts connections (kernel backlog) but never answers. promphp sends SELECT before it applies
+        // read_timeout, so without a cap the handshake waits for default_socket_timeout (60 s in prod).
+        $hanging = stream_socket_server('tcp://127.0.0.1:' . $this->port);
+        self::assertIsResource($hanging);
+        $timeout = ini_set('default_socket_timeout', '5');
+        $adapter = new Factory()->create('redis://127.0.0.1:' . $this->port . '?database=5&read_timeout=0.5');
+
+        try {
+            $started = hrtime(true);
+            for ($i = 0; $i < 100; $i++) {
+                $adapter->updateCounter($this->counter());
+            }
+            $elapsed = (hrtime(true) - $started) / 1e9;
+            self::assertSame('5', ini_get('default_socket_timeout'), 'The adapter restores default_socket_timeout.');
+        } finally {
+            ini_set('default_socket_timeout', (string) $timeout);
+            fclose($hanging);
+        }
+
+        self::assertLessThan(3.0, $elapsed);
+    }
+
+    public function testFirstWriteAfterTheBackoffReconnects(): void
+    {
+        $now = 0.0;
+        $options = ['host' => '127.0.0.1', 'port' => $this->port, 'database' => 5, 'timeout' => 0.5, 'read_timeout' => 1.0, 'persistent_connections' => false];
+        $adapter = new ReconnectingRedisAdapter(
+            static fn (): PrometheusRedis => new PrometheusRedis($options),
+            new CollectingLogger(),
+            static function () use (&$now): float {
+                return $now;
+            },
+            backoffSeconds: 5.0,
+        );
+        $adapter->updateCounter($this->counter());
+
+        $this->startServer();
+        $now += 4.9;
+        $adapter->updateCounter($this->counter());
+        self::assertSame([], $this->loggedCommands(), 'Inside the backoff window: no connection attempt.');
+
+        $now += 0.1;
+        $adapter->updateCounter($this->counter());
+        self::assertSame(['SELECT 5', 'EVAL'], $this->loggedCommands());
     }
 
     /**
@@ -148,6 +256,14 @@ final class RedisReconnectTest extends TestCase
         self::assertIsArray($lines);
 
         return $lines;
+    }
+
+    private function plainClient(): Redis
+    {
+        $client = new Redis();
+        self::assertTrue($client->connect('127.0.0.1', $this->port, 0.5));
+
+        return $client;
     }
 
     private function startServer(): void

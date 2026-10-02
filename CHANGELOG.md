@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.3.3
+
+Upgrade from 1.3.0 straight to 1.3.3: 1.3.1 can turn a phpredis connect warning into an HTTP 500
+and 1.3.2 slows every request down by seconds while Redis is unreachable. Skip both.
+
+### Fixed
+
+- While Redis was unreachable, 1.3.2 tried to reconnect on every metric operation. A request makes
+  dozens of them and each attempt costs a DNS lookup or a connect/read timeout, so with the Redis
+  container stopped a RoadRunner request took seconds (6.3 s instead of ~30 ms, 13.8 s with an
+  idempotency key). The Redis adapter now has a circuit breaker: after a connection failure it
+  makes no reconnect attempt for `metrics.storage.reconnect_backoff_seconds` (default 5 s, per
+  process). Inside that window writes are dropped at once (still counted in the throttled log) and
+  reads throw `StorageException` without a network call, so `/_/metrics` answers 503 immediately.
+  After the window exactly one attempt is made: success closes the breaker, failure opens it again.
+
+### Behaviour change to be aware of (since 1.3.2)
+
+- Up to 1.3.1 a scrape of `/_/metrics` during a Redis outage ended in an uncaught exception. Under
+  RoadRunner with `kernel_reboot.strategy: on_exception` that exception rebooted the kernel and,
+  as a side effect, rebuilt the application's own Redis clients (`cache.app`, lock store). Since
+  1.3.2 the endpoint answers 503 without an exception, so that accidental reboot no longer happens.
+  phpredis keeps a client whose command hit the outage failed (`Redis server ... went away`) until
+  it is reconnected, and Symfony's Redis cache/lock connections do not reconnect by themselves, so
+  such applications now stay broken after Redis comes back. This is not caused by the bundle (the
+  same happens with 1.3.0 when nothing scrapes `/_/metrics`); see README, "Redis restarts in
+  long-running workers", for application-side fixes.
+
+### Added
+
+- Bundle option `metrics.storage.reconnect_backoff_seconds` (float, `>= 0`, default `5`; `0`
+  restores the 1.3.2 behaviour of reconnecting on every operation). `Storage\Factory` takes it as
+  an optional second constructor argument.
+  Env placeholders (`%env(float:...)%`) are accepted.
+- A Redis that accepts connections but never answers no longer holds a reconnect for
+  `default_socket_timeout` (60 s by default): promphp sends `AUTH`/`SELECT` before it applies
+  `read_timeout`, so the adapter lowers `default_socket_timeout` to the DSN `read_timeout` (rounded
+  up to whole seconds, default 1 s; never raised, untouched for `read_timeout <= 0`) while a fresh
+  connection handshakes, and restores it afterwards. A negative backoff coming from an env
+  placeholder (which bypasses the configuration's `min(0)`) is logged and replaced by the default.
+
 ## 1.3.2
 
 ### Fixed

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Test\Support\Redis;
 
+use Closure;
 use Override;
 use Redis;
 use RedisException;
@@ -118,6 +119,10 @@ final class FailingOnceDownRedis extends Redis
 
         if ($this->server->notice !== null) {
             trigger_error($this->server->notice, \E_USER_NOTICE);
+        }
+
+        if ($this->server->onCommand instanceof Closure) {
+            ($this->server->onCommand)();
         }
 
         $this->server->commands[] = $command;

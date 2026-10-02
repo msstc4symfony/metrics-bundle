@@ -6,6 +6,7 @@ namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Storage;
 
 use Msstc4Symfony\MetricsBundle\Infrastructure\Storage\Factory;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Storage\ReconnectingRedisAdapter;
+use Msstc4Symfony\MetricsBundle\Test\Support\CollectingLogger;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -161,5 +162,16 @@ final class FactoryTest extends TestCase
         $factory = new Factory();
 
         self::assertInstanceOf(InMemory::class, $factory->create(''));
+    }
+
+    public function testNegativeBackoffFromTheEnvironmentFallsBackToTheDefaultInsteadOfInMemory(): void
+    {
+        $logger = new CollectingLogger();
+
+        $adapter = new Factory($logger, -1.0)->create('redis://localhost:6379');
+
+        self::assertInstanceOf(ReconnectingRedisAdapter::class, $adapter);
+        self::assertCount(1, $logger->records);
+        self::assertStringStartsWith('warning: ', $logger->records[0]);
     }
 }

@@ -114,7 +114,7 @@ Redis query parameters: `database` (or the DSN path, `redis://host:6379/4`), `re
 redis://user:pass@redis:6379/4?read_timeout=2&persistent_connections=1
 ```
 
-> **Operational notes.** `ssl_verify_peer` is accepted in the DSN but currently has no effect: `promphp/prometheus_client_php` connects without passing TLS context options to phpredis. If `read_timeout=1` is too aggressive for the network, metric writes fail (logged as `Cannot save metric ...`) — increase it via the query parameter. While Redis is unreachable every metric operation makes one connection attempt bounded by `timeout` (default `0.1` s): a refused connection fails at once, but a host that silently drops packets adds up to `timeout` per metric write, so keep `timeout` small.
+> **Operational notes.** `ssl_verify_peer` is accepted in the DSN but currently has no effect: `promphp/prometheus_client_php` connects without passing TLS context options to phpredis. If `read_timeout=1` is too aggressive for the network, metric writes fail (logged as `Cannot save metric ...`) — increase it via the query parameter. While Redis is unreachable the adapter retries the connection at most once per `metrics.storage.reconnect_backoff_seconds` (default 5 s, since 1.3.3); in between, writes are dropped and reads fail without touching the network. Each retry costs up to `timeout` (default `0.1` s), a DNS lookup, or — for a server that accepts connections but never answers — `read_timeout` (default `1` s; the bundle caps `default_socket_timeout` to it while the handshake runs). The option accepts env placeholders, e.g. `'%env(float:METRICS_RECONNECT_BACKOFF)%'`.
 
 ## Configuration
 
@@ -128,6 +128,12 @@ metrics:
         #   host_dbname — "<host>:<dbname>" from the connection parameters (default, 1.x behaviour)
         #   name        — the DoctrineBundle connection name ("default", "replica", ...)
         connection_label: host_dbname
+    storage:
+        # After a Redis connection failure, metric writes are dropped and /_/metrics answers 503
+        # without any network call for this many seconds; then one reconnect is tried
+        # (success closes the breaker, failure opens it again). Per process. 0 = reconnect on
+        # every operation (not recommended: each attempt can cost a DNS lookup or a timeout).
+        reconnect_backoff_seconds: 5
 ```
 
 `connection_label: name` needs DoctrineBundle (its `ConnectionNameAwareInterface`); without
@@ -135,6 +141,19 @@ DoctrineBundle the label stays `host:dbname`. If the application defines the
 `Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\Middleware` service itself,
 `name` fails the container compilation instead of being silently ignored. Switching it changes the label values of existing
 series, so update dashboards and alerts that filter on `connection`.
+
+## Redis restarts in long-running workers
+
+The bundle's own Redis storage reconnects by itself (circuit breaker, see
+`metrics.storage.reconnect_backoff_seconds`). Your application's Redis clients may not: once a phpredis
+command hits a dropped connection, that `\Redis` instance answers every later command with
+`Redis server ... went away` until it is reconnected, and Symfony's Redis cache and lock connections
+are built once per container. Under RoadRunner (`kernel_reboot.strategy: on_exception`) they are only
+rebuilt when an unexpected exception reboots the kernel. Up to 1.3.1 a failing `/_/metrics` scrape
+caused such a reboot by accident; since 1.3.2 it answers 503 and does not. If your readiness checks
+stay red after Redis is back, rebuild the clients explicitly, for example by dispatching
+`Baldinof\RoadRunnerBundle\Event\ForceKernelRebootEvent` when a Redis-backed check fails, or by
+resetting the connection services between requests (`kernel.reset`).
 
 ## Messenger metrics
 

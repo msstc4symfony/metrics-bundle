@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-// Minimal RESP server for reconnect tests: answers every command with "+OK" and appends
+// Minimal RESP server for reconnect tests: an empty Redis that accepts every write; appends
 // "COMMAND arg1 arg2" lines to the log file. Usage: php resp-server.php <port> <log-file>
 
 [, $port, $log] = $argv;
@@ -53,7 +53,7 @@ while (time() < $deadline) {
             // EVAL carries the whole Lua script; its name is enough for the log.
             $logged = $command === 'EVAL' ? [] : $arguments;
             file_put_contents($log, trim($command . ' ' . implode(' ', $logged)) . PHP_EOL, FILE_APPEND);
-            $replies .= "+OK\r\n";
+            $replies .= reply($command, \count($arguments));
         }
 
         $buffers[(int) $socket] = substr($buffer, $frameStart);
@@ -87,4 +87,16 @@ function parseFrame(string $buffer, int $offset): ?array
     }
 
     return [$arguments, $offset];
+}
+
+function reply(string $command, int $argumentCount): string
+{
+    return match ($command) {
+        'PING' => "+PONG\r\n",
+        'GET' => "\$-1\r\n",
+        'MGET' => '*' . $argumentCount . "\r\n" . str_repeat("\$-1\r\n", $argumentCount),
+        'SMEMBERS', 'KEYS', 'HGETALL' => "*0\r\n",
+        'EVAL', 'EVALSHA', 'EXISTS', 'DEL', 'UNLINK' => ":1\r\n",
+        default => "+OK\r\n",
+    };
 }

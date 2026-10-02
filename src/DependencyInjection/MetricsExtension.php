@@ -17,6 +17,8 @@ final class MetricsExtension extends Extension
 {
     public const string DOCTRINE_CONNECTION_LABEL_PARAMETER = 'metrics_bundle.doctrine.connection_label';
 
+    public const string STORAGE_RECONNECT_BACKOFF_PARAMETER = 'metrics_bundle.storage.reconnect_backoff_seconds';
+
     /**
      * @param array<array-key, mixed> $configs
      *
@@ -36,6 +38,7 @@ final class MetricsExtension extends Extension
 
         $config = $this->processConfiguration(new Configuration(), $configs);
         $container->setParameter(self::DOCTRINE_CONNECTION_LABEL_PARAMETER, $this->doctrineConnectionLabel($config));
+        $container->setParameter(self::STORAGE_RECONNECT_BACKOFF_PARAMETER, $this->reconnectBackoffSeconds($config));
     }
 
     /**
@@ -50,5 +53,24 @@ final class MetricsExtension extends Extension
         }
 
         return $connectionLabel;
+    }
+
+    /**
+     * @param array<array-key, mixed> $config
+     */
+    private function reconnectBackoffSeconds(array $config): float|string
+    {
+        $storage = $config['storage'] ?? null;
+        $backoff = is_array($storage) ? $storage['reconnect_backoff_seconds'] ?? null : null;
+        // An env placeholder ("%env(float:...)%") is resolved at runtime.
+        if (is_string($backoff)) {
+            return $backoff;
+        }
+
+        if (!is_int($backoff) && !is_float($backoff)) {
+            throw new LogicException('The processed "metrics.storage.reconnect_backoff_seconds" must be a number.');
+        }
+
+        return (float) $backoff;
     }
 }

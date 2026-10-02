@@ -32,6 +32,16 @@ final class Configuration implements ConfigurationInterface
                         ->end()
                     ->end()
                 ->end()
+                ->arrayNode('storage')
+                    ->addDefaultsIfNotSet()
+                    ->children()
+                        ->floatNode('reconnect_backoff_seconds')
+                            ->info('After a Redis connection failure, metric writes are dropped and reads fail without reconnecting for this long. 0 reconnects on every operation.')
+                            ->min(0)
+                            ->defaultValue(5.0)
+                        ->end()
+                    ->end()
+                ->end()
             ->end()
         ;
 

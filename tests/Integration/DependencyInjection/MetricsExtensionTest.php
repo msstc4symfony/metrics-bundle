@@ -8,11 +8,15 @@ use Msstc4Symfony\MetricsBundle\DependencyInjection\MetricsExtension;
 use Msstc4Symfony\MetricsBundle\Framework\EventListener\MessengerEventListener;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Storage\Factory;
 use PHPUnit\Framework\TestCase;
 use Prometheus\RegistryInterface;
 use Prometheus\RendererInterface;
 use Prometheus\Storage\Adapter;
+use ReflectionParameter;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\DependencyInjection\Compiler\MergeExtensionConfigurationPass;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
 use Symfony\Component\Yaml\Yaml;
@@ -66,6 +70,57 @@ final class MetricsExtensionTest extends TestCase
         $this->expectException(InvalidConfigurationException::class);
 
         new MetricsExtension()->load([['doctrine' => ['connection_label' => 'dsn']]], new ContainerBuilder());
+    }
+
+    public function testStorageReconnectBackoffDefaultsToFiveSeconds(): void
+    {
+        $container = new ContainerBuilder();
+
+        new MetricsExtension()->load([], $container);
+
+        self::assertSame(5.0, $container->getParameter(MetricsExtension::STORAGE_RECONNECT_BACKOFF_PARAMETER));
+    }
+
+    public function testStorageReconnectBackoffCanBeDisabled(): void
+    {
+        $container = new ContainerBuilder();
+
+        new MetricsExtension()->load([['storage' => ['reconnect_backoff_seconds' => 0]]], $container);
+
+        self::assertSame(0.0, $container->getParameter(MetricsExtension::STORAGE_RECONNECT_BACKOFF_PARAMETER));
+    }
+
+    public function testStorageReconnectBackoffRejectsNegativeValues(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+
+        new MetricsExtension()->load([['storage' => ['reconnect_backoff_seconds' => -1]]], new ContainerBuilder());
+    }
+
+    public function testStorageReconnectBackoffAcceptsAnEnvPlaceholder(): void
+    {
+        $container = new ContainerBuilder();
+        $container->registerExtension(new MetricsExtension());
+        $container->loadFromExtension('metrics', ['storage' => ['reconnect_backoff_seconds' => '%env(float:METRICS_TEST_BACKOFF)%']]);
+        $_SERVER['METRICS_TEST_BACKOFF'] = '2.5';
+
+        try {
+            new MergeExtensionConfigurationPass()->process($container);
+            $resolved = $container->resolveEnvPlaceholders($container->getParameter(MetricsExtension::STORAGE_RECONNECT_BACKOFF_PARAMETER), true);
+        } finally {
+            unset($_SERVER['METRICS_TEST_BACKOFF']);
+        }
+
+        self::assertSame(2.5, $resolved);
+    }
+
+    public function testFactoryIsWiredToTheBackoffParameter(): void
+    {
+        $parameter = new ReflectionParameter([Factory::class, '__construct'], 'reconnectBackoffSeconds');
+        $autowire = $parameter->getAttributes(Autowire::class)[0] ?? null;
+
+        self::assertNotNull($autowire);
+        self::assertSame('%' . MetricsExtension::STORAGE_RECONNECT_BACKOFF_PARAMETER . '%', $autowire->newInstance()->value);
     }
 
     public function testMessengerListenerIsRegisteredOnlyWithMessenger(): void

@@ -7,6 +7,7 @@ namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Storage;
 use Closure;
 use Error;
 use ErrorException;
+use InvalidArgumentException;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Storage\ReconnectingRedisAdapter;
 use Msstc4Symfony\MetricsBundle\Test\Support\CollectingLogger;
 use Msstc4Symfony\MetricsBundle\Test\Support\Redis\FailingOnceDownRedis;
@@ -48,7 +49,7 @@ final class ReconnectingRedisAdapterTest extends TestCase
     #[DataProvider('provideOperations')]
     public function testOperationReconnectsAfterRedisWentAway(Closure $operation, string $command, bool $read): void
     {
-        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger);
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger, $this->clock(...), backoffSeconds: 0.0);
         $operation($adapter);
 
         $this->server->up = false;
@@ -83,7 +84,7 @@ final class ReconnectingRedisAdapterTest extends TestCase
     #[DataProvider('provideOperations')]
     public function testWarningWhileRedisIsDownNeverReachesTheApplicationErrorHandler(Closure $operation, string $command, bool $read): void
     {
-        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger);
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger, $this->clock(...), backoffSeconds: 0.0);
         $this->server->up = false;
         $this->server->warningWhenDown = 'Redis::connect(): php_network_getaddresses: getaddrinfo for redis failed: Name or service not known';
 
@@ -105,7 +106,7 @@ final class ReconnectingRedisAdapterTest extends TestCase
 
     public function testOutageIsLoggedOnceThenSummarisedAndRecoveryIsLogged(): void
     {
-        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger, $this->clock(...));
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger, $this->clock(...), backoffSeconds: 0.0);
         $this->server->up = false;
 
         $adapter->updateCounter(self::counter());
@@ -134,7 +135,7 @@ final class ReconnectingRedisAdapterTest extends TestCase
 
     public function testDeprecationDuringAnOperationStillReachesTheApplicationHandler(): void
     {
-        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger);
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger, $this->clock(...), backoffSeconds: 0.0);
         $this->server->deprecation = 'Some option is deprecated';
 
         $seen = [];
@@ -160,7 +161,7 @@ final class ReconnectingRedisAdapterTest extends TestCase
 
     public function testWarningOnASuccessfulOperationIsLoggedAtDebugOnly(): void
     {
-        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger);
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger, $this->clock(...), backoffSeconds: 0.0);
         $this->server->notice = 'Serializer fallback used';
 
         $handled = 0;
@@ -186,7 +187,7 @@ final class ReconnectingRedisAdapterTest extends TestCase
     {
         $logger = self::createStub(LoggerInterface::class);
         $logger->method('log')->willThrowException(new RuntimeException('log handler is down'));
-        $adapter = new ReconnectingRedisAdapter($this->connect(...), $logger);
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $logger, $this->clock(...), backoffSeconds: 0.0);
         $this->server->up = false;
 
         $this->expectNotToPerformAssertions();
@@ -195,7 +196,7 @@ final class ReconnectingRedisAdapterTest extends TestCase
 
     public function testEveryOperationWhileRedisIsDownTriesOneFreshConnection(): void
     {
-        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger);
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger, $this->clock(...), backoffSeconds: 0.0);
         $this->server->up = false;
 
         for ($i = 0; $i < 3; $i++) {
@@ -207,7 +208,7 @@ final class ReconnectingRedisAdapterTest extends TestCase
 
     public function testNonConnectionFailureIsDroppedButKeepsTheConnection(): void
     {
-        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger);
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger, $this->clock(...), backoffSeconds: 0.0);
 
         // promphp encodes summary label values with a RuntimeException on invalid UTF-8.
         $adapter->updateSummary(['labelNames' => ['l'], 'labelValues' => ["\xB1"]] + self::summary());
@@ -224,7 +225,7 @@ final class ReconnectingRedisAdapterTest extends TestCase
     #[DataProvider('provideConnectionErrors')]
     public function testClientLevelConnectionErrorAlsoReconnects(Closure $error): void
     {
-        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger);
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger, $this->clock(...), backoffSeconds: 0.0);
         $this->server->nextError = $error();
 
         $adapter->updateCounter(self::counter());
@@ -240,6 +241,131 @@ final class ReconnectingRedisAdapterTest extends TestCase
     {
         yield 'storage exception' => [static fn (): Throwable => new StorageException("Can't connect to Redis server")];
         yield 'redis client exception' => [static fn (): Throwable => new RedisClientException('Connection lost')];
+    }
+
+    public function testNoReconnectAttemptWithinTheBackoffWindow(): void
+    {
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger, $this->clock(...), backoffSeconds: 5.0);
+        $this->server->up = false;
+
+        $adapter->updateCounter(self::counter());
+        $this->now += 4.9;
+        for ($i = 0; $i < 50; $i++) {
+            $adapter->updateCounter(self::counter());
+        }
+
+        try {
+            $adapter->collect();
+            self::fail('A read inside the backoff window must report the storage as unavailable.');
+        } catch (StorageException) {
+        }
+
+        self::assertSame(1, $this->connections, 'Only the adapter built in the constructor; no reconnect inside the window.');
+        self::assertCount(1, $this->logger->records);
+    }
+
+    public function testWipeStorageInsideTheWindowFailsWithoutConnecting(): void
+    {
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger, $this->clock(...), backoffSeconds: 5.0);
+        $this->server->up = false;
+        $adapter->updateCounter(self::counter());
+        $this->server->up = true;
+
+        try {
+            $adapter->wipeStorage();
+            self::fail('wipeStorage() inside the window must fail.');
+        } catch (StorageException) {
+        }
+
+        self::assertSame(1, $this->connections);
+        self::assertSame([], $this->server->commands);
+    }
+
+    public function testHandshakeNeverRaisesDefaultSocketTimeout(): void
+    {
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger, $this->clock(...), handshakeTimeout: 120.0);
+        $seen = null;
+        $this->server->onCommand = static function () use (&$seen): void {
+            $seen = ini_get('default_socket_timeout');
+        };
+        $timeout = ini_set('default_socket_timeout', '3');
+
+        try {
+            $adapter->updateCounter(self::counter());
+        } finally {
+            ini_set('default_socket_timeout', (string) $timeout);
+        }
+
+        self::assertSame('3', $seen);
+    }
+
+    public function testHandshakeLowersDefaultSocketTimeoutToTheReadTimeout(): void
+    {
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger, $this->clock(...), handshakeTimeout: 0.5);
+        $seen = null;
+        $this->server->onCommand = static function () use (&$seen): void {
+            $seen = ini_get('default_socket_timeout');
+        };
+        $timeout = ini_set('default_socket_timeout', '60');
+
+        try {
+            $adapter->updateCounter(self::counter());
+            $after = ini_get('default_socket_timeout');
+        } finally {
+            ini_set('default_socket_timeout', (string) $timeout);
+        }
+
+        self::assertSame('1', $seen);
+        self::assertSame('60', $after);
+    }
+
+    public function testNegativeBackoffIsRejected(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new ReconnectingRedisAdapter($this->connect(...), $this->logger, $this->clock(...), backoffSeconds: -1.0);
+    }
+
+    public function testOneAttemptAfterTheWindowThenTheBreakerOpensAgain(): void
+    {
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger, $this->clock(...), backoffSeconds: 5.0);
+        $this->server->up = false;
+        $adapter->updateCounter(self::counter());
+
+        $this->now += 5.0;
+        $adapter->updateCounter(self::counter());
+        $adapter->updateCounter(self::counter());
+
+        self::assertSame(2, $this->connections);
+    }
+
+    public function testSuccessfulAttemptAfterTheWindowClosesTheBreaker(): void
+    {
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger, $this->clock(...), backoffSeconds: 5.0);
+        $this->server->up = false;
+        $adapter->updateCounter(self::counter());
+        $this->server->up = true;
+
+        $adapter->updateCounter(self::counter());
+        self::assertSame([], $this->server->commands, 'Still inside the window: dropped without a network call.');
+
+        $this->now += 5.0;
+        $adapter->updateCounter(self::counter());
+        $adapter->updateCounter(self::counter());
+
+        self::assertSame(['EVAL', 'EVAL'], $this->server->commands);
+        self::assertSame(2, $this->connections);
+        self::assertStringStartsWith('info: ', $this->logger->records[1] ?? '');
+    }
+
+    public function testNonConnectionFailureDoesNotOpenTheBreaker(): void
+    {
+        $adapter = new ReconnectingRedisAdapter($this->connect(...), $this->logger, $this->clock(...), backoffSeconds: 5.0);
+
+        $adapter->updateSummary(['labelNames' => ['l'], 'labelValues' => ["\xB1"]] + self::summary());
+        $adapter->updateCounter(self::counter());
+
+        self::assertSame(['SETNX', 'EVAL'], $this->server->commands);
     }
 
     public function testConnectsEagerlySoTheFactoryCanFallBackOnConstructionErrors(): void

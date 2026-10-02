@@ -65,4 +65,5 @@ MongoDB, Elastica, Messenger, APCu. Точка проводки молча вы�
 строит новый (`new Redis($options)`) — новое соединение, AUTH, SELECT, read timeout. Сама упавшая
 операция не повторяется. С 1.3.2 запись никогда не бросает (лог в `metrics_bundle`), чтение бросает
 `StorageException`, а PHP warnings phpredis не доходят до обработчика приложения; `/_/metrics` при
-недоступном хранилище отвечает 503. Подробности — `known-issues.md`, разделы 1.3.1 и 1.3.2.
+недоступном хранилище отвечает 503. С 1.3.3 после сетевой ошибки действует circuit breaker:
+`metrics.storage.reconnect_backoff_seconds` (5 с) без попыток переподключения. Подробности — `known-issues.md`, разделы 1.3.1 и 1.3.2.

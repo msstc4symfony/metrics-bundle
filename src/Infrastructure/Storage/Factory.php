@@ -14,6 +14,7 @@ use Prometheus\Storage\Redis;
 use Prometheus\Storage\RedisNg;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Throwable;
 
 // Its own channel keeps the storage logger out of the metrics HandlerDecorator:
@@ -47,6 +48,8 @@ final readonly class Factory implements FactoryInterface
 
     public function __construct(
         private LoggerInterface $logger = new NullLogger(),
+        #[Autowire(param: 'metrics_bundle.storage.reconnect_backoff_seconds')]
+        private float $reconnectBackoffSeconds = ReconnectingRedisAdapter::DEFAULT_BACKOFF_SECONDS,
     ) {
     }
 
@@ -152,7 +155,12 @@ final readonly class Factory implements FactoryInterface
     {
         $options = $this->buildRedisOptions($parts, $query);
 
-        return new ReconnectingRedisAdapter(static fn (): Redis => new Redis($options), $this->logger);
+        return new ReconnectingRedisAdapter(
+            static fn (): Redis => new Redis($options),
+            $this->logger,
+            backoffSeconds: $this->reconnectBackoffSeconds(),
+            handshakeTimeout: (float) $options['read_timeout'],
+        );
     }
 
     /**
@@ -172,7 +180,12 @@ final readonly class Factory implements FactoryInterface
     {
         $options = $this->buildRedisOptions($parts, $query);
 
-        return new ReconnectingRedisAdapter(static fn (): RedisNg => new RedisNg($options), $this->logger);
+        return new ReconnectingRedisAdapter(
+            static fn (): RedisNg => new RedisNg($options),
+            $this->logger,
+            backoffSeconds: $this->reconnectBackoffSeconds(),
+            handshakeTimeout: (float) $options['read_timeout'],
+        );
     }
 
     /**
@@ -187,7 +200,17 @@ final readonly class Factory implements FactoryInterface
      * } $parts
      * @param array<string, string> $query
      *
-     * @return array<string, mixed>
+     * @return array{
+     *     host: string,
+     *     port: int,
+     *     read_timeout: float|int,
+     *     timeout: float,
+     *     user: string|null,
+     *     password: string|null,
+     *     ssl: array{verify_peer: bool},
+     *     persistent_connections: bool,
+     *     database: int,
+     * }
      */
     private function buildRedisOptions(array $parts, array $query): array
     {
@@ -237,6 +260,21 @@ final readonly class Factory implements FactoryInterface
         }
 
         return $options;
+    }
+
+    private function reconnectBackoffSeconds(): float
+    {
+        if ($this->reconnectBackoffSeconds >= 0) {
+            return $this->reconnectBackoffSeconds;
+        }
+
+        // Only reachable through an env placeholder, which bypasses the configuration's min(0).
+        $this->logger->warning('metrics-bundle: negative reconnect_backoff_seconds, using the default', [
+            'configured' => $this->reconnectBackoffSeconds,
+            'default' => ReconnectingRedisAdapter::DEFAULT_BACKOFF_SECONDS,
+        ]);
+
+        return ReconnectingRedisAdapter::DEFAULT_BACKOFF_SECONDS;
     }
 
     private function createApc(): APC
