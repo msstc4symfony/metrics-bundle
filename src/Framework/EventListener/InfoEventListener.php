@@ -61,35 +61,7 @@ final readonly class InfoEventListener
             $this->infoCollector->setMetric(MetricLabelEnum::INFO_FILESYSTEM_USED, $value);
         }
 
-        // OPcache
-        if (function_exists('opcache_get_status')) {
-            $data = opcache_get_status(false);
-
-            if (is_array($data)) {
-                if (isset($data['memory_usage'])) {
-                    $total = $data['memory_usage']['used_memory'] + $data['memory_usage']['free_memory'];
-                    $this->infoCollector->setMetric(
-                        MetricLabelEnum::INFO_OPCACHE_MEMORY_USED,
-                        round($data['memory_usage']['used_memory'] / $total, 4),
-                    );
-                    $this->infoCollector->setMetric(
-                        MetricLabelEnum::INFO_OPCACHE_MEMORY_WASTED,
-                        round($data['memory_usage']['current_wasted_percentage'] / 100, 4),
-                    );
-                }
-
-                if (isset($data['opcache_statistics'])) {
-                    $this->infoCollector->setMetric(
-                        MetricLabelEnum::INFO_OPCACHE_CACHED_SCRIPTS,
-                        $data['opcache_statistics']['num_cached_scripts'],
-                    );
-                    $this->infoCollector->setMetric(
-                        MetricLabelEnum::INFO_OPCACHE_HIT_RATE,
-                        round($data['opcache_statistics']['opcache_hit_rate'] / 100, 4),
-                    );
-                }
-            }
-        }
+        $this->collectOpcache();
 
         // FPM
         if (function_exists('fpm_get_status')) {
@@ -110,10 +82,59 @@ final readonly class InfoEventListener
         }
     }
 
+    private function collectOpcache(): void
+    {
+        if (!function_exists('opcache_get_status')) {
+            return;
+        }
+
+        $status = opcache_get_status(false);
+        if (!is_array($status)) {
+            return;
+        }
+
+        $memory = $status['memory_usage'] ?? null;
+        if (is_array($memory)) {
+            $used = $this->number($memory, 'used_memory');
+            $free = $this->number($memory, 'free_memory');
+            if ($used !== null && $free !== null && $used + $free > 0) {
+                $this->infoCollector->setMetric(MetricLabelEnum::INFO_OPCACHE_MEMORY_USED, round($used / ($used + $free), 4));
+            }
+
+            $wasted = $this->number($memory, 'current_wasted_percentage');
+            if ($wasted !== null) {
+                $this->infoCollector->setMetric(MetricLabelEnum::INFO_OPCACHE_MEMORY_WASTED, round($wasted / 100, 4));
+            }
+        }
+
+        $statistics = $status['opcache_statistics'] ?? null;
+        if (is_array($statistics)) {
+            $cachedScripts = $this->number($statistics, 'num_cached_scripts');
+            if ($cachedScripts !== null) {
+                $this->infoCollector->setMetric(MetricLabelEnum::INFO_OPCACHE_CACHED_SCRIPTS, $cachedScripts);
+            }
+
+            $hitRate = $this->number($statistics, 'opcache_hit_rate');
+            if ($hitRate !== null) {
+                $this->infoCollector->setMetric(MetricLabelEnum::INFO_OPCACHE_HIT_RATE, round($hitRate / 100, 4));
+            }
+        }
+    }
+
+    /**
+     * @param array<mixed> $data
+     */
+    private function number(array $data, string $key): int|float|null
+    {
+        $value = $data[$key] ?? null;
+
+        return is_int($value) || is_float($value) ? $value : null;
+    }
+
     private function getCPULoad(): ?float
     {
         $data = sys_getloadavg();
-        if (!is_array($data) || !isset($data[0])) {
+        if ($data === false) {
             return null;
         }
 

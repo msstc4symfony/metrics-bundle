@@ -1,12 +1,6 @@
 parameters:
 	ignoreErrors:
 		-
-			message: '#^Offset 0 on array\{float, float, float\} in isset\(\) always exists and is not nullable\.$#'
-			identifier: isset.offset
-			count: 1
-			path: src/Framework/EventListener/InfoEventListener.php
-
-		-
 			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterCounter\(\) expects string, int\|string given\.$#'
 			identifier: argument.type
 			count: 1
