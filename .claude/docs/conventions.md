@@ -18,6 +18,11 @@
 - В компилер-пассах — `new TaggedIteratorArgument(...)`, а не функция
   `tagged_iterator()`: она определена в файле конфигуратора и вне загрузки
   PHP-конфигов не существует.
-- Новые метрики — case в `MetricLabelEnum` или enum хоста в
-  `metrics_bundle.metric_enums`; значения лейблов нормализуются (кардинальность).
+- Новые метрики — новый enum бандла (как `MessengerMetricLabelEnum`, дописывается пассом) или enum
+  хоста в `metrics_bundle.metric_enums`; кейсы в `MetricLabelEnum` в мажоре 1 не добавляем (Roave
+  считает это BC-break). Значения лейблов нормализуются (кардинальность). Контракт каталога
+  (тип, лейблы, бакеты) закреплён `MetricCatalogTest`.
+- PHPStan level 10 без baseline-роста и без `@phpstan-ignore`: `mixed` из внешних массивов
+  (`opcache_get_status()` и т. п.) сужается `is_array()`/`is_int()`/`is_float()` в маленьком хелпере
+  (`InfoEventListener::number()`), а не кастами.
 - Комментарии — только «почему», на английском.

@@ -16,29 +16,29 @@ Auto-collects runtime metrics (HTTP, console, exceptions, Doctrine DBAL, MongoDB
 ## Architectural invariants you MUST check
 
 ### 1. Collector contract (`Infrastructure/Collector/AbstractCollector`)
-- Every concrete collector extends `AbstractCollector` and uses its `incCounter()` / similar helpers — never calls `$registry->getOrRegisterCounter()` directly. The helper guarantees the `application`/`component`/`container` labels are prepended; bypassing it produces samples with mismatched cardinality and breaks Prometheus.
-- `prepareLabelValues()` adds exactly three implicit labels (`application`, `component`, `container`). Any new `MetricLabelEnumInterface::getLabels()` must return only the *additional* labels — no duplicates of those three.
+- Every concrete collector extends `AbstractCollector` and uses its `incCounter()` / similar helpers — never calls `$registry->getOrRegisterCounter()` directly. The helper guarantees the `application`/`component` labels are prepended; bypassing it produces samples with mismatched cardinality and breaks Prometheus.
+- `prepareLabelValues()` adds exactly two implicit labels (`application`, `component`). Any new `MetricLabelEnumInterface::getLabels()` must return only the *additional* labels — no duplicates of those two.
 - `$this->namespace` defaults to `'symfony'`. Renaming it changes every exported metric name — that's a breaking API change for downstream Prometheus configs and dashboards.
 
 ### 2. Metric catalog (`Infrastructure/Enum/MetricLabelEnum` + `MetricLabelEnumInterface`)
-- New metrics must be string-backed enums implementing `MetricLabelEnumInterface` (which extends `BackedEnum`). `MetricRepositoryFactory` filters with `is_a($x, StringBackedEnum::class, true)` — int-backed enums are silently dropped.
-- Enum case names map to Prometheus metric names verbatim. Renaming an existing case = breaking change. Adding a new case requires `getType()`, `getDescription()`, `getLabels()`, `getBatches()` to handle it.
+- New metrics must be string-backed enums implementing `MetricLabelEnumInterface` (which extends `BackedEnum`). `MetricRepositoryFactory` skips classes that do not implement `MetricLabelEnumInterface` and enums that are not string-backed — silently, so a typo in `metrics_bundle.metric_enums` just loses metrics.
+- Enum case *values* become Prometheus metric names (`symfony_<value>`). Renaming a value = breaking change. Within major 1 do not add cases to `MetricLabelEnum` (Roave reports added enum cases); add a new enum instead (see `MessengerMetricLabelEnum`). `tests/Unit/Infrastructure/Enum/MetricCatalogTest` pins type, labels and buckets of every case — a diff there is a contract change.
 - Histograms must define `getBatches()` (buckets); for other types it returns `[]`. Catch missing buckets on histogram cases.
 - Downstream apps extend the catalog by appending FQCNs to the `metrics_bundle.metric_enums` container parameter. Don't break that contract (e.g., don't hardcode `MetricLabelEnum::cases()` somewhere — use the repository).
 
 ### 3. Compiler passes (`DependencyInjection/Compiler/*`)
 - `AddMonologDecoratorCompilerPass` excludes channels `profiling`, `removal_request`, `deprecation`. Adding a channel to that list must be intentional — silent log volume drops are hard to debug.
-- `AddDoctrineDBALMonitorPass` matches services with regex `^doctrine\.dbal\.[\w_]+_connection$`. New Doctrine naming would silently disable DBAL metrics. Flag if the regex is touched without a test.
+- `AddDoctrineDBALMonitorPass` (priority 1, before DoctrineBundle's `MiddlewaresPass`) registers `Middleware` tagged `doctrine.middleware` when the `doctrine.connections` parameter exists, untagged otherwise; with `connection_label: name` it tags `NamedConnectionMiddleware` instead. Flag changes to the priority or the tag — `DoctrineDbalMetricsTest` (real kernel, both bundle orders) must keep passing.
 - `AddHttpClientMonitorPass` runs at priority `-256` (late) — preserve that priority; raising it can race with other decorators of `symfony/http-client`.
 - `SaveElasticaClientsListPass` populates the `metrics.elastica.clients` container parameter; `MetricsBundle::boot()` reads it. Both sides must stay in sync.
 - `MetricsBundle::boot()` guards MongoDB/Elastica wiring with `class_exists()` and `NULL_ON_INVALID_REFERENCE`. Never remove those guards — the bundle is meant to work without those optional libraries.
 
 ### 4. Storage (`Infrastructure/Storage/Factory`)
-- The factory **silently falls back to `InMemory` on any exception**. That's intentional but treacherous: a typo in DSN credentials, an unreachable Redis, or a wrong port produce zero observable error and metrics evaporate on each request. If a PR adds new schemes or changes the parsing, ensure the fallback is preserved AND that the failure is at least logged (currently it isn't — flag this as a known limitation if relevant).
+- The factory falls back to `InMemory` when the adapter cannot be **constructed** (malformed DSN, unknown scheme, missing class/extension) and logs it on the `metrics_bundle` channel. An unreachable or restarting Redis does not trigger the fallback: `ReconnectingRedisAdapter` drops writes with a rate-limited log, throws `StorageException` on reads (`/_/metrics` → 503) and reconnects at most once per `reconnect_backoff_seconds`. If a PR adds schemes or changes parsing, keep both the fallback and its log.
 - `parse_url()` is the only validator. Don't accept user-controlled DSNs without env-level protection.
 
 ### 5. Static analysis scope
-PHPStan level 9 analyses all of `src/` and `tests/` with no `excludePaths` (shared `bundle-standard` template; Psalm is not used). Accepted findings live only in `phpstan-baseline.neon`, each with a reason. If a PR adds an ignore or baseline entry for new code, push back: fix the type at its origin.
+PHPStan level 10 analyses all of `src/` and `tests/` with no `excludePaths` (shared `bundle-standard` template; Psalm is not used). Accepted findings live only in `phpstan-baseline.neon`, each with a reason. If a PR adds an ignore or baseline entry for new code, push back: fix the type at its origin.
 
 ### 6. Tests & coverage
 - Suites `unit` (`tests/Unit/`) and `integration` (`tests/Integration/`, self-skipping without optional libraries). Coverage source is all of `src/` (shared `bundle-standard` phpunit/codecov templates).
@@ -46,7 +46,7 @@ PHPStan level 9 analyses all of `src/` and `tests/` with no `excludePaths` (shar
 - PSR-4 for tests: `Msstc4Symfony\MetricsBundle\Test\` → `tests/`.
 
 ### 7. Symfony/PHP compatibility
-- `composer.json` requires PHP `>=8.1` and Symfony `^6.4|^7.0|^8.0`. PHPStan is at `phpVersion: 80300` and Rector targets `php81`. Don't introduce 8.2+ syntax (readonly classes, DNF types, etc.) without bumping `composer.json`.
+- `composer.json` requires PHP `>=8.4` and Symfony `^6.4|^7.0|^8.0` (the `bundle-standard` verifier enforces both). PHPStan runs with `phpVersion: 80400`, Rector with the PHP 8.4 set. Lower bounds of other dependencies are real: CI runs a `--prefer-lowest` cell, so raising a used API's minimum version means raising the constraint in `composer.json` and `composer-ci.json`.
 - The bundle uses `#[AsEventListener]`, `#[AsCommand]`, `#[AsController]`, `#[Route]` attributes everywhere. Don't reintroduce YAML/XML wiring for new code.
 
 ### 8. Endpoint and routing

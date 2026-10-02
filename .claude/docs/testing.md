@@ -46,3 +46,34 @@ PHPUnit параллельно, а `setUp()` чистит каталог.
 Номер БД из пути DSN (`redis://host/3`) проверяет только этот интеграционный тест (`SELECT 3`):
 `FactoryTest` видит лишь тип адаптера. `freePort()` освобождает порт до старта сервера — теоретическая
 гонка; если тест начнёт мигать, сервер должен слушать порт 0 и сообщать фактический порт.
+
+## Чтение реестра в тестах
+
+Только `tests/Support/RegistrySamples`: `labels($registry, $metric, $suffix)`, `samples(...)` (лейблы +
+значение строкой), `exists($registry, $metric)`. Суффикс `_count`/`_sum`/`_bucket` выбирает сэмплы
+гистограммы. Собственные `labelValuesFor()`/`familyExists()` убраны в 1.4.0: они возвращали
+`array<array>` с `mixed`-значениями лейблов и не проходили PHPStan level 10.
+
+`tests/Unit/Infrastructure/Enum/MetricCatalogTest` — снимок контракта каталога (тип, лейблы с
+перечислениями, бакеты) для `MetricLabelEnum` и `MessengerMetricLabelEnum`; `testEveryCaseIsPinned`
+ловит новый кейс без строки в провайдере.
+
+## Ветка, недостижимая на CI-профиле
+
+`LogicException` пасса `AddDoctrineDBALMonitorPass` («нет `ConnectionNameAwareInterface`») в CI не
+воспроизвести: интерфейс всегда установлен. Тест запускается `#[RunInSeparateProcess]` и добавляет
+в Composer class map `ConnectionNameAwareInterface => /dev/null` — class map проверяется раньше PSR-4,
+пустой файл класс не объявляет, и `interface_exists()` в этом процессе даёт `false`.
+
+## prefer-lowest локально
+
+`/tmp` (tmpfs) в песочнице кончается по инодам — копию держать в `var/work/` бандла (в `.gitignore`),
+`TMPDIR` и `COMPOSER_CACHE_DIR` туда же (кеш `~/.cache/composer/vcs` в песочнице не пишется, а
+profiling-bundle ставится из vcs). Шаги как в CI: `composer remove --dev --no-update` для
+`roave/backward-compatibility-check` и `deptrac/deptrac`, `composer require --no-update
+<symfony/*>:6.4.*` для `framework-bundle`, `console`, `http-kernel`, `dependency-injection`,
+`config` и всех `symfony/*` из манифеста (кроме contracts/monolog-bundle/polyfill), затем
+`COMPOSER=composer-ci.json composer update --prefer-lowest --prefer-stable`. Перед `make check` копию
+удалить: `php -l` обходит всё, кроме `vendor/`. На framework-bundle 6.4.0 PHP 8.4 печатает
+«Implicitly marking parameter ... as nullable» при загрузке классов — это вывод в stderr, не
+провал теста.

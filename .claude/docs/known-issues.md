@@ -80,10 +80,11 @@ Symfony 8 DBAL 3 не ставится (конфликт с `symfony/http-founda
 `wireElasticaTransports()` достаёт каждый клиент и соединение при загрузке ядра —
 один раз на воркер. Ленивая обёртка — этап B вместе с поддержкой Elastica 8.
 
-## BC check красный до релиза `v1.1.0`
+## BC check: история
 
-Последний тег `v1.0.0` — под старым namespace; Roave видит «удалённые» классы.
-Job `continue-on-error`. После тега `v1.1.0` сравнение пойдёт с ним.
+До тега `v1.1.0` последний тег `v1.0.0` был под старым namespace, и Roave видел «удалённые» классы;
+job был `continue-on-error`. С `bundle-standard` v1.8.0 (metrics 1.4.0) BC check **блокирующий** и
+сравнивает с последним стабильным тегом.
 
 ## Коммит `0df4722` содержит больше, чем в сообщении
 
@@ -105,14 +106,14 @@ PHPStan: profiling-bundle стоит в `composer-ci.json`.
 Переход `MetricProcessor` на `getDuration()` в 1.2 покрыт `tests/Unit/Framework/Profiling/MetricProcessorTest`.
 Конструктор вызывает `trigger_deprecation` — срабатывает, только если процессор реально
 используется (мост снимает с него тег end-процессора).
-BC-джоб (Roave, неблокирующий) на сравнении 1.2.0 с v1.1.0 красный: базовая ревизия ставится со
+BC-джоб (Roave, тогда неблокирующий) на сравнении 1.2.0 с v1.1.0 был красным: базовая ревизия ставится со
 своим `composer-ci.json` без profiling-bundle, и BetterReflection не находит
 `EndSpanProcessorInterface` (7 × `[BC] SKIPPED`, реальных изменений API нет — проверено локально
 2026-10-01 UTC). С 1.2.0 profiling-bundle в require-dev (vcs-репозиторий в `composer-ci.json`),
 `MetricProcessor` под PHPStan и тестом — сравнения с базой >= v1.2.0 зелёные.
-`symfony/deprecation-contracts` (для `trigger_deprecation`) не объявлен напрямую: верификатор
-стандарта требует для всех `symfony/*` `^6.4|^7.0|^8.0`, contracts версионируются `^2.5|^3`.
-Гарантирован транзитивно через framework-bundle / console / event-dispatcher.
+`symfony/deprecation-contracts` (для `trigger_deprecation`) до 1.4.0 не объявлялся: верификатор
+требовал для всех `symfony/*` `^6.4|^7.0|^8.0`. С `bundle-standard` v1.8.0 contracts могут иметь свою
+границу — в 1.4.0 объявлен `^2.5|^3` в обоих манифестах.
 
 ## DBAL-метрики не собирались с DoctrineBundle (исправлено в 1.2.1, 2026-10-01 UTC)
 
@@ -156,15 +157,15 @@ BC-джоб (Roave, неблокирующий) на сравнении 1.2.0 с
 
 - Без DoctrineBundle пасс снова регистрирует `Middleware` (autowire, **без** тега) — как до 1.2.1,
   для приложений, которые сами подключают его в свои соединения. С DoctrineBundle — с тегом.
-- Разбор таблицы: `SELECT\s+.+?\s+FROM` — ленивый, берётся первый (внешний) `FROM`. Жадный
+- Разбор таблицы в 1.2.2: `SELECT\s+.+?\s+FROM` — ленивый, берётся первый `FROM`. Жадный
   вариант с флагом `s` брал последний `FROM` (подзапрос), а на длинных `IN (...)` упирался в
   `pcre.backtrack_limit` → `preg_match` возвращал `false` → метка `unknown`. Разбирается только
   первые 16 KiB SQL (`QueryMeter::MAX_PARSED_SQL_LENGTH`); `FROM` дальше этого порога → `unknown`.
-  Подзапрос в списке колонок (`SELECT (SELECT … FROM a) … FROM b`) по-прежнему даёт `a`.
+  Ленивый вариант всё ещё брал `FROM` из скобок и комментариев — исправлено в 1.4.0 (см. ниже).
 - `TestKernel::hasDoctrine()` = DoctrineBundle **и** `ext-pdo_sqlite`; `pdo_sqlite` явно добавлен
   во вход `extensions` в `.github/workflows/checks.yml` (общий workflow не трогали).
-- Хелпер выборки сэмплов из реестра — `tests/Support/RegistrySamples` (Unit и Integration).
-  Старые тесты коллекторов пока сканируют реестр сами.
+- Хелпер выборки сэмплов из реестра — `tests/Support/RegistrySamples` (Unit и Integration); с 1.4.0
+  на него переведены все тесты.
 
 ## 1.3.0 (2026-10-02 UTC)
 
@@ -227,10 +228,11 @@ check считает добавление кейса в enum BC-break (`[BC] ADD
 Бакеты гистограммы длительности начинаются с 5 мс (обычный обработчик — миллисекунды); менять их
 после 1.3.0 — смена значений `le`, т.е. BC.
 
-### Не покрыто тестом
+### `LogicException` без `ConnectionNameAwareInterface`
 
 `AddDoctrineDBALMonitorPass` бросает `LogicException`, если выбран `name`, а DoctrineBundle без
-`ConnectionNameAwareInterface` — в CI-профиле интерфейс всегда есть.
+`ConnectionNameAwareInterface`. В CI-профиле интерфейс всегда есть; с 1.4.0 ветку покрывает тест в
+отдельном процессе с подменой class map (`testing.md`).
 
 ## 1.3.1 (2026-10-02 UTC): Redis-хранилище не восстанавливалось после рестарта Redis
 
@@ -271,11 +273,11 @@ check считает добавление кейса в enum BC-break (`[BC] ADD
 `FailingOnceDownRedis` повторяет типизированные сигнатуры phpredis 6 — на ext-redis 5 тест
 самопропускается.
 
-Нижняя граница `promphp/prometheus_client_php ^2.6`: в 2.6.0 нет `AbstractRedis`, `RedisNg`,
-`RedisClientException` — поэтому обёртка типизирована `Redis|RedisNg` (не `AbstractRedis`), а `catch`
-по отсутствующему классу безопасен. `redisng://` на 2.6 по-прежнему уходит в `InMemory`
-(`FactoryTest::testRedisngSchemeWithHostReturnsReconnectingAdapter` на `--prefer-lowest` красный —
-так было и до 1.3.1, в CI lowest не гоняется).
+Нижняя граница `promphp/prometheus_client_php`: до 1.4.0 — `^2.6`, и `redisng://` на 2.6 уходил в
+`InMemory` (класса `RedisNg` нет до 2.7). С 1.4.0 — `^2.13` (см. раздел 1.4.0). `AbstractRedis` и
+`RedisClientException` появились только в 2.15, поэтому обёртка типизирована `Redis|RedisNg`, а
+`catch` по отсутствующему классу безопасен; data set «redis client exception» в
+`ReconnectingRedisAdapterTest` на promphp < 2.15 самопропускается.
 
 Predis бандл не поддерживает (схемы `predis://` нет). Для справки: promphp-клиент `Predis`
 проверяет `isConnected()` в каждом `ensureOpenConnection()`, а Predis после `CommunicationException`
@@ -484,3 +486,50 @@ cache, lock и `collect()` promphp спотыкались на `+OK`.
 - Тест неразрешимого хоста не учитывает первый DNS-запрос: он зависит от резолвера раннера. Оставшиеся
   99 записей должны уложиться в 0.5 с.
 - В тестах для backoff и handshake используются именованные аргументы.
+
+## 1.4.0 (2026-10-02 UTC)
+
+### Метка `table="partitioned"` на системных запросах Postgres
+
+Ленивая регулярка 1.2.2 брала первый `FROM` где угодно: в аргументах функций
+(`EXTRACT(EPOCH FROM created_at)` → `created_at`), в подзапросе списка колонок
+(`(SELECT pg_get_expr(...) FROM pg_attrdef ...)` → `pg_attrdef`), в комментариях. В интроспекции
+колонок DBAL (`PostgreSQLSchemaManager::selectTableColumns()`, `PostgreSQLMetadataProvider`) есть
+комментарий `-- exclude partitions (tables that inherit from partitioned tables)` — отсюда
+`partitioned`. Квотированные идентификаторы (`FROM "users"`) не матчились `\w+`, и поиск уходил к
+следующему `FROM` — в том числе в комментарий.
+
+Сейчас `QueryMeter::assembleTableName()`:
+1. режет SQL до 16 KiB, заменяет комментарии (`--`, `/* */`) пробелом, строковые литералы — `''`
+   (экранирование `''` и `\'`);
+2. сворачивает скобочные группы (рекурсивная PCRE `\((?:[^()]++|(?R))*+\)`) в плейсхолдеры `(#n)`;
+3. ищет `SELECT … FROM`, `INSERT INTO`, `DELETE FROM`, `UPDATE` только на верхнем уровне;
+   `FROM (#n)` (derived table) разбирается рекурсивно по содержимому группы `n`;
+4. снимает кавычки `"…"`, `` `…` ``, `[…]` и префикс схемы.
+Незакрытая скобка (обрезка на 16 KiB) остаётся как есть — тогда возможен `FROM` из неё. Литерал
+Postgres, оканчивающийся обратным слешем (`'C:\'` при `standard_conforming_strings=on`), читается как
+незакрытый — пограничный случай, у Doctrine значения идут параметрами.
+
+### prefer-lowest: что было красным и почему
+
+Воспроизведено локально 2026-10-02 UTC (PHP 8.4.17, Symfony 6.4.0, до изменений):
+- PHPUnit 10.5.62 не валидирует шаблон `phpunit.xml.dist` (`ignoreIndirectDeprecations` есть с 11.1,
+  `failOnPhpunitDeprecation`/`displayDetailsOnPhpunitDeprecations` в 11.0–11.3 отсутствуют) — граница
+  `>=11.4`. Фактически lowest ставит 11.5.50 (более ранние запрещает `roave/security-advisories`).
+- `FactoryTest::testRedisngSchemeWithHostReturnsReconnectingAdapter` — promphp 2.6.0 без `RedisNg`.
+- `RedisReconnectTest::testWritesRecoverAfterRedisRestart` ждал `AUTH user secret`, а приходил
+  `AUTH secret`. Причина — **promphp**, не `symfony/cache`: имя пользователя DSN promphp передаёт в
+  `AUTH` только с 2.13.0. Это реальный баг для ACL-пользователей Redis → граница `^2.13`.
+- `RedisClientException` не найден (появился в promphp 2.15) — data set самопропускается.
+- `Constant E_STRICT is deprecated` из `symfony/error-handler` 6.4.0 → `conflict <6.4.10` (оба
+  манифеста), плюс CI-only `conflict` на error-handler/http-kernel ради risky (`tooling.md`).
+После изменений: 277 тестов, 5 пропусков (2 APCu без `apc.enable_cli`, 2 `routing.controllers` на 6.4,
+1 `RedisClientException` на promphp 2.13).
+
+### PHPStan level 10
+
+11 ошибок в `InfoEventListener` (`opcache_get_status()` типизирован как `array<mixed>`) — сужение в
+`collectOpcache()` через `number()`; заодно защита от деления на ноль при пустом пуле памяти OPcache.
+7 ошибок `labelValuesFor()` в тестах исчезли вместе с хелперами (переход на `RegistrySamples`).
+Запись baseline `isset.offset` (`sys_getloadavg()` на PHP 8.4 возвращает `array{float,float,float}|false`)
+удалена — проверка стала `=== false`.

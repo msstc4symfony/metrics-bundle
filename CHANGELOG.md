@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.4.0
+
+### Fixed
+
+- The `table` label of the `doctrine_query_*` metrics took the first `FROM` anywhere in the statement,
+  including function arguments (`EXTRACT(EPOCH FROM created_at)` gave `created_at`), subqueries in the
+  select list or in conditions, SQL comments and string literals. DBAL's PostgreSQL schema introspection
+  was labelled `pg_attrdef` or even `partitioned` (from the comment "inherit from partitioned tables").
+  Only the statement's own top-level `FROM` is used now; a derived table is labelled with its inner
+  table, and quoted identifiers (`"public"."users"`, `` `users` ``, `[users]`) are recognised instead
+  of giving `unknown`. Label values of such queries change.
+- OPcache gauges are skipped instead of failing when `opcache_get_status()` reports non-numeric values
+  or an empty memory pool.
+
+### Changed
+
+- `promphp/prometheus_client_php` is required at `^2.13` (was `^2.6`). Below 2.7 `redisng://` fell
+  back to `InMemory` (no `RedisNg` class); below 2.13 the user name of a `redis://user:pass@...` DSN
+  was not sent to `AUTH`, so Redis ACL users could not authenticate.
+- `symfony/deprecation-contracts` (`^2.5|^3`, used for `trigger_deprecation()`) is declared instead of
+  being relied on transitively.
+- Conflicts with `symfony/error-handler` < 6.4.10, whose error handler references `E_STRICT` and emits
+  a deprecation on every boot under PHP 8.4.
+- Development: PHPUnit `>=11.4` (the `phpunit.xml.dist` template uses `ignoreIndirectDeprecations`
+  and `failOnPhpunitDeprecation`), PHPStan level 10, `bundle-standard` v1.8.0 (blocking BC check,
+  Infection gate at 69 % MSI, a `--prefer-lowest` PHPUnit cell).
+
 ## 1.3.3
 
 Upgrade from 1.3.0 straight to 1.3.3: 1.3.1 can turn a phpredis connect warning into an HTTP 500

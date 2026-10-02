@@ -33,7 +33,9 @@ and is replaced by the bridge once it is installed.
 | ------ | ----- | ----------------- |
 | 1.x    | 8.4+  | 6.4, 7.x, 8.x     |
 
-Requires `ext-redis` and a Redis-compatible storage (or APCu / in-memory for tests).
+Requires `ext-redis` and a Redis-compatible storage (or APCu / in-memory for tests), and
+`promphp/prometheus_client_php` 2.13+ (`redisng://` needs 2.7, a DSN user name for Redis ACL is sent
+to `AUTH` from 2.13). Since 1.4 the lowest declared versions are tested in CI (`--prefer-lowest`).
 
 ## Installation
 
@@ -104,7 +106,7 @@ or behind a reverse proxy / private network.
 | `apcng://`   | `Prometheus\Storage\APCng`    | APCu with sharded counters.                     |
 | `inmemory://`| `Prometheus\Storage\InMemory` | Per-process, lost on shutdown (tests/dev).      |
 
-If the configured adapter cannot be constructed (malformed DSN, unknown scheme, missing extension), the bundle logs a warning/error via PSR-3 and silently falls back to `InMemory`. Watch your logs in production.
+If the configured adapter cannot be constructed (malformed DSN, unknown scheme, missing extension), the bundle logs a warning/error via PSR-3 (channel `metrics_bundle`) and falls back to `InMemory`. Watch your logs in production.
 
 The Redis connection is opened lazily on the first metric write or read, so an unreachable Redis does not trigger the fallback: each failed write is logged (`Cannot save metric ...`) and never breaks the request, command or message. Since 1.3.1 the `redis://` and `redisng://` adapters reconnect after a lost connection (Redis restart, network blip): the operation that hits the failure is dropped, the next one opens a fresh connection (database, credentials and read timeout are applied again). Long-running workers (RoadRunner, `messenger:consume`) recover without a restart. Since 1.3.2 a failed write never throws (the sample is dropped and logged on the `metrics_bundle` channel), and PHP warnings raised by phpredis while (re)connecting — e.g. `getaddrinfo ... failed` while the Redis container is stopped — never reach the application error handler, so `framework.php_errors.throw` cannot turn them into 500s.
 
@@ -141,6 +143,13 @@ DoctrineBundle the label stays `host:dbname`. If the application defines the
 `Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\Middleware` service itself,
 `name` fails the container compilation instead of being silently ignored. Switching it changes the label values of existing
 series, so update dashboards and alerts that filter on `connection`.
+
+The `table` label of the `doctrine_query_*` metrics is the first table of the statement's own `FROM`
+(`SELECT`/`DELETE`), `INSERT INTO` or `UPDATE`, without a schema prefix or identifier quotes. Since 1.4 a
+`FROM` inside parentheses (function arguments such as `EXTRACT(EPOCH FROM ...)`, subqueries in the select
+list or in conditions), comments and string literals is ignored, and a derived table
+(`FROM (SELECT ... FROM orders) t`) is labelled with its inner table. Statements without a recognisable
+table, or whose `FROM` lies beyond the first 16 KiB, are labelled `unknown`.
 
 ## Redis restarts in long-running workers
 
