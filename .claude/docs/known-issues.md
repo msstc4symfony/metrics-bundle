@@ -180,7 +180,10 @@ BC-джоб (Roave, неблокирующий) на сравнении 1.2.0 с
 `RouteCollection` хранит маршрут по имени `metrics-get`. Ловушка: если когда-нибудь выключить
 автоконфигурацию контроллера, маршрут молча пропадёт у 7.4+-приложений —
 `ContainerCompileTest::testMetricsRouteLoadsOnceThroughRoutingControllers` это ловит (на 6.4
-самопропускается: нет `AttributeServicesLoader`).
+самопропускается по `Kernel::VERSION_ID < 70400`: в CI-ячейке 6.4 закреплены только
+framework-bundle/http-kernel/…, а `symfony/routing` резолвится в 7.4+ — класс `AttributeServicesLoader`
+есть, но FrameworkBundle 6.4 не регистрирует лоадер → `Cannot load resource "routing.controllers"`;
+первый прогон 1.3.0 упал на этом).
 
 ### Метка `connection` по имени соединения — opt-in
 
