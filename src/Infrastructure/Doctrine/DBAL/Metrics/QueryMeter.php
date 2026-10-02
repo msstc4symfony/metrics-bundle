@@ -11,13 +11,14 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\DoctrineConnectionColle
 /** @internal Shared by the connection and statement middlewares. */
 final readonly class QueryMeter
 {
-    private QueryLabeller $labeller;
+    private QueryLabelling $labeller;
 
     public function __construct(
         private DoctrineConnectionCollector $collector,
         private string $connectionName,
+        ?QueryLabelling $labeller = null,
     ) {
-        $this->labeller = new QueryLabeller();
+        $this->labeller = $labeller ?? new QueryLabeller();
     }
 
     /**

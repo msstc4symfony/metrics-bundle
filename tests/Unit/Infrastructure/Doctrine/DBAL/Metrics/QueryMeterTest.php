@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Doctrine\DBAL\Metrics;
 
 use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\DoctrineConnectionCollector;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\QueryLabelling;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\QueryLabels;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\QueryMeter;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\DoctrineQueryTypeEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
+use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
@@ -164,22 +168,25 @@ final class QueryMeterTest extends TestCase
 
     public function testDurationExcludesLabelParsing(): void
     {
-        [$registry, $meter] = $this->buildMeter();
-        // Without JIT this statement takes the label parser a few hundred milliseconds.
-        $sql = 'SELECT ' . str_repeat('SELECT 1 UNION ', 1_000) . 'SELECT 1';
-        $jit = ini_set('pcre.jit', '0');
+        $registry = new CollectorRegistry(new InMemory());
+        $collector = new DoctrineConnectionCollector($registry, new MetricRepository([]), 'app', 'cmp');
+        $slowLabeller = new class implements QueryLabelling {
+            public const int PARSING_MICROSECONDS = 100_000;
 
-        try {
-            $startTime = microtime(true);
-            $meter->measure($sql, static fn (): int => 0);
-            $elapsed = microtime(true) - $startTime;
-        } finally {
-            ini_set('pcre.jit', (string) $jit);
-        }
+            #[Override]
+            public function label(string $sql): QueryLabels
+            {
+                usleep(self::PARSING_MICROSECONDS);
+
+                return new QueryLabels(DoctrineQueryTypeEnum::SELECT, 'users');
+            }
+        };
+
+        new QueryMeter($collector, 'default', $slowLabeller)->measure('SELECT * FROM users', static fn (): int => 0);
 
         [[, $duration]] = RegistrySamples::samples($registry, MetricLabelEnum::DOCTRINE_QUERY_DURATION_HISTOGRAM_SECONDS, '_sum');
-        self::assertGreaterThan(0.05, $elapsed);
-        self::assertLessThan($elapsed / 10, (float) $duration);
+        // The query itself is instant; any duration near the parsing time means parsing was measured.
+        self::assertLessThan($slowLabeller::PARSING_MICROSECONDS / 1_000_000 / 2, (float) $duration);
     }
 
     public function testFailedQueryIsNotRecorded(): void

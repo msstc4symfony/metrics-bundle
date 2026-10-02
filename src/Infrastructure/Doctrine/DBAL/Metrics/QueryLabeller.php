@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics;
 
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\DoctrineQueryTypeEnum;
+use Override;
 
 /**
  * Derives the "type" and "table" labels from SQL text. Results are cached per SQL because prepared
@@ -12,7 +13,7 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\DoctrineQueryTypeEnum;
  *
  * @internal
  */
-final class QueryLabeller
+final class QueryLabeller implements QueryLabelling
 {
     private const string IDENTIFIER = '(?:\w+|"(?:[^"]|"")+"|`(?:[^`]|``)+`|\[[^\]]+\])';
 
@@ -49,6 +50,7 @@ final class QueryLabeller
     private array $cache = [];
 
     /** @phpstan-impure Updates the cache. */
+    #[Override]
     public function label(string $sql): QueryLabels
     {
         $sql = substr($sql, 0, self::MAX_PARSED_SQL_LENGTH);
