@@ -1,0 +1,54 @@
+deptrac:
+    paths:
+        - ./src
+
+    exclude_files:
+        - '#.*test.*#i'
+
+    layers:
+        - name: Presentation
+          collectors:
+              - type: directory
+                value: src/Presentation/.*
+
+        - name: Framework
+          collectors:
+              - type: directory
+                value: src/Framework/.*
+
+        - name: Infrastructure
+          collectors:
+              - type: directory
+                value: src/Infrastructure/.*
+
+        - name: DependencyInjection
+          collectors:
+              - type: directory
+                value: src/DependencyInjection/.*
+
+        - name: BundleRoot
+          collectors:
+              - type: classLike
+                value: Msstc4Symfony\\MetricsBundle\\MetricsBundle
+    # Status quo of phase A (spec 6.2): records the current layering and blocks new directions.
+    ruleset:
+        # Collectors, storage, entities and third-party adapters depend on nothing in-bundle.
+        Infrastructure: ~
+
+        # Endpoint and console commands read metrics through the repository.
+        Presentation:
+            - Infrastructure
+
+        # Listeners feed collectors; RequestEventListener skips the metrics endpoint itself.
+        Framework:
+            - Infrastructure
+            - Presentation
+
+        # Compiler passes register the Infrastructure decorators/middlewares.
+        DependencyInjection:
+            - Infrastructure
+
+        # boot() wires MongoDB and Elastica adapters that need the runtime container.
+        BundleRoot:
+            - DependencyInjection
+            - Infrastructure

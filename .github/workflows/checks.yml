@@ -1,0 +1,30 @@
+name: Code Quality Checks
+
+on:
+  pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - LICENSE
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**/*.md'
+      - LICENSE
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  standard:
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.0.0
+    with:
+      slug: msstc4symfony/metrics-bundle
+      extensions: 'mbstring, xml, ctype, iconv, intl, redis, apcu, mongodb, pdo_sqlite'
+      ini-values: 'apc.enable_cli=1'
+      # Measured MSI 73 (2026-10-02 UTC); the gate sits about four points below it.
+      infection-min-msi: 69
+      infection-min-covered-msi: 69
+    secrets:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

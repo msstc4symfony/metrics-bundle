@@ -1,0 +1,49 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterCounter\(\) expects string, int\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Collector/AbstractCollector.php
+
+		-
+			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterGauge\(\) expects string, int\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Collector/AbstractCollector.php
+
+		-
+			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterHistogram\(\) expects string, int\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Collector/AbstractCollector.php
+
+		-
+			message: '#^Parameter \#2 \$name of method Prometheus\\RegistryInterface\:\:getOrRegisterSummary\(\) expects string, int\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Collector/AbstractCollector.php
+
+		-
+			message: '#^Class Symfony\\Component\\Security\\Core\\Exception\\AccessDeniedException not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: src/Infrastructure/Collector/ErrorCollector.php
+
+		-
+			message: '#^Call to function method_exists\(\) with MongoDB\\Driver\\Monitoring\\CommandFailedEvent and ''getHost'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Infrastructure/Doctrine/ODM/Metrics/TimingSubscriber.php
+
+		-
+			message: '#^Call to function method_exists\(\) with MongoDB\\Driver\\Monitoring\\CommandSucceededEvent and ''getHost'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Infrastructure/Doctrine/ODM/Metrics/TimingSubscriber.php
+
+		-
+			message: '#^Parameter \#1 \$level of static method Monolog\\Logger\:\:toMonologLevel\(\) expects 100\|200\|250\|300\|400\|500\|550\|600\|''ALERT''\|''alert''\|''CRITICAL''\|''critical''\|''DEBUG''\|''debug''\|''EMERGENCY''\|''emergency''\|''ERROR''\|''error''\|''INFO''\|''info''\|''NOTICE''\|''notice''\|''WARNING''\|''warning''\|Monolog\\Level, mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Infrastructure/Monolog/Handler/HandlerDecorator.php

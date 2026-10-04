@@ -1,0 +1,93 @@
+{
+  "name": "msstc4symfony/metrics-bundle",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Maxim Shamaev",
+      "email": "maxim.shamaev@gmail.com"
+    }
+  ],
+  "type": "symfony-bundle",
+  "description": "Metrics bundle (CI profile — installs optional libraries and CI-only tools)",
+  "minimum-stability": "stable",
+  "keywords": [
+    "php",
+    "symfony",
+    "metrics"
+  ],
+  "prefer-stable": true,
+  "autoload": {
+    "psr-4": {
+      "Msstc4Symfony\\MetricsBundle\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Msstc4Symfony\\MetricsBundle\\Test\\": "tests/"
+    }
+  },
+  "require": {
+    "php": ">=8.4",
+    "ext-redis": "*",
+    "composer-runtime-api": ">=2.2",
+    "monolog/monolog": "^3.5",
+    "promphp/prometheus_client_php": "^2.13",
+    "symfony/console": "^7.4|^8.0",
+    "symfony/event-dispatcher": "^7.4|^8.0",
+    "symfony/framework-bundle": "^7.4|^8.0",
+    "symfony/monolog-bundle": "^3.11|^4.0"
+  },
+  "require-dev": {
+    "deptrac/deptrac": "^4.6",
+    "doctrine/dbal": "^3.0|^4.0",
+    "doctrine/doctrine-bundle": "^2.13|^3.0",
+    "friendsofphp/php-cs-fixer": "^3.55",
+    "infection/infection": "^0.32",
+    "mongodb/mongodb": "^2.1",
+    "phpstan/extension-installer": "^1.4",
+    "phpstan/phpstan": "^2.1",
+    "phpstan/phpstan-beberlei-assert": "^2.0",
+    "phpstan/phpstan-doctrine": "^2.0",
+    "phpstan/phpstan-strict-rules": "^2.0",
+    "phpstan/phpstan-symfony": "^2.0",
+    "phpunit/phpunit": ">=11.4",
+    "rector/rector": "^2.1",
+    "roave/backward-compatibility-check": "^8.20",
+    "roave/security-advisories": "dev-latest",
+    "ruflin/elastica": "^7.3",
+    "spaze/phpstan-disallowed-calls": "^v4.0",
+    "symfony/http-client": "^7.4|^8.0",
+    "symfony/messenger": "^7.4|^8.0"
+  },
+  "suggest": {
+    "doctrine/dbal": "To collect Doctrine DBAL query metrics",
+    "doctrine/doctrine-bundle": "To register the DBAL query metrics middleware on its connections",
+    "ext-apcu": "To store metrics in APCu (apc:// and apcng:// storage DSNs)",
+    "ext-mongodb": "To collect MongoDB driver command metrics",
+    "mongodb/mongodb": "To use MongoDB ODM TimingSubscriber",
+    "ruflin/elastica": "To collect Elastica request metrics",
+    "symfony/http-client": "To collect outbound HTTP request metrics",
+    "symfony/messenger": "To collect Messenger sent/consumed message metrics"
+  },
+  "config": {
+    "platform": {
+      "ext-mongodb": "2.5.2"
+    },
+    "allow-plugins": {
+      "composer/package-versions-deprecated": true,
+      "infection/extension-installer": true,
+      "phpstan/extension-installer": true
+    },
+    "sort-packages": true
+  },
+  "conflict": {
+    "symfony/error-handler": "<7.4.17 || >=8.0,<8.1.5",
+    "symfony/symfony": "*"
+  },
+  "extra": {
+    "symfony": {
+      "allow-contrib": false,
+      "require": "^7.4|^8.0"
+    }
+  }
+}

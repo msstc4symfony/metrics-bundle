@@ -1,0 +1,178 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Storage;
+
+use Msstc4Symfony\MetricsBundle\Infrastructure\Storage\Factory;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Storage\ReconnectingRedisAdapter;
+use Msstc4Symfony\MetricsBundle\Test\Support\CollectingLogger;
+use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
+use Prometheus\Storage\APC;
+use Prometheus\Storage\APCng;
+use Prometheus\Storage\InMemory;
+use Psr\Log\AbstractLogger;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
+use Stringable;
+
+final class FactoryTest extends TestCase
+{
+    public function testInMemorySchemeReturnsInMemoryAdapter(): void
+    {
+        $factory = new Factory(new NullLogger(), ReconnectingRedisAdapter::DEFAULT_BACKOFF_SECONDS);
+
+        self::assertInstanceOf(InMemory::class, $factory->create('inmemory://anything'));
+    }
+
+    #[DataProvider('provideHostlessDsns')]
+    public function testHostlessDsnIsNotRejectedAsMalformed(string $dsn): void
+    {
+        $logger = new class extends AbstractLogger {
+            /** @var list<string> */
+            public array $messages = [];
+
+            #[Override]
+            public function log(mixed $level, string|Stringable $message, array $context = []): void
+            {
+                $this->messages[] = (string) $message;
+            }
+        };
+
+        new Factory($logger, ReconnectingRedisAdapter::DEFAULT_BACKOFF_SECONDS)->create($dsn);
+
+        self::assertSame(
+            [],
+            array_values(array_filter(
+                $logger->messages,
+                static fn (string $message): bool => str_contains($message, 'malformed'),
+            )),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{non-empty-string}>
+     */
+    public static function provideHostlessDsns(): iterable
+    {
+        yield 'apc' => ['apc://'];
+        yield 'apcng' => ['apcng://'];
+        yield 'inmemory' => ['inmemory://'];
+        yield 'apc with trailing slash' => ['apc:///'];
+        yield 'apcng with query' => ['apcng://?prefix=app'];
+        yield 'inmemory with slash and query' => ['inmemory:///?x=1'];
+    }
+
+    public function testApcSchemeReturnsApcAdapter(): void
+    {
+        if (!extension_loaded('apcu') || !apcu_enabled()) {
+            self::markTestSkipped('apcu extension with apc.enable_cli=1 required');
+        }
+
+        $factory = new Factory(new NullLogger(), ReconnectingRedisAdapter::DEFAULT_BACKOFF_SECONDS);
+
+        self::assertInstanceOf(APC::class, $factory->create('apc://'));
+    }
+
+    public function testApcngSchemeReturnsApcngAdapter(): void
+    {
+        if (!extension_loaded('apcu') || !apcu_enabled()) {
+            self::markTestSkipped('apcu extension with apc.enable_cli=1 required');
+        }
+
+        $factory = new Factory(new NullLogger(), ReconnectingRedisAdapter::DEFAULT_BACKOFF_SECONDS);
+
+        self::assertInstanceOf(APCng::class, $factory->create('apcng://'));
+    }
+
+    public function testRedisSchemeWithHostReturnsReconnectingAdapter(): void
+    {
+        $factory = new Factory(new NullLogger(), ReconnectingRedisAdapter::DEFAULT_BACKOFF_SECONDS);
+
+        self::assertInstanceOf(ReconnectingRedisAdapter::class, $factory->create('redis://localhost:6379'));
+    }
+
+    public function testRedisngSchemeWithHostReturnsReconnectingAdapter(): void
+    {
+        $factory = new Factory(new NullLogger(), ReconnectingRedisAdapter::DEFAULT_BACKOFF_SECONDS);
+
+        self::assertInstanceOf(ReconnectingRedisAdapter::class, $factory->create('redisng://localhost:6379'));
+    }
+
+    public function testMalformedRedisDsnFallsBackToInMemoryAndLogsError(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('error')
+            ->with(self::stringContains('malformed'))
+        ;
+
+        $factory = new Factory($logger, ReconnectingRedisAdapter::DEFAULT_BACKOFF_SECONDS);
+
+        self::assertInstanceOf(InMemory::class, $factory->create('redis://'));
+    }
+
+    public function testUnknownSchemeFallsBackToInMemoryAndWarns(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('warning')
+            ->with(self::stringContains('unsupported'))
+        ;
+
+        $factory = new Factory($logger, ReconnectingRedisAdapter::DEFAULT_BACKOFF_SECONDS);
+
+        self::assertInstanceOf(InMemory::class, $factory->create('mysql://localhost'));
+    }
+
+    public function testMissingSchemeFallsBackToInMemoryAndWarns(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('warning')
+            ->with(self::stringContains('unsupported'))
+        ;
+
+        $factory = new Factory($logger, ReconnectingRedisAdapter::DEFAULT_BACKOFF_SECONDS);
+
+        self::assertInstanceOf(InMemory::class, $factory->create('not-a-dsn'));
+    }
+
+    public function testRedisDsnPropagatesDatabaseAndOptionsViaQuery(): void
+    {
+        $factory = new Factory(new NullLogger(), ReconnectingRedisAdapter::DEFAULT_BACKOFF_SECONDS);
+
+        $adapter = $factory->create('redis://user:pass@redis-host:6390/?database=7&timeout=0.5&persistent_connections=1&ssl_verify_peer=1');
+
+        self::assertInstanceOf(ReconnectingRedisAdapter::class, $adapter);
+    }
+
+    public function testRedisDatabaseFromPath(): void
+    {
+        $factory = new Factory(new NullLogger(), ReconnectingRedisAdapter::DEFAULT_BACKOFF_SECONDS);
+
+        $adapter = $factory->create('redis://localhost/3');
+
+        self::assertInstanceOf(ReconnectingRedisAdapter::class, $adapter);
+    }
+
+    public function testDefaultsToInMemoryOnEmptyDsn(): void
+    {
+        $factory = new Factory(new NullLogger(), ReconnectingRedisAdapter::DEFAULT_BACKOFF_SECONDS);
+
+        self::assertInstanceOf(InMemory::class, $factory->create(''));
+    }
+
+    public function testNegativeBackoffFromTheEnvironmentFallsBackToTheDefaultInsteadOfInMemory(): void
+    {
+        $logger = new CollectingLogger();
+
+        $adapter = new Factory($logger, -1.0)->create('redis://localhost:6379');
+
+        self::assertInstanceOf(ReconnectingRedisAdapter::class, $adapter);
+        self::assertCount(1, $logger->records);
+        self::assertStringStartsWith('warning: ', $logger->records[0]);
+    }
+}

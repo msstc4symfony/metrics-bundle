@@ -1,0 +1,5 @@
+framework:
+  cache:
+    pools:
+      metrics.cache:
+        adapter: cache.app
