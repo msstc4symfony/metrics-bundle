@@ -234,6 +234,44 @@ final class TimingHttpClientTest extends TestCase
         self::assertSame([['app', 'cmp', 'GET', 'i/_doc/1']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
     }
 
+    public function testUnreadableErrorBodyIsFailureAndDoesNotEscape(): void
+    {
+        $factory = new Psr17Factory();
+        $stream = self::createStub(StreamInterface::class);
+        $stream->method('isSeekable')->willReturn(true);
+        $stream->method('getContents')->willThrowException(new RuntimeException('broken stream'));
+        $response = $factory->createResponse(500)->withBody($stream);
+
+        $returned = $this->send($response, $factory->createRequest('GET', 'http://es:9200/x'));
+
+        self::assertSame($response, $returned);
+        self::assertSame([['app', 'cmp', 'GET', 'x']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
+        self::assertFalse(RegistrySamples::exists($this->registry, MetricLabelEnum::ELASTICA_REQUEST_SUCCESS));
+    }
+
+    public function testBodyIsRewoundAgainAfterAFailedRead(): void
+    {
+        $factory = new Psr17Factory();
+        $stream = $this->createMock(StreamInterface::class);
+        $stream->method('isSeekable')->willReturn(true);
+        $stream->method('getContents')->willThrowException(new RuntimeException('broken stream'));
+        $stream->expects(self::exactly(2))->method('rewind');
+
+        $this->send($factory->createResponse(500)->withBody($stream), $factory->createRequest('GET', 'http://es:9200/x'));
+    }
+
+    public function testUnrewindableErrorBodyIsFailureAndDoesNotEscape(): void
+    {
+        $factory = new Psr17Factory();
+        $stream = self::createStub(StreamInterface::class);
+        $stream->method('isSeekable')->willReturn(true);
+        $stream->method('rewind')->willThrowException(new RuntimeException('broken stream'));
+
+        $this->send($factory->createResponse(404)->withBody($stream), $factory->createRequest('GET', 'http://es:9200/x'));
+
+        self::assertSame([['app', 'cmp', 'GET', 'x']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
+    }
+
     public function testQueryStringIsNotPartOfThePathLabel(): void
     {
         $factory = new Psr17Factory();

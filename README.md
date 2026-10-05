@@ -15,7 +15,7 @@ Out of the box the following are measured:
 - Doctrine DBAL queries (count, duration, type, table)
 - MongoDB driver commands
 - Symfony Messenger messages sent to transports and consumed by workers (count by outcome, handling duration)
-- `ruflin/elastica` 7.x requests (Elastica 8 removed the transport API the bundle hooks into; its requests are not measured)
+- `ruflin/elastica` 7.x and 8.x requests, for `Elastica\Client` and its subclasses (FOSElasticaBundle clients included) — see [Elastica metrics](#elastica-metrics)
 - system info (CPU load, memory, OPcache, FPM, filesystem)
 
 The exact list of metrics with labels and histogram buckets is shown by `bin/console metrics:list`.
@@ -204,6 +204,49 @@ Messenger is installed; without Messenger they are never recorded and `/_/metric
 Cardinality: the histogram writes 16 series (14 buckets, `_sum`, `_count`) per
 transport × message × status combination — with many message classes, watch the storage size.
 
+## Elastica metrics
+
+Every container service whose class is `Elastica\Client` or a subclass (FOSElasticaBundle's
+`FOS\ElasticaBundle\Elastica\Client` included) is measured, with no configuration:
+`elastica_request_success`, `elastica_request_failed` and
+`elastica_request_duration_histogram_seconds`, labelled with the HTTP `method` and the request
+`path` without the leading `/` (`GET`, `index/_search`). Metric names, labels and buckets are the
+same on Elastica 7 and 8, so dashboards do not change when you upgrade.
+
+| | Elastica 7 | Elastica 8 |
+| --- | --- | --- |
+| Measurement point | the connection transport, wrapped when the kernel boots | the PSR-18 HTTP client, wrapped through `transport_config.http_client` at container compile time |
+| Failed request | the transport throws: connection error, a body with a top-level `error` key, or a partial shard failure (`_shards.failed` > 0) | the HTTP client throws, or the status is ≥ 400 **and** the body is not a JSON object or has a top-level `error` key; a `404` with `"found": false` and an empty `HEAD 404` count as successful, as on 7 |
+| Duration | the HTTP call as Elastica's HTTP transport times it | the HTTP call, timed by the decorator |
+
+FOSElasticaBundle clients (child definitions of `fos_elastica.client_prototype`) are found through
+their parent definition on both versions.
+
+Differences and limits on Elastica 8:
+
+- The client's configuration (first constructor argument or the named `$config` argument, on the
+  service or inherited from its parent definition) must be a literal array. A client configured with a
+  DSN string, a parameter or a reference is not measured; the container compiler log
+  (`var/cache/<env>/*Compiler.log`, debug mode) says `Elastica client "<id>" is not measured: …`.
+- `transport_config.http_client_config` / `http_client_options` keep working: the bundle applies them
+  to the HTTP client exactly as Elastica does (same adapters, same error for a client without one)
+  and then wraps the result.
+- A `transport_config.http_client` you configure yourself is kept and wrapped. If it is Symfony's
+  `psr18.http_client`, the same requests are also counted in the `http_client_*` metrics (a separate
+  metric family).
+- Every transport retry is a separate HTTP request and is recorded separately (a request retried
+  once after a connection error records one failure and one success).
+- A host with a base path (`http://es:9200/prefix`) puts the prefix into the `path` label
+  (`prefix/index/_search`); Elastica 7 does not.
+- A ≥ 400 response with a non-JSON body (proxy HTML, plain text) is a failure on 8; Elastica 7 wraps
+  such a body as `{"message": …}` and counts it as a success. This difference is deliberate.
+- A partial shard failure (`200` with `_shards.failed` > 0) is a failure on 7
+  (`PartialShardFailureException`) and a success on 8.
+- The wrapper hides the inner HTTP client's class from Elastica and elastic-transport: with `cloud_id`
+  the gzip `Accept-Encoding` decision falls back to async-client discovery, and the
+  `x-elastic-client-meta` library hint is lost. The async (`HttpAsyncClient`) capability of the inner
+  client is not exposed.
+
 ## Endpoints and commands
 
 | Method             | What                                                                |
@@ -279,7 +322,7 @@ the metric repository throws a `LogicException` naming both cases.
 
 ## How it works
 
-Collectors measure at well-known integration points (Symfony kernel events, console events, Monolog handler decorator, Doctrine DBAL middleware, MongoDB driver subscriber, Elastica transport adapter, `symfony/http-client` decorator). They write to a Prometheus `RegistryInterface` backed by the configured storage adapter (Redis by default). Prometheus periodically scrapes the `/_/metrics` controller, which renders the registry as text/plain.
+Collectors measure at well-known integration points (Symfony kernel events, console events, Monolog handler decorator, Doctrine DBAL middleware, MongoDB driver subscriber, Elastica transport adapter on 7 / PSR-18 client decorator on 8, `symfony/http-client` decorator). They write to a Prometheus `RegistryInterface` backed by the configured storage adapter (Redis by default). Prometheus periodically scrapes the `/_/metrics` controller, which renders the registry as text/plain.
 
 Metric state lives in Redis indefinitely (or until `metrics:clear` is run / the app is redeployed and the keys are flushed). Each scrape returns the full current state — Prometheus overwrites its own series on every scrape, so a stale Redis simply produces stale values, not duplicates.
 

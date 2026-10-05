@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler;
 
-use Elastica\Client;
+use Elastica\Transport\AbstractTransport;
 use Override;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -16,15 +16,15 @@ final class SaveElasticaClientsListPass implements CompilerPassInterface
     #[Override]
     public function process(ContainerBuilder $container): void
     {
-        $ids = [];
-        foreach ($container->getDefinitions() as $id => $definition) {
-            if (
-                $definition->getClass() !== Client::class
-                || !DefinitionFilter::isDecoratable($definition)
-            ) {
-                continue;
-            }
+        // The Elastica 7 transport API this list feeds is gone in Elastica 8 (DecorateElasticaClientsPass covers 8).
+        if (!class_exists(AbstractTransport::class)) {
+            $container->setParameter(self::PARAMETER, []);
 
+            return;
+        }
+
+        $ids = [];
+        foreach (ElasticaClientDefinitions::find($container) as $id => $definition) {
             $ids[] = $id;
 
             $definition->setPublic(true);

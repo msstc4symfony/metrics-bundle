@@ -6,7 +6,8 @@
   Опциональные библиотеки — в `suggest`.
 - `composer-ci.json` — тот же runtime + опциональные библиотеки
   (`symfony/http-client`, `symfony/messenger`, `doctrine/dbal`, `doctrine/doctrine-bundle`, `mongodb/mongodb` ^2,
-  `ruflin/elastica` ^7) + deptrac, infection, Roave BC check. Лок —
+  `ruflin/elastica` `^7.3|^8.0`, лок на 7 — см. known-issues, `php-http/discovery`, `psr/http-client`,
+  `nyholm/psr7`) + deptrac, infection, Roave BC check. Лок —
   `composer-ci.lock`, коммитится.
 - `config.platform.ext-mongodb` в `composer-ci.json` = версия расширения на
   раннере CI. Без этого лок, собранный локально с `ext-mongodb` 1.x, не
@@ -55,3 +56,16 @@ dry-run → deptrac. Запускать как `COMPOSER=composer-ci.json make c
 `error-handler` в манифестах не перечислен, поэтому пин его не трогает и lowest брал 7.3.0. Бисекция
 2026-10-04 UTC (framework-bundle 7.4.0, http-kernel 7.4.12): error-handler 7.3.0/7.4.0/7.4.4/7.4.8/
 7.4.14/7.4.15 → 18 risky, 7.4.17/7.4.20 → 0. Не удалять при чистке «лишних» `conflict`.
+
+## Elastica в CI
+
+- Основные ячейки PHPUnit (`composer update`) ставят Elastica 8, lowest — 7.3.0, статанализ и
+  Infection — лок (7.3.2).
+- Job «Elasticsearch integration» (`bundle-standard` `v1.1.0`, вход `elasticsearch` в
+  `checks.yml`): Elastica `^7.3` + ES `7.17.29` и `^8.0` + ES `8.19.22` (теги — те же, что в
+  healthcheck-bundle), гоняет `vendor/bin/phpunit --group elasticsearch`.
+- Локально: `docker run -d --rm --name es -p 9200:9200 -e discovery.type=single-node
+  -e xpack.security.enabled=false -e ES_JAVA_OPTS='-Xms512m -Xmx512m'
+  docker.elastic.co/elasticsearch/elasticsearch:<тег>`, затем
+  `ELASTICSEARCH_URL=http://localhost:9200 vendor/bin/phpunit --group elasticsearch`. Без
+  `ELASTICSEARCH_URL` тест группы пропускается.

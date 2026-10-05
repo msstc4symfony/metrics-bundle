@@ -72,3 +72,13 @@ PHPUnit параллельно, а `setUp()` чистит каталог.
 `config` и всех `symfony/*` из манифеста (кроме contracts/monolog-bundle/polyfill), затем
 `COMPOSER=composer-ci.json composer update --prefer-lowest --prefer-stable`. Перед `make check` копию
 удалить: `php -l` обходит всё, кроме `vendor/`.
+
+## Группа `elasticsearch` (живой кластер)
+
+`tests/Integration/Infrastructure/Elastica/ElasticsearchMetricsTest` (`#[Group('elasticsearch')]`)
+поднимает `ElasticsearchKernel` (FrameworkBundle + MonologBundle + MetricsBundle, `inmemory://`,
+`application`/`component` = `app`/`cmp`) с клиентом-подклассом `tests/Support/SubclassedElasticaClient`
+и проверяет серии после `getCluster()->getHealth()`. Без `ELASTICSEARCH_URL` — skip. Тесты пассов
+Elastica разделены по версии: `SaveElasticaClientsListPassTest` пропускается без
+`AbstractTransport` (7), `DecorateElasticaClientsPassTest` — без `Elastic\Transport\Transport` (8);
+локально 8 гонять в копии с `composer update` (лок на 7).

@@ -4,6 +4,22 @@ All notable changes to this bundle are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions follow
 [Semantic Versioning](https://semver.org/); dates are UTC.
 
+## [1.1.0] - 2026-10-05
+
+### Added
+
+- Elastica 8 request metrics: `DecorateElasticaClientsPass` wraps each client's PSR-18 HTTP client
+  (`transport_config.http_client`) in `TimingHttpClient`; metric names, labels and buckets are the
+  same as on Elastica 7. `http_client_config` / `http_client_options` are applied to the HTTP client
+  before it is wrapped. Clients whose configuration is not a literal array, or whose `transport_config`
+  is not a literal array, are not measured (the container compiler log says why).
+- Subclasses of `Elastica\Client` and FOSElasticaBundle clients (child definitions of its abstract
+  client prototype) are measured on Elastica 7 and 8.
+
+### Changed
+
+- Optional `ruflin/elastica` support is now `^7.3|^8.0` (was 7 only).
+
 ## [1.0.0] - 2026-10-04
 
 First release of `msstc4symfony/metrics-bundle` (namespace `Msstc4Symfony\MetricsBundle`).
@@ -32,7 +48,8 @@ First release of `msstc4symfony/metrics-bundle` (namespace `Msstc4Symfony\Metric
 
 - PHP >= 8.4 with `ext-redis`, Symfony ^7.4|^8.0, Monolog ^3.5, `symfony/monolog-bundle` ^3.11|^4.0,
   `promphp/prometheus_client_php` ^2.13.
-- Optional: Doctrine DBAL / DoctrineBundle, `mongodb/mongodb`, `ruflin/elastica` 7, Symfony
+- Optional: Doctrine DBAL / DoctrineBundle, `mongodb/mongodb`, `ruflin/elastica` ^7.3|^8.0, Symfony
   HttpClient, Messenger, APCu.
 
+[1.1.0]: https://github.com/msstc4symfony/metrics-bundle/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/msstc4symfony/metrics-bundle/releases/tag/v1.0.0

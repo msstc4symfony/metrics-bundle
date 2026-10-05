@@ -54,11 +54,22 @@
      правильным host. Повторы `retry_failed` — отдельные запросы. Клиенты, созданные
      приложением в обход FrameworkBundle, не мониторятся. URL-ассемблеры — по тегу
      `AssemblerInterface::TAG` (`metrics.http_client.url_assembler`);
-   - `SaveElasticaClientsListPass` — пишет id клиентов Elastica в параметр
-     `msstc4symfony_metrics.elastica.clients` (`SaveElasticaClientsListPass::PARAMETER`).
+   - `ElasticaClientDefinitions` (`@internal`): `find()` — общий отбор для двух пассов ниже: не
+     абстрактные и не декораторы (`DefinitionFilter::isDecoratable`), класс (по цепочке родителей
+     `ChildDefinition` — `lineage()`, после разрешения параметров, через `getReflectionClass`) —
+     `Elastica\Client` или подкласс (FOSElasticaBundle);
+   - `SaveElasticaClientsListPass` (Elastica 7) — пишет id клиентов в параметр
+     `msstc4symfony_metrics.elastica.clients` (`SaveElasticaClientsListPass::PARAMETER`) и делает
+     их public. На Elastica 8 (нет `AbstractTransport`) — пустой список;
+   - `DecorateElasticaClientsPass` (Elastica 8, гард `class_exists(Elastic\Transport\Transport)`) —
+     в литеральный массив конфига клиента (`index_0` / `$config` / `0`, свой или от родителя) пишет
+     `transport_config.http_client` = inline `TimingHttpClient(<inner>, @ElasticaCollector)`, где
+     `<inner>` = фабрика `ConfiguredHttpClientFactory::create(<http_client|null>, http_client_config,
+     http_client_options)`; эти два ключа из `transport_config` удаляются. Не литеральный
+     конфиг/`transport_config` — пропуск с `$container->log()`.
 4. `MetricsBundle::boot()` — то, что нельзя сделать в контейнере:
    подписка `TimingSubscriber` на драйвер MongoDB и подмена транспорта у
-   соединений Elastica 7 на `TimingTransport`.
+   соединений Elastica 7 на `TimingTransport` (на 8 — ничего, там всё сделал пасс).
 5. `MetricRepositoryFactory` собирает каталог из `msstc4symfony_metrics.metric_enums` (повторный
    класс читается один раз); одинаковое имя метрики в двух enum — `LogicException`.
 

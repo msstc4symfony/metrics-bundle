@@ -35,7 +35,7 @@ final readonly class TimingHttpClient implements ClientInterface
             throw $exception;
         }
 
-        if ($response->getStatusCode() >= 400 && $this->carriesElasticsearchError($response)) {
+        if ($response->getStatusCode() >= 400 && $this->isFailedErrorResponse($response)) {
             $this->collector->incRequestFailed($method, $path);
 
             return $response;
@@ -48,18 +48,29 @@ final readonly class TimingHttpClient implements ClientInterface
     }
 
     /**
-     * Mirrors the Elastica 7 HTTP transport: only a body with a top-level "error" key (or a non-JSON-object body) is a failure.
+     * Like the Elastica 7 HTTP transport, a JSON object without a top-level "error" key is not a failure (404 "found": false).
+     * Deliberate difference: a non-JSON body (proxy HTML, plain text) is a failure here, while Elastica 7 wraps it as
+     * {"message": …} and counts it as a success. An unreadable body counts as failed instead of failing a completed request.
      */
-    private function carriesElasticsearchError(ResponseInterface $response): bool
+    private function isFailedErrorResponse(ResponseInterface $response): bool
     {
         $body = $response->getBody();
         if (!$body->isSeekable()) {
             return true;
         }
 
-        $body->rewind();
-        $contents = $body->getContents();
-        $body->rewind();
+        try {
+            $body->rewind();
+            $contents = $body->getContents();
+            $body->rewind();
+        } catch (Throwable) {
+            try {
+                $body->rewind();
+            } catch (Throwable) {
+            }
+
+            return true;
+        }
 
         if ($contents === '') {
             return false;

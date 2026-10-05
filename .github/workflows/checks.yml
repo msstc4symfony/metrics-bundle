@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   standard:
-    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.0.0
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.1.0
     with:
       slug: msstc4symfony/metrics-bundle
       extensions: 'mbstring, xml, ctype, iconv, intl, redis, apcu, mongodb, pdo_sqlite'
@@ -26,5 +26,10 @@ jobs:
       # Measured MSI 73 (2026-10-02 UTC); the gate sits about four points below it.
       infection-min-msi: 69
       infection-min-covered-msi: 69
+      elasticsearch: >-
+        [
+          {"elastica": "^7.3", "image": "docker.elastic.co/elasticsearch/elasticsearch:7.17.29"},
+          {"elastica": "^8.0", "image": "docker.elastic.co/elasticsearch/elasticsearch:8.19.22"}
+        ]
     secrets:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

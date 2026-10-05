@@ -94,12 +94,61 @@ instanceof-тег `metrics.http_client.url_assembler`, только если и�
 
 3.x не ставится на Symfony 8.
 
-## Elastica 8 не поддерживается
+## Elastica: две точки измерения (с v1.1.0)
 
-`TimingTransport` построен на транспортном API Elastica 7 (`Connection`,
-`AbstractTransport`), которого в 8 нет. `boot()` выходит, если нет
-`AbstractTransport`, — метрики Elastica 8 молча не собираются. Поддержка 8 —
-этап B. В CI зафиксирована `^7.3`, чтобы транспорт реально тестировался.
+- **7**: `TimingTransport` подменяет транспорт соединений в `boot()` (список клиентов —
+  `SaveElasticaClientsListPass`). Неуспех = транспорт бросил. Длительность — `Response::getQueryTime()`.
+- **8**: транспортного API нет (клиент строит `elastic/transport` поверх PSR-18 в конструкторе),
+  поэтому `DecorateElasticaClientsPass` на этапе компиляции кладёт `TimingHttpClient` в
+  `transport_config.http_client`. Неуспех: исключение PSR-18; статус < 400 — успех + длительность;
+  ≥ 400 — неуспех, только если тело не JSON-объект или в нём есть ключ верхнего уровня `error`
+  (`404` c `found: false` и пустой `HEAD 404` — успех, как на 7); non-seekable тело при ≥ 400 —
+  неуспех без чтения; тело, чтение/перемотка которого бросает, — неуспех, исключение не выпускается,
+  перемотка повторяется под try (`isFailedErrorResponse()`).
+- Сознательные расхождения с 7: не-JSON тело при ≥ 400 на 7 — успех (`Response::getData()`
+  оборачивает в `['message' => …]`, `hasError()` = false), на 8 — неуспех; частичный отказ шардов
+  (`200`, `_shards.failed` > 0) на 7 — неуспех (`PartialShardFailureException`), на 8 — успех.
+- Метки одинаковы: путь без ведущего `/`. Проверено вживую (2026-10-05 UTC):
+  `getCluster()->getHealth()` даёт `_cluster/state` + `_cluster/health` и на Elastica 7.3.2 /
+  ES 7.17.29, и на Elastica 8.2.0 / ES 8.19.22 (`getCluster()` сначала грузит state).
+- Расхождения на 8: каждая повторная попытка транспорта (`retries`, по умолчанию = число хостов) —
+  отдельный запрос в метриках; хост с base path (`http://es:9200/prefix`) даёт метку с префиксом
+  (`prefix/index/_search`), на 7 — без.
+- Не измеряются на 8 (лог компиляции `Elastica client "<id>" is not measured: …`): конфиг не
+  литеральный массив (DSN-строка, параметр, ссылка), `transport_config` не массив.
+- `transport_config.http_client_config`/`http_client_options` Elastica применяет через адаптер по
+  классу конкретного клиента (`AdapterOptions::HTTP_ADAPTERS`) и на обёртке бросала бы
+  `HttpClientException`. Поэтому пасс убирает оба ключа из `transport_config` и передаёт их в
+  `ConfiguredHttpClientFactory::create(<http_client|null>, <config>, <options>)` (рантайм, `@internal`),
+  которая повторяет `Client::setTransportClientOptions()` (пустые → клиент как есть; иначе адаптер,
+  та же ошибка) — результат оборачивается `TimingHttpClient`. FOSElasticaBundle 7 всегда задаёт
+  `http_client_options` (headers/timeout). Классы elasticsearch-php 8 в фабрике названы строками
+  (лок CI на 7, PHPStan анализирует и там), класс исключения — в static-свойстве: константу PHPStan
+  сворачивает в литерал и на 7 ругается `class.notFound`/`argument.type`.
+- FOSElasticaBundle регистрирует клиентов как `ChildDefinition('fos_elastica.client_prototype')`;
+  класс — у абстрактного родителя, а наши пассы идут до `ResolveChildDefinitionsPass`, так что
+  `getClass()` у клиента `null`. `ElasticaClientDefinitions::lineage()` идёт по цепочке родителей
+  (класс и конфиг). Конфиг ищется по ключам `index_0` (так `ChildDefinition::replaceArgument(0)`
+  хранит позиционный аргумент — FOS 6), `$config` (FOS 7), `0`; записывается назад тем же ключом через
+  `replaceArgument()`, иначе после слияния родителя появился бы лишний позиционный аргумент.
+- Подклассы `Elastica\Client` (FOSElasticaBundle) подхватываются на обеих версиях через
+  `ElasticaClientDefinitions` (до v1.1.0 — только класс ровно `Elastica\Client`).
+- Тестовый клиент Elastica 7 нельзя задать `['url' => 'http://host:9200']` — «Malformed URL»;
+  `ElasticsearchKernel` разбирает `ELASTICSEARCH_URL` на `host`/`port`.
+
+## CI-лок держит Elastica 7, хотя `composer-ci.json` разрешает `^7.3|^8.0`
+
+`composer-ci.lock` намеренно на Elastica 7 (`composer update ruflin/elastica --with ruflin/elastica:^7.3`).
+На лок-е с 8 PHPStan падает internal error: `TimingTransport extends AbstractTransport`,
+которого в 8 нет, а phpstan-doctrine (`EntityNotFinalRule`) делает `class_exists()` на каждом
+классе → fatal при автозагрузке; плюс `Request::getPath()`, `Response::getQueryTime()`,
+`Client::getConnections()` в 8 отсутствуют. `phpstan.dist.neon` — шаблон стандарта, ни stubs,
+ни `excludePaths` туда не добавить. Поэтому PHPStan/Rector/deptrac/Infection идут на 7, а
+Elastica 8 покрывают ячейки PHPUnit (`composer update` → highest = 8; lowest = 7.3.0) и
+job «Elasticsearch integration» (8.19.22). Не делать `composer update` лока без `--with ruflin/elastica:^7.3`.
+`php-http/discovery` — явный require-dev (на 7 его никто не тянет, а
+`DecorateElasticaClientsPass` ссылается на `Psr18ClientDiscovery`); его composer-плагин выключен
+(`allow-plugins: false`).
 
 ## `Statement::execute()` и DBAL 3/4
 
@@ -110,8 +159,8 @@ Symfony 8 DBAL 3 не ставится (конфликт с `symfony/http-founda
 
 ## Elastica: клиенты создаются в `boot()`
 
-`wireElasticaTransports()` достаёт каждый клиент и соединение при загрузке ядра —
-один раз на воркер. Ленивая обёртка — этап B вместе с поддержкой Elastica 8.
+`wireElasticaTransports()` (только Elastica 7) достаёт каждый клиент и соединение при загрузке
+ядра — один раз на воркер. На Elastica 8 клиенты остаются ленивыми: обёртка — в определении сервиса.
 
 ## BC check
 
