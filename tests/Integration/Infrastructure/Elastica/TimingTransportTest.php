@@ -55,6 +55,21 @@ final class TimingTransportTest extends TestCase
         self::assertTrue(RegistrySamples::exists($this->registry, MetricLabelEnum::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS));
     }
 
+    public function testResponseWithoutQueryTimeFallsBackToMeasuredDuration(): void
+    {
+        $inner = self::createStub(AbstractTransport::class);
+        $inner->method('exec')->willReturn(new Response('{}', 200));
+
+        $response = new TimingTransport()->init($inner, $this->collector)->exec(new Request('/index/_search', Request::POST), []);
+
+        self::assertNull($response->getQueryTime());
+        self::assertSame(
+            [['app', 'cmp', 'POST', '/index/_search']],
+            RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS, '_count'),
+        );
+        self::assertSame([], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
+    }
+
     public function testFailedRequestRecordsFailureAndRethrows(): void
     {
         $request = new Request('/index/_search', Request::POST);

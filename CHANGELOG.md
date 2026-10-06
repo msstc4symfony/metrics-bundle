@@ -19,6 +19,11 @@ All notable changes to this bundle are documented here. The format follows
 - `msstc4symfony_metrics.elastica.sanitize_path` (bool, default `true`); `false` keeps the raw
   request path in the label, as in 1.1.0.
 
+### Fixed
+
+- Elastica 7: a response without a query time (`NullTransport`, custom transports) no longer makes
+  the application request fail with a `TypeError`; the duration is measured around the call instead.
+
 ## [1.1.0] - 2026-10-05
 
 ### Added

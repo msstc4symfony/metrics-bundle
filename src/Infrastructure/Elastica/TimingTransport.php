@@ -44,11 +44,18 @@ final class TimingTransport extends AbstractTransport
 
         $method = $request->getMethod();
         $path = $this->sanitizePath ? ElasticaPathSanitizer::sanitize($request->getPath()) : $request->getPath();
+        $start = hrtime(true);
 
         try {
             $response = $this->inner->exec($request, $params);
+            // Only the HTTP transports set the query time; NullTransport and custom ones leave it null.
+            $queryTime = $response->getQueryTime();
             $this->collector->incRequestSuccess($method, $path);
-            $this->collector->setRequestDuration($method, $path, $response->getQueryTime());
+            $this->collector->setRequestDuration(
+                $method,
+                $path,
+                \is_float($queryTime) || \is_int($queryTime) ? $queryTime : (hrtime(true) - $start) / 1e9,
+            );
         } catch (Throwable $exception) {
             $this->collector->incRequestFailed($method, $path);
             throw $exception;

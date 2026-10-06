@@ -97,7 +97,7 @@ instanceof-тег `metrics.http_client.url_assembler`, только если и�
 ## Elastica: две точки измерения (с v1.1.0)
 
 - **7**: `TimingTransport` подменяет транспорт соединений в `boot()` (список клиентов —
-  `SaveElasticaClientsListPass`). Неуспех = транспорт бросил. Длительность — `Response::getQueryTime()`.
+  `SaveElasticaClientsListPass`). Неуспех = транспорт бросил. Длительность — `Response::getQueryTime()`, а если он `null` (`NullTransport`, свои транспорты) — `hrtime` вокруг вызова.
 - **8**: транспортного API нет (клиент строит `elastic/transport` поверх PSR-18 в конструкторе),
   поэтому `DecorateElasticaClientsPass` на этапе компиляции кладёт `TimingHttpClient` в
   `transport_config.http_client`. Неуспех: исключение PSR-18; статус < 400 — успех + длительность;
@@ -151,10 +151,9 @@ instanceof-тег `metrics.http_client.url_assembler`, только если и�
   параметра — опциональные хвостовые, Roave BC к v1.1.0 чист.
 - Сквозной тест без сети: `ElasticaPathLabelWiringTest` + `ElasticaWiringKernel` (7 — `NullTransport`
   объектом в `transport`, 8 — `Test\Support\StaticJsonPsr18Client` в `transport_config.http_client`).
-- Находка: на 7 `Response::getQueryTime()` может вернуть `null` (так у ответа `NullTransport` по
-  умолчанию) → `TypeError` в `ElasticaCollector::setRequestDuration()` внутри `TimingTransport::exec()`,
-  запрос приложения падает. Боевой HTTP-транспорт время всегда ставит; в тесте ответ `NullTransport`
-  задан с `setQueryTime()`. Не исправлено (вне задачи 1.2.0).
+- До 1.2.0 на 7 `Response::getQueryTime()` = `null` (ответ `NullTransport`, свои транспорты) давал
+  `TypeError` в `TimingTransport::exec()` и ронял запрос приложения; исправлено fallback'ом на `hrtime`
+  (`TimingTransportTest::testResponseWithoutQueryTimeFallsBackToMeasuredDuration`).
 
 ## CI-лок держит Elastica 7, хотя `composer-ci.json` разрешает `^7.3|^8.0`
 
