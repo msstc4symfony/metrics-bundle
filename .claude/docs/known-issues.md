@@ -136,6 +136,26 @@ instanceof-тег `metrics.http_client.url_assembler`, только если и�
 - Тестовый клиент Elastica 7 нельзя задать `['url' => 'http://host:9200']` — «Malformed URL»;
   `ElasticsearchKernel` разбирает `ELASTICSEARCH_URL` на `host`/`port`.
 
+## Elastica: нормализация метки `path` (v1.2.0, 2026-10-06 UTC)
+
+- `ElasticaPathSanitizer::sanitize()` (`@internal`, `Infrastructure/Elastica/`) — общая для 7 и 8:
+  сегмент после `_doc|_create|_update|_source|_explain|_termvectors` (если до него есть непустой
+  сегмент-индекс и после — непустой id) становится `:id`, затем весь путь проходит
+  `HttpClient\PathSanitizer` (UUID → `:uuid`, цифры → `:id`, 24+ hex → `:hash`). `''` остаётся `''`
+  (у `PathSanitizer` `''` → `/`), ведущий `/` сохраняется как был (на 7 путь с `/`, на 8 без).
+  Индекс целиком из цифр/UUID/длинного hex тоже заменится — сознательно, правила общие.
+- Флаг `msstc4symfony_metrics.elastica.sanitize_path` (`DecorateElasticaClientsPass::SANITIZE_PATH_PARAMETER`,
+  default true). 7: `boot()` читает параметр и передаёт в `TimingTransport::init(..., $sanitizePath)`.
+  8: пасс добавляет третьим аргументом `TimingHttpClient` строку `%…sanitize_path%`, только если
+  параметр есть (голый `ContainerBuilder` в тестах пасса — аргументов два, дефолт true). Оба новых
+  параметра — опциональные хвостовые, Roave BC к v1.1.0 чист.
+- Сквозной тест без сети: `ElasticaPathLabelWiringTest` + `ElasticaWiringKernel` (7 — `NullTransport`
+  объектом в `transport`, 8 — `Test\Support\StaticJsonPsr18Client` в `transport_config.http_client`).
+- Находка: на 7 `Response::getQueryTime()` может вернуть `null` (так у ответа `NullTransport` по
+  умолчанию) → `TypeError` в `ElasticaCollector::setRequestDuration()` внутри `TimingTransport::exec()`,
+  запрос приложения падает. Боевой HTTP-транспорт время всегда ставит; в тесте ответ `NullTransport`
+  задан с `setQueryTime()`. Не исправлено (вне задачи 1.2.0).
+
 ## CI-лок держит Elastica 7, хотя `composer-ci.json` разрешает `^7.3|^8.0`
 
 `composer-ci.lock` намеренно на Elastica 7 (`composer update ruflin/elastica --with ruflin/elastica:^7.3`).

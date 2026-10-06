@@ -95,6 +95,15 @@ final class MetricsBundle extends AbstractBundle
                         ->end()
                     ->end()
                 ->end()
+                ->arrayNode('elastica')
+                    ->addDefaultsIfNotSet()
+                    ->children()
+                        ->booleanNode('sanitize_path')
+                            ->info('Replace document ids and other identifiers in Elastica request paths with placeholders to bound the "path" label.')
+                            ->defaultTrue()
+                        ->end()
+                    ->end()
+                ->end()
                 ->arrayNode('metric_enums')
                     ->info("Extra metric catalogs, appended after the bundle's own.")
                     ->scalarPrototype()
@@ -127,6 +136,7 @@ final class MetricsBundle extends AbstractBundle
             ->set(self::PARAMETER_PREFIX . 'component_name', $config['component_name'] ?? null)
             ->set(self::PARAMETER_PREFIX . 'errors.short_exception_class_name', $this->section($config, 'errors')['short_exception_class_name'] ?? null)
             ->set(self::PARAMETER_PREFIX . 'http_client.sanitize_path', $this->section($config, 'http_client')['sanitize_path'] ?? null)
+            ->set(DecorateElasticaClientsPass::SANITIZE_PATH_PARAMETER, $this->section($config, 'elastica')['sanitize_path'] ?? null)
             ->set(self::PARAMETER_PREFIX . 'metric_enums', [MetricLabelEnum::class, ...array_values($this->section($config, 'metric_enums'))])
         ;
 
@@ -196,6 +206,8 @@ final class MetricsBundle extends AbstractBundle
             return;
         }
 
+        $sanitizePath = !$container->hasParameter(DecorateElasticaClientsPass::SANITIZE_PATH_PARAMETER) || $container->getParameter(DecorateElasticaClientsPass::SANITIZE_PATH_PARAMETER) !== false;
+
         foreach ($ids as $id) {
             $client = is_string($id) ? $container->get($id, ContainerInterface::NULL_ON_INVALID_REFERENCE) : null;
             if (!$client instanceof ElasticaClient) {
@@ -207,7 +219,7 @@ final class MetricsBundle extends AbstractBundle
                 // transport object that AbstractTransport::create() accepts at runtime.
                 $connection->setParam(
                     'transport',
-                    new TimingTransport()->init($connection->getTransportObject(), $collector),
+                    new TimingTransport()->init($connection->getTransportObject(), $collector, $sanitizePath),
                 );
             }
         }

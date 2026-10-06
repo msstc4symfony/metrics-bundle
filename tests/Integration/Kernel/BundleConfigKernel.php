@@ -25,6 +25,7 @@ use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
  *     component_name?: string,
  *     errors?: array{short_exception_class_name?: bool},
  *     http_client?: array{sanitize_path?: bool},
+ *     elastica?: array{sanitize_path?: bool},
  *     metric_enums?: list<string>,
  * }
  */

@@ -22,6 +22,8 @@ use Symfony\Component\DependencyInjection\Reference;
  */
 final class DecorateElasticaClientsPass implements CompilerPassInterface
 {
+    public const string SANITIZE_PATH_PARAMETER = 'msstc4symfony_metrics.elastica.sanitize_path';
+
     /**
      * Where the client's first argument may sit: ChildDefinition::replaceArgument(0) stores "index_0".
      */
@@ -66,7 +68,12 @@ final class DecorateElasticaClientsPass implements CompilerPassInterface
                 unset($transportConfig[$option]);
             }
 
-            $transportConfig['http_client'] = new Definition(TimingHttpClient::class, [$inner, new Reference(ElasticaCollector::class)]);
+            $timingArguments = [$inner, new Reference(ElasticaCollector::class)];
+            if ($container->hasParameter(self::SANITIZE_PATH_PARAMETER)) {
+                $timingArguments[] = '%' . self::SANITIZE_PATH_PARAMETER . '%';
+            }
+
+            $transportConfig['http_client'] = new Definition(TimingHttpClient::class, $timingArguments);
             $config['transport_config'] = $transportConfig;
 
             if ($definition instanceof ChildDefinition) {

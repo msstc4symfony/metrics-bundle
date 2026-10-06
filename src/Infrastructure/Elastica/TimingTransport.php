@@ -18,12 +18,16 @@ final class TimingTransport extends AbstractTransport
 
     private ?ElasticaCollector $collector = null;
 
+    private bool $sanitizePath = true;
+
     public function init(
         AbstractTransport $inner,
         ElasticaCollector $collector,
+        bool $sanitizePath = true,
     ): static {
         $this->inner = $inner;
         $this->collector = $collector;
+        $this->sanitizePath = $sanitizePath;
 
         return $this;
     }
@@ -38,12 +42,15 @@ final class TimingTransport extends AbstractTransport
             throw new LogicException(self::class . '::init() must be called before exec().');
         }
 
+        $method = $request->getMethod();
+        $path = $this->sanitizePath ? ElasticaPathSanitizer::sanitize($request->getPath()) : $request->getPath();
+
         try {
             $response = $this->inner->exec($request, $params);
-            $this->collector->incRequestSuccess($request->getMethod(), $request->getPath());
-            $this->collector->setRequestDuration($request->getMethod(), $request->getPath(), $response->getQueryTime());
+            $this->collector->incRequestSuccess($method, $path);
+            $this->collector->setRequestDuration($method, $path, $response->getQueryTime());
         } catch (Throwable $exception) {
-            $this->collector->incRequestFailed($request->getMethod(), $request->getPath());
+            $this->collector->incRequestFailed($method, $path);
             throw $exception;
         }
 

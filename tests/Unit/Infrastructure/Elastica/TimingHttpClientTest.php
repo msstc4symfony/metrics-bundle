@@ -10,6 +10,7 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use Nyholm\Psr7\Factory\Psr17Factory;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
 use Prometheus\Storage\InMemory;
@@ -69,7 +70,7 @@ final class TimingHttpClientTest extends TestCase
         $returned = $this->send($response, $factory->createRequest('GET', 'http://es:9200/missing/_doc/1'));
 
         self::assertSame($response, $returned);
-        self::assertSame([['app', 'cmp', 'GET', 'missing/_doc/1']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
+        self::assertSame([['app', 'cmp', 'GET', 'missing/_doc/:id']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
         self::assertFalse(RegistrySamples::exists($this->registry, MetricLabelEnum::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS));
     }
 
@@ -89,7 +90,7 @@ final class TimingHttpClientTest extends TestCase
 
         $this->send($factory->createResponse(404)->withBody($factory->createStream('{"_index":"i","_id":"1","found":false}')), $factory->createRequest('GET', 'http://es:9200/i/_doc/1'));
 
-        self::assertSame([['app', 'cmp', 'GET', 'i/_doc/1']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_SUCCESS));
+        self::assertSame([['app', 'cmp', 'GET', 'i/_doc/:id']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_SUCCESS));
         self::assertTrue(RegistrySamples::exists($this->registry, MetricLabelEnum::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS));
         self::assertFalse(RegistrySamples::exists($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
     }
@@ -231,7 +232,7 @@ final class TimingHttpClientTest extends TestCase
         $this->send($factory->createResponse(404)->withBody($stream), $factory->createRequest('GET', 'http://es:9200/i/_doc/1'));
 
         self::assertFalse($stream->read);
-        self::assertSame([['app', 'cmp', 'GET', 'i/_doc/1']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
+        self::assertSame([['app', 'cmp', 'GET', 'i/_doc/:id']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
     }
 
     public function testUnreadableErrorBodyIsFailureAndDoesNotEscape(): void
@@ -281,7 +282,57 @@ final class TimingHttpClientTest extends TestCase
         self::assertSame([['app', 'cmp', 'GET', 'index/_search']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_SUCCESS));
     }
 
-    private function send(ResponseInterface $response, RequestInterface $request): ResponseInterface
+    /**
+     * @return iterable<string, array{bool, string}>
+     */
+    public static function sanitizePathProvider(): iterable
+    {
+        yield 'sanitized by default' => [true, 'products/_doc/:id'];
+        yield 'raw when disabled' => [false, 'products/_doc/sku%2F42'];
+    }
+
+    #[DataProvider('sanitizePathProvider')]
+    public function testDocumentIdInThePathLabelFollowsTheSanitizeFlag(bool $sanitizePath, string $expected): void
+    {
+        $factory = new Psr17Factory();
+
+        $this->send($factory->createResponse(200), $factory->createRequest('GET', 'http://es:9200/products/_doc/sku%2F42'), $sanitizePath);
+
+        self::assertSame([['app', 'cmp', 'GET', $expected]], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_SUCCESS));
+        self::assertSame([['app', 'cmp', 'GET', $expected]], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS, '_count'));
+    }
+
+    #[DataProvider('sanitizePathProvider')]
+    public function testFailedRequestPathLabelFollowsTheSanitizeFlag(bool $sanitizePath, string $expected): void
+    {
+        $factory = new Psr17Factory();
+
+        $this->send($factory->createResponse(500)->withBody($factory->createStream('{"error":"x"}')), $factory->createRequest('GET', 'http://es:9200/products/_doc/sku%2F42'), $sanitizePath);
+
+        self::assertSame([['app', 'cmp', 'GET', $expected]], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
+    }
+
+    public function testThrownRequestPathLabelIsSanitized(): void
+    {
+        $factory = new Psr17Factory();
+        $inner = new class implements ClientInterface {
+            public function sendRequest(RequestInterface $request): ResponseInterface
+            {
+                throw new class('down') extends RuntimeException implements ClientExceptionInterface {
+                };
+            }
+        };
+
+        try {
+            new TimingHttpClient($inner, $this->collector)->sendRequest($factory->createRequest('GET', 'http://es:9200/products/_doc/42'));
+            self::fail('Expected the client exception to propagate');
+        } catch (ClientExceptionInterface) {
+        }
+
+        self::assertSame([['app', 'cmp', 'GET', 'products/_doc/:id']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
+    }
+
+    private function send(ResponseInterface $response, RequestInterface $request, bool $sanitizePath = true): ResponseInterface
     {
         $inner = new readonly class($response) implements ClientInterface {
             public function __construct(private ResponseInterface $response)
@@ -294,7 +345,7 @@ final class TimingHttpClientTest extends TestCase
             }
         };
 
-        return new TimingHttpClient($inner, $this->collector)->sendRequest($request);
+        return new TimingHttpClient($inner, $this->collector, $sanitizePath)->sendRequest($request);
     }
 
     public function testClientExceptionCountsAsFailureAndIsRethrown(): void

@@ -141,6 +141,10 @@ msstc4symfony_metrics:
     http_client:
         # Replace id/uuid/hash segments of outbound paths (/users/42 -> /users/:id) when no URL assembler matched.
         sanitize_path: true
+    elastica:
+        # Replace document ids (products/_doc/sku-1 -> products/_doc/:id) and id/uuid/hash segments
+        # in the "path" label of the elastica_request_* metrics. false keeps the raw request path.
+        sanitize_path: true
     # Extra metric catalogs (see "Adding a custom metric"), appended after the bundle's MetricLabelEnum.
     metric_enums: []
 ```
@@ -212,6 +216,19 @@ Every container service whose class is `Elastica\Client` or a subclass (FOSElast
 `elastica_request_duration_histogram_seconds`, labelled with the HTTP `method` and the request
 `path` without the leading `/` (`GET`, `index/_search`). Metric names, labels and buckets are the
 same on Elastica 7 and 8, so dashboards do not change when you upgrade.
+
+The `path` label is normalised so that its cardinality stays bounded
+(`msstc4symfony_metrics.elastica.sanitize_path`, default `true`, same on 7 and 8):
+
+- In a document endpoint `<index>/<endpoint>/<id>` with `<endpoint>` one of `_doc`, `_create`,
+  `_update`, `_source`, `_explain`, `_termvectors`, the id segment becomes `:id`, whatever it
+  looks like (`products/_doc/sku%2F1` → `products/_doc/:id`).
+- Then the `http_client.sanitize_path` rules apply to every segment: a UUID becomes `:uuid`, digits
+  become `:id`, 24+ hex characters become `:hash` (`_tasks/1234` → `_tasks/:id`).
+- Index names and endpoints such as `_search`, `_bulk`, `_cluster/health` are kept. An index whose
+  whole name is digits, a UUID or long hex would be replaced too.
+
+With `sanitize_path: false` the label is the raw request path, as before 1.2.0.
 
 | | Elastica 7 | Elastica 8 |
 | --- | --- | --- |

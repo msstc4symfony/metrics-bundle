@@ -48,6 +48,27 @@ final class DecorateElasticaClientsPassTest extends TestCase
         self::assertSame(['http://es:9200'], $this->config($container)['hosts'] ?? null);
     }
 
+    public function testHandsTheSanitizePathParameterToTheTimingClient(): void
+    {
+        $container = $this->container(new Definition(Client::class, [['hosts' => ['http://es:9200']]]));
+        $container->setParameter(DecorateElasticaClientsPass::SANITIZE_PATH_PARAMETER, false);
+
+        new DecorateElasticaClientsPass()->process($container);
+
+        $http = $this->httpClient($container);
+        self::assertSame('%' . DecorateElasticaClientsPass::SANITIZE_PATH_PARAMETER . '%', $http->getArgument(2));
+        self::assertFalse($container->getParameterBag()->resolveValue($http->getArgument(2)));
+    }
+
+    public function testKeepsTheTimingClientDefaultWithoutTheSanitizePathParameter(): void
+    {
+        $container = $this->container(new Definition(Client::class, [['hosts' => ['http://es:9200']]]));
+
+        new DecorateElasticaClientsPass()->process($container);
+
+        self::assertCount(2, $this->httpClient($container)->getArguments());
+    }
+
     public function testWrapsTheConfiguredHttpClient(): void
     {
         $container = $this->container(new Definition(Client::class, [[

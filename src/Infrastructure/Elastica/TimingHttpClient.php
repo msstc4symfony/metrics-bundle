@@ -17,6 +17,7 @@ final readonly class TimingHttpClient implements ClientInterface
     public function __construct(
         private ClientInterface $inner,
         private ElasticaCollector $collector,
+        private bool $sanitizePath = true,
     ) {
     }
 
@@ -25,6 +26,9 @@ final readonly class TimingHttpClient implements ClientInterface
     {
         $method = $request->getMethod();
         $path = ltrim($request->getUri()->getPath(), '/');
+        if ($this->sanitizePath) {
+            $path = ElasticaPathSanitizer::sanitize($path);
+        }
         $start = hrtime(true);
 
         try {

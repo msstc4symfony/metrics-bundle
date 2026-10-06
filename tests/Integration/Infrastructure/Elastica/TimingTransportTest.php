@@ -13,6 +13,7 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Elastica\TimingTransport;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
 use Prometheus\Storage\InMemory;
@@ -75,6 +76,52 @@ final class TimingTransportTest extends TestCase
             [['app', 'cmp', 'POST', '/index/_search']],
             RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED),
         );
+    }
+
+    /**
+     * @return iterable<string, array{bool|null, string}>
+     */
+    public static function sanitizePathProvider(): iterable
+    {
+        yield 'sanitized by default' => [null, '/products/_doc/:id'];
+        yield 'sanitized when enabled' => [true, '/products/_doc/:id'];
+        yield 'raw when disabled' => [false, '/products/_doc/sku%2F42'];
+    }
+
+    #[DataProvider('sanitizePathProvider')]
+    public function testDocumentIdInThePathLabelFollowsTheSanitizeFlag(?bool $sanitizePath, string $expected): void
+    {
+        $response = self::createStub(Response::class);
+        $response->method('getQueryTime')->willReturn(0.05);
+        $inner = self::createStub(AbstractTransport::class);
+        $inner->method('exec')->willReturn($response);
+
+        $transport = $sanitizePath === null
+            ? new TimingTransport()->init($inner, $this->collector)
+            : new TimingTransport()->init($inner, $this->collector, $sanitizePath);
+        $transport->exec(new Request('/products/_doc/sku%2F42', Request::GET), []);
+
+        self::assertSame([['app', 'cmp', 'GET', $expected]], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_SUCCESS));
+        self::assertSame([['app', 'cmp', 'GET', $expected]], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS, '_count'));
+    }
+
+    #[DataProvider('sanitizePathProvider')]
+    public function testFailedRequestPathLabelFollowsTheSanitizeFlag(?bool $sanitizePath, string $expected): void
+    {
+        $inner = self::createStub(AbstractTransport::class);
+        $inner->method('exec')->willThrowException(new RuntimeException('upstream gone'));
+
+        $transport = $sanitizePath === null
+            ? new TimingTransport()->init($inner, $this->collector)
+            : new TimingTransport()->init($inner, $this->collector, $sanitizePath);
+
+        try {
+            $transport->exec(new Request('/products/_doc/sku%2F42', Request::GET), []);
+            self::fail('Expected the transport exception to propagate');
+        } catch (RuntimeException) {
+        }
+
+        self::assertSame([['app', 'cmp', 'GET', $expected]], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
     }
 
     public function testExecBeforeInitThrowsLogicException(): void

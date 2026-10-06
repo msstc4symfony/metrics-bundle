@@ -4,6 +4,21 @@ All notable changes to this bundle are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions follow
 [Semantic Versioning](https://semver.org/); dates are UTC.
 
+## [1.2.0] - 2026-10-06
+
+### Changed
+
+- The `path` label of the `elastica_request_*` metrics is normalised on Elastica 7 and 8: the id of a
+  document endpoint (`<index>/{_doc,_create,_update,_source,_explain,_termvectors}/<id>`) becomes
+  `:id`, then UUID / digit / long-hex segments become `:uuid` / `:id` / `:hash`. Label values for
+  document paths change (`products/_doc/sku-1` → `products/_doc/:id`): dashboards and alerts that
+  match raw ids need updating.
+
+### Added
+
+- `msstc4symfony_metrics.elastica.sanitize_path` (bool, default `true`); `false` keeps the raw
+  request path in the label, as in 1.1.0.
+
 ## [1.1.0] - 2026-10-05
 
 ### Added
@@ -51,5 +66,6 @@ First release of `msstc4symfony/metrics-bundle` (namespace `Msstc4Symfony\Metric
 - Optional: Doctrine DBAL / DoctrineBundle, `mongodb/mongodb`, `ruflin/elastica` ^7.3|^8.0, Symfony
   HttpClient, Messenger, APCu.
 
+[1.2.0]: https://github.com/msstc4symfony/metrics-bundle/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/msstc4symfony/metrics-bundle/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/msstc4symfony/metrics-bundle/releases/tag/v1.0.0

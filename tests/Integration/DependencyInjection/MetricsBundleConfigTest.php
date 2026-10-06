@@ -61,6 +61,7 @@ final class MetricsBundleConfigTest extends TestCase
         self::assertSame('unknown', $container->getParameter('msstc4symfony_metrics.component_name'));
         self::assertFalse($container->getParameter('msstc4symfony_metrics.errors.short_exception_class_name'));
         self::assertTrue($container->getParameter('msstc4symfony_metrics.http_client.sanitize_path'));
+        self::assertTrue($container->getParameter('msstc4symfony_metrics.elastica.sanitize_path'));
         self::assertSame([MetricLabelEnum::class], $container->getParameter('msstc4symfony_metrics.metric_enums'));
     }
 
@@ -85,6 +86,7 @@ final class MetricsBundleConfigTest extends TestCase
             'component_name' => 'worker',
             'errors' => ['short_exception_class_name' => true],
             'http_client' => ['sanitize_path' => false],
+            'elastica' => ['sanitize_path' => false],
             'metric_enums' => [ExtraMetricEnum::class],
         ])->getContainer();
 
@@ -94,6 +96,7 @@ final class MetricsBundleConfigTest extends TestCase
         self::assertSame('worker', $container->getParameter('msstc4symfony_metrics.component_name'));
         self::assertTrue($container->getParameter('msstc4symfony_metrics.errors.short_exception_class_name'));
         self::assertFalse($container->getParameter('msstc4symfony_metrics.http_client.sanitize_path'));
+        self::assertFalse($container->getParameter('msstc4symfony_metrics.elastica.sanitize_path'));
         self::assertSame(
             [MetricLabelEnum::class, ExtraMetricEnum::class],
             $container->getParameter('msstc4symfony_metrics.metric_enums'),
