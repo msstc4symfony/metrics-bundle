@@ -61,7 +61,7 @@
    - `SaveElasticaClientsListPass` (Elastica 7) — пишет id клиентов в параметр
      `msstc4symfony_metrics.elastica.clients` (`SaveElasticaClientsListPass::PARAMETER`) и делает
      их public. На Elastica 8 (нет `AbstractTransport`) — пустой список;
-   - `DecorateElasticaClientsPass` (Elastica 8, гард `class_exists(Elastic\Transport\Transport)`) —
+   - `DecorateElasticaClientsPass` (Elastica 8 и 9, гард `class_exists(Elastic\Transport\Transport)`) —
      в литеральный массив конфига клиента (`index_0` / `$config` / `0`, свой или от родителя) пишет
      `transport_config.http_client` = inline `TimingHttpClient(<inner>, @ElasticaCollector[, %msstc4symfony_metrics.elastica.sanitize_path%])`, где
      `<inner>` = фабрика `ConfiguredHttpClientFactory::create(<http_client|null>, http_client_config,
@@ -69,7 +69,7 @@
      конфиг/`transport_config` — пропуск с `$container->log()`.
 4. `MetricsBundle::boot()` — то, что нельзя сделать в контейнере:
    подписка `TimingSubscriber` на драйвер MongoDB и подмена транспорта у
-   соединений Elastica 7 на `TimingTransport` с флагом `elastica.sanitize_path` (на 8 — ничего,
+   соединений Elastica 7 на `TimingTransport` с флагом `elastica.sanitize_path` (на 8/9 — ничего,
    там всё сделал пасс). Метку `path` на обеих версиях нормализует `ElasticaPathSanitizer`.
 5. `MetricRepositoryFactory` собирает каталог из `msstc4symfony_metrics.metric_enums` (повторный
    класс читается один раз); одинаковое имя метрики в двух enum — `LogicException`.

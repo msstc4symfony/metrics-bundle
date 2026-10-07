@@ -185,7 +185,7 @@ final class MetricsBundle extends AbstractBundle
 
     private function wireElasticaTransports(ContainerInterface $container): void
     {
-        // TimingTransport hooks the Elastica 7 connection/transport API, which Elastica 8 removed.
+        // TimingTransport hooks the Elastica 7 connection/transport API, which Elastica 8 and 9 do not have.
         if (!class_exists(AbstractTransport::class)) {
             return;
         }

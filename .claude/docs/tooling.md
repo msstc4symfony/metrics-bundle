@@ -6,7 +6,7 @@
   Опциональные библиотеки — в `suggest`.
 - `composer-ci.json` — тот же runtime + опциональные библиотеки
   (`symfony/http-client`, `symfony/messenger`, `doctrine/dbal`, `doctrine/doctrine-bundle`, `mongodb/mongodb` ^2,
-  `ruflin/elastica` `^7.3|^8.0`, лок на 7 — см. known-issues, `php-http/discovery`, `psr/http-client`,
+  `ruflin/elastica` `^7.3|^8.0|^9.0`, лок на 7 — см. known-issues, `php-http/discovery`, `psr/http-client`,
   `nyholm/psr7`) + deptrac, infection, Roave BC check. Лок —
   `composer-ci.lock`, коммитится.
 - `config.platform.ext-mongodb` в `composer-ci.json` = версия расширения на
@@ -59,10 +59,11 @@ dry-run → deptrac. Запускать как `COMPOSER=composer-ci.json make c
 
 ## Elastica в CI
 
-- Основные ячейки PHPUnit (`composer update`) ставят Elastica 8, lowest — 7.3.0, статанализ и
-  Infection — лок (7.3.2).
+- Основные ячейки PHPUnit (`composer update`) ставят Elastica 9 (с v1.3.0; до того 8), lowest — 7.3.0,
+  статанализ и Infection — лок (7.3.2). Полный набор тестов на Elastica 8 в CI больше не гоняется —
+  только `--group elasticsearch` в ячейке `^8.0` ниже.
 - Job «Elasticsearch integration» (`bundle-standard` `v1.1.0`, вход `elasticsearch` в
-  `checks.yml`): Elastica `^7.3` + ES `7.17.29` и `^8.0` + ES `8.19.22` (теги — те же, что в
+  `checks.yml`): Elastica `^7.3` + ES `7.17.29`, `^8.0` + ES `8.19.22` и `^9.0` + ES `9.5.5` (теги — те же, что в
   healthcheck-bundle), гоняет `vendor/bin/phpunit --group elasticsearch`.
 - Локально: `docker run -d --rm --name es -p 9200:9200 -e discovery.type=single-node
   -e xpack.security.enabled=false -e ES_JAVA_OPTS='-Xms512m -Xmx512m'

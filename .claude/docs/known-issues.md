@@ -155,7 +155,7 @@ instanceof-тег `metrics.http_client.url_assembler`, только если и�
   `TypeError` в `TimingTransport::exec()` и ронял запрос приложения; исправлено fallback'ом на `hrtime`
   (`TimingTransportTest::testResponseWithoutQueryTimeFallsBackToMeasuredDuration`).
 
-## CI-лок держит Elastica 7, хотя `composer-ci.json` разрешает `^7.3|^8.0`
+## CI-лок держит Elastica 7, хотя `composer-ci.json` разрешает `^7.3|^8.0|^9.0`
 
 `composer-ci.lock` намеренно на Elastica 7 (`composer update ruflin/elastica --with ruflin/elastica:^7.3`).
 На лок-е с 8 PHPStan падает internal error: `TimingTransport extends AbstractTransport`,
@@ -163,8 +163,9 @@ instanceof-тег `metrics.http_client.url_assembler`, только если и�
 классе → fatal при автозагрузке; плюс `Request::getPath()`, `Response::getQueryTime()`,
 `Client::getConnections()` в 8 отсутствуют. `phpstan.dist.neon` — шаблон стандарта, ни stubs,
 ни `excludePaths` туда не добавить. Поэтому PHPStan/Rector/deptrac/Infection идут на 7, а
-Elastica 8 покрывают ячейки PHPUnit (`composer update` → highest = 8; lowest = 7.3.0) и
-job «Elasticsearch integration» (8.19.22). Не делать `composer update` лока без `--with ruflin/elastica:^7.3`.
+Elastica 9 покрывают ячейки PHPUnit (`composer update` → highest = 9 с v1.3.0; lowest = 7.3.0), а 8 и 9 —
+job «Elasticsearch integration» (8.19.22, 9.5.5). Полный набор на 8 в CI больше не идёт (только группа
+`elasticsearch`); при правках пути 8 гоняй его вручную: `composer update ruflin/elastica -W --with ruflin/elastica:^8.0` в копии. Не делать `composer update` лока без `--with ruflin/elastica:^7.3`.
 `php-http/discovery` — явный require-dev (на 7 его никто не тянет, а
 `DecorateElasticaClientsPass` ссылается на `Psr18ClientDiscovery`); его composer-плагин выключен
 (`allow-plugins: false`).
@@ -175,6 +176,28 @@ DBAL 3 передаёт параметры в `execute($params)`, DBAL 4 пар�
 принимает `mixed $params = null` и форвардит `func_get_args()`. CI-лок держит DBAL 4;
 DBAL 3 (3.10 + Symfony 7.4) проверен вручную 2026-10-01 — весь набор зелёный. На
 Symfony 8 DBAL 3 не ставится (конфликт с `symfony/http-foundation`).
+
+## Elastica 9 (v1.3.0, 2026-10-07 UTC)
+
+- Elastica 9.0.0 (elasticsearch-php 9.x, elastic-transport 9.x) для бандла ведёт себя как 8: тот же
+  `Elastic\Transport\Transport` (гард пасса), те же ключи `transport_config.http_client` /
+  `http_client_config` / `http_client_options`, тот же `Client::setTransportClientOptions()` и
+  `AdapterOptions::HTTP_ADAPTERS` (+ `Elastic\Transport\Client\Curl` → адаптер `ElasticCurl`).
+  Проверено 2026-10-07 UTC: полный phpunit на Elastica 9.0.0 / elasticsearch-php 9.5.0 /
+  elastic-transport 9.0.1 зелёный, `--group elasticsearch` против ES 9.5.5 зелёный.
+- **Нет PSR-18 клиента.** `TransportBuilder::getClient()` в elastic-transport 9 при
+  `NotFoundException` discovery берёт свой `Elastic\Transport\Client\Curl` (PSR-18), в 8.x (до 8.11.0
+  включительно) — исключение летит наружу. Пасс всегда кладёт `http_client` (обёртку), поэтому fallback
+  транспорта не срабатывает — его повторяет `ConfiguredHttpClientFactory::discover()`: Curl, если класс
+  есть (имя строкой в static-свойстве, как класс исключения), иначе rethrow. Curl измеряется как любой
+  клиент. Решение в рантайме, не в пассе: наличие discoverable клиента зависит от автозагрузки/стратегий
+  во время работы, а не от контейнера.
+- Ловушка `ElasticCurl`: `http_client_options` он передаёт в `new Curl(...)` как сырые опции cURL, так что
+  `['timeout' => 3]` (FOSElasticaBundle задаёт такие) роняет запрос `ValueError: curl_setopt_array()`
+  — и без бандла так же (апстрим). Тест опций в fallback использует только `http_client_config`.
+- Тест без discovery: `ClassDiscovery::setStrategies([])` + восстановление в `tearDown()`. Пустые стратегии
+  ломают и PSR-17 discovery (`Node` транспорта зовёт `Psr17FactoryDiscovery::findUriFactory()`), так что
+  клиента Elastica в таком тесте строить нельзя — только фабрику.
 
 ## Elastica: клиенты создаются в `boot()`
 

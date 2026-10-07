@@ -30,7 +30,8 @@ jobs:
       elasticsearch: >-
         [
           {"elastica": "^7.3", "image": "docker.elastic.co/elasticsearch/elasticsearch:7.17.29"},
-          {"elastica": "^8.0", "image": "docker.elastic.co/elasticsearch/elasticsearch:8.19.22"}
+          {"elastica": "^8.0", "image": "docker.elastic.co/elasticsearch/elasticsearch:8.19.22"},
+          {"elastica": "^9.0", "image": "docker.elastic.co/elasticsearch/elasticsearch:9.5.5"}
         ]
     secrets:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

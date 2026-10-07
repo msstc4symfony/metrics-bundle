@@ -16,7 +16,7 @@ final class SaveElasticaClientsListPass implements CompilerPassInterface
     #[Override]
     public function process(ContainerBuilder $container): void
     {
-        // The Elastica 7 transport API this list feeds is gone in Elastica 8 (DecorateElasticaClientsPass covers 8).
+        // The Elastica 7 transport API this list feeds is gone in Elastica 8+ (DecorateElasticaClientsPass covers 8 and 9).
         if (!class_exists(AbstractTransport::class)) {
             $container->setParameter(self::PARAMETER, []);
 

@@ -57,7 +57,7 @@
     "rector/rector": "^2.1",
     "roave/backward-compatibility-check": "^8.20",
     "roave/security-advisories": "dev-latest",
-    "ruflin/elastica": "^7.3|^8.0",
+    "ruflin/elastica": "^7.3|^8.0|^9.0",
     "spaze/phpstan-disallowed-calls": "^v4.0",
     "symfony/http-client": "^7.4|^8.0",
     "symfony/messenger": "^7.4|^8.0"

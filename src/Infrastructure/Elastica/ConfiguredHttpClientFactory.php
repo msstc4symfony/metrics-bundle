@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Infrastructure\Elastica;
 
+use Http\Discovery\Exception\NotFoundException;
 use Http\Discovery\Psr18ClientDiscovery;
 use LogicException;
 use Psr\Http\Client\ClientInterface;
@@ -11,11 +12,11 @@ use ReflectionClass;
 use Throwable;
 
 /**
- * Elastica 8: builds the PSR-18 client the way Elastica\Client::setTransportClientOptions() would, so that
+ * Elastica 8 and 9: builds the PSR-18 client the way Elastica\Client::setTransportClientOptions() would, so that
  * TimingHttpClient can wrap it — Elastica looks the options adapter up by the concrete client class and
  * cannot apply "http_client_config"/"http_client_options" to the wrapper.
  *
- * The elasticsearch-php 8 classes are named by string: the CI lock carries Elastica 7, where they do not
+ * The elasticsearch-php / elastic-transport 8+ classes are named by string: the CI lock carries Elastica 7, where they do not
  * exist, and PHPStan analyses this file there as well.
  *
  * @internal
@@ -32,12 +33,17 @@ final class ConfiguredHttpClientFactory
     private static string $exceptionClass = 'Elastic\Elasticsearch\Exception\HttpClientException';
 
     /**
+     * elastic/transport 9 falls back to this client when discovery finds none; 8 rethrows (a property — see above).
+     */
+    private static string $fallbackClientClass = 'Elastic\Transport\Client\Curl';
+
+    /**
      * @param array<array-key, mixed>|null $config transport_config.http_client_config
      * @param array<array-key, mixed>|null $options transport_config.http_client_options
      */
     public static function create(?ClientInterface $client, ?array $config, ?array $options): ClientInterface
     {
-        $client ??= Psr18ClientDiscovery::find();
+        $client ??= self::discover();
         $config ??= [];
         $options ??= [];
 
@@ -62,6 +68,23 @@ final class ConfiguredHttpClientFactory
         }
 
         return $configured;
+    }
+
+    /**
+     * Mirrors elastic/transport TransportBuilder::getClient().
+     */
+    private static function discover(): ClientInterface
+    {
+        try {
+            return Psr18ClientDiscovery::find();
+        } catch (NotFoundException $notFoundException) {
+            $fallback = class_exists(self::$fallbackClientClass) ? new ReflectionClass(self::$fallbackClientClass)->newInstance() : null;
+            if (!$fallback instanceof ClientInterface) {
+                throw $notFoundException;
+            }
+
+            return $fallback;
+        }
     }
 
     private static function exception(string $message): Throwable

@@ -18,7 +18,7 @@ use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
 
 /**
- * Elastica 8: puts TimingHttpClient in front of each client's PSR-18 client through its "transport_config".
+ * Elastica 8 and 9: puts TimingHttpClient in front of each client's PSR-18 client through its "transport_config".
  */
 final class DecorateElasticaClientsPass implements CompilerPassInterface
 {

@@ -15,7 +15,7 @@ Out of the box the following are measured:
 - Doctrine DBAL queries (count, duration, type, table)
 - MongoDB driver commands
 - Symfony Messenger messages sent to transports and consumed by workers (count by outcome, handling duration)
-- `ruflin/elastica` 7.x and 8.x requests, for `Elastica\Client` and its subclasses (FOSElasticaBundle clients included) — see [Elastica metrics](#elastica-metrics)
+- `ruflin/elastica` 7.x, 8.x and 9.x requests, for `Elastica\Client` and its subclasses (FOSElasticaBundle clients included) — see [Elastica metrics](#elastica-metrics)
 - system info (CPU load, memory, OPcache, FPM, filesystem)
 
 The exact list of metrics with labels and histogram buckets is shown by `bin/console metrics:list`.
@@ -215,10 +215,10 @@ Every container service whose class is `Elastica\Client` or a subclass (FOSElast
 `elastica_request_success`, `elastica_request_failed` and
 `elastica_request_duration_histogram_seconds`, labelled with the HTTP `method` and the request
 `path` without the leading `/` (`GET`, `index/_search`). Metric names, labels and buckets are the
-same on Elastica 7 and 8, so dashboards do not change when you upgrade.
+same on Elastica 7, 8 and 9, so dashboards do not change when you upgrade.
 
 The `path` label is normalised so that its cardinality stays bounded
-(`msstc4symfony_metrics.elastica.sanitize_path`, default `true`, same on 7 and 8):
+(`msstc4symfony_metrics.elastica.sanitize_path`, default `true`, same on 7, 8 and 9):
 
 - In a document endpoint `<index>/<endpoint>/<id>` with `<endpoint>` one of `_doc`, `_create`,
   `_update`, `_source`, `_explain`, `_termvectors`, the id segment becomes `:id`, whatever it
@@ -230,7 +230,7 @@ The `path` label is normalised so that its cardinality stays bounded
 
 With `sanitize_path: false` the label is the raw request path, as before 1.2.0.
 
-| | Elastica 7 | Elastica 8 |
+| | Elastica 7 | Elastica 8 and 9 |
 | --- | --- | --- |
 | Measurement point | the connection transport, wrapped when the kernel boots | the PSR-18 HTTP client, wrapped through `transport_config.http_client` at container compile time |
 | Failed request | the transport throws: connection error, a body with a top-level `error` key, or a partial shard failure (`_shards.failed` > 0) | the HTTP client throws, or the status is ≥ 400 **and** the body is not a JSON object or has a top-level `error` key; a `404` with `"found": false` and an empty `HEAD 404` count as successful, as on 7 |
@@ -239,7 +239,7 @@ With `sanitize_path: false` the label is the raw request path, as before 1.2.0.
 FOSElasticaBundle clients (child definitions of `fos_elastica.client_prototype`) are found through
 their parent definition on both versions.
 
-Differences and limits on Elastica 8:
+Differences and limits on Elastica 8 and 9 ("8" below means both):
 
 - The client's configuration (first constructor argument or the named `$config` argument, on the
   service or inherited from its parent definition) must be a literal array. A client configured with a
@@ -248,6 +248,10 @@ Differences and limits on Elastica 8:
 - `transport_config.http_client_config` / `http_client_options` keep working: the bundle applies them
   to the HTTP client exactly as Elastica does (same adapters, same error for a client without one)
   and then wraps the result.
+- Without `transport_config.http_client` the HTTP client is discovered (`php-http/discovery`), as
+  elastic-transport does. If no PSR-18 client is installed, Elastica 9 falls back to elastic-transport's
+  own `Elastic\Transport\Client\Curl` and the bundle does the same, so that client is measured too; on
+  Elastica 8 there is no fallback and the discovery error is thrown, with or without the bundle.
 - A `transport_config.http_client` you configure yourself is kept and wrapped. If it is Symfony's
   `psr18.http_client`, the same requests are also counted in the `http_client_*` metrics (a separate
   metric family).
@@ -339,7 +343,7 @@ the metric repository throws a `LogicException` naming both cases.
 
 ## How it works
 
-Collectors measure at well-known integration points (Symfony kernel events, console events, Monolog handler decorator, Doctrine DBAL middleware, MongoDB driver subscriber, Elastica transport adapter on 7 / PSR-18 client decorator on 8, `symfony/http-client` decorator). They write to a Prometheus `RegistryInterface` backed by the configured storage adapter (Redis by default). Prometheus periodically scrapes the `/_/metrics` controller, which renders the registry as text/plain.
+Collectors measure at well-known integration points (Symfony kernel events, console events, Monolog handler decorator, Doctrine DBAL middleware, MongoDB driver subscriber, Elastica transport adapter on 7 / PSR-18 client decorator on 8 and 9, `symfony/http-client` decorator). They write to a Prometheus `RegistryInterface` backed by the configured storage adapter (Redis by default). Prometheus periodically scrapes the `/_/metrics` controller, which renders the registry as text/plain.
 
 Metric state lives in Redis indefinitely (or until `metrics:clear` is run / the app is redeployed and the keys are flushed). Each scrape returns the full current state — Prometheus overwrites its own series on every scrape, so a stale Redis simply produces stale values, not duplicates.
 
