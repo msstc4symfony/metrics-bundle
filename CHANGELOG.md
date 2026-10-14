@@ -6,14 +6,14 @@ All notable changes to this bundle are documented here. The format follows
 
 ## [1.4.0] - 2026-10-14
 
+### Added
+
+- `symfony/polyfill-php84` dependency (`array_any` on PHP 8.2/8.3).
+
 ### Changed
 
 - Requires PHP 8.2 instead of 8.4 (Symfony 8 still needs PHP 8.4).
 - Class constants no longer declare a native type (PHP 8.2 has none); values are unchanged.
-
-### Added
-
-- `symfony/polyfill-php84` dependency (`array_any` on PHP 8.2/8.3).
 
 ## [1.3.0] - 2026-10-07
 

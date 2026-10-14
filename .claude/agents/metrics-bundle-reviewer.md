@@ -46,7 +46,7 @@ PHPStan level 10 analyses all of `src/` and `tests/` with no `excludePaths` (sha
 - PSR-4 for tests: `Msstc4Symfony\MetricsBundle\Test\` → `tests/`.
 
 ### 7. Symfony/PHP compatibility
-- `composer.json` requires PHP `>=8.4` and Symfony `^7.4|^8.0` (the `bundle-standard` verifier enforces both). PHPStan runs with `phpVersion: 80400`, Rector with the PHP 8.4 set. Lower bounds of other dependencies are real: CI runs a `--prefer-lowest` cell, so raising a used API's minimum version means raising the constraint in `composer.json` and `composer-ci.json`.
+- `composer.json` requires PHP `>=8.2` and Symfony `^7.4|^8.0` (the `bundle-standard` verifier enforces both). PHPStan runs with `phpVersion: {min: 80200, max: 80599}`, Rector with the PHP 8.2 set. Code must run on 8.2: no typed class constants, anonymous `readonly class`, `new X()->m()`, property hooks or asymmetric visibility; PHP 8.3/8.4 functions (`array_any`, `json_validate`, …) only with the matching `symfony/polyfill-php8x` in `require`. Lower bounds of other dependencies are real: CI runs a `--prefer-lowest` cell, so raising a used API's minimum version means raising the constraint in `composer.json` and `composer-ci.json`.
 - The bundle uses `#[AsEventListener]`, `#[AsCommand]`, `#[AsController]`, `#[Route]` attributes everywhere; the rest of the wiring is `src/Resources/config/services.php` and `MetricsBundle::loadExtension()`. Don't reintroduce YAML/XML wiring, plain (non-config) bundle parameters or BC-only optional constructor arguments.
 
 ### 8. Endpoint and routing
