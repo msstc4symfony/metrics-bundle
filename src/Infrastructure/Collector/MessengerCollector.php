@@ -9,7 +9,7 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 
 final class MessengerCollector extends AbstractCollector
 {
-    private const string ANONYMOUS_CLASS_MARKER = '@anonymous';
+    private const ANONYMOUS_CLASS_MARKER = '@anonymous';
 
     /**
      * @param class-string $messageClass

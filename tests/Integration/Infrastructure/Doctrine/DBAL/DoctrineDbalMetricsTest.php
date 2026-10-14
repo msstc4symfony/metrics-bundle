@@ -21,7 +21,7 @@ use Symfony\Component\Filesystem\Filesystem;
  */
 final class DoctrineDbalMetricsTest extends KernelTestCase
 {
-    private const string DSN_ENV = 'METRICS_STORAGE_DSN';
+    private const DSN_ENV = 'METRICS_STORAGE_DSN';
 
     #[Override]
     protected function setUp(): void
@@ -30,7 +30,7 @@ final class DoctrineDbalMetricsTest extends KernelTestCase
             self::markTestSkipped('doctrine/doctrine-bundle, ext-pdo_sqlite or symfony/monolog-bundle missing');
         }
 
-        new Filesystem()->remove(TestKernel::cacheRoot());
+        (new Filesystem())->remove(TestKernel::cacheRoot());
         $_SERVER[self::DSN_ENV] = 'inmemory://';
     }
 
@@ -39,7 +39,7 @@ final class DoctrineDbalMetricsTest extends KernelTestCase
     {
         parent::tearDown();
         unset($_SERVER[self::DSN_ENV]);
-        new Filesystem()->remove(TestKernel::cacheRoot());
+        (new Filesystem())->remove(TestKernel::cacheRoot());
     }
 
     #[Override]

@@ -37,7 +37,7 @@ final class StatementTest extends TestCase
         $registry = new CollectorRegistry(new InMemory());
         $collector = new DoctrineConnectionCollector($registry, new MetricRepository([]), 'app', 'cmp');
 
-        self::assertSame($result, new Statement($inner, new QueryMeter($collector, 'default', new QueryLabeller()), 'SELECT * FROM users')->execute());
+        self::assertSame($result, (new Statement($inner, new QueryMeter($collector, 'default', new QueryLabeller()), 'SELECT * FROM users'))->execute());
 
         self::assertSame([['app', 'cmp', 'default', 'select', 'users']], RegistrySamples::labels($registry, MetricLabelEnum::DOCTRINE_QUERY_EXECUTE));
     }

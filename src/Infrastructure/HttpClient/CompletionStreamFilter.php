@@ -7,7 +7,6 @@ namespace Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient;
 use Closure;
 use Override;
 use php_user_filter;
-use StreamBucket;
 
 /**
  * Pass-through read filter that reports the end of the body. Lets toStream() keep the inner,
@@ -17,7 +16,7 @@ use StreamBucket;
  */
 final class CompletionStreamFilter extends php_user_filter
 {
-    public const string NAME = 'msstc4symfony.metrics.completion';
+    public const NAME = 'msstc4symfony.metrics.completion';
 
     public static function attach(mixed $stream, Closure $onClosing): void
     {
@@ -38,8 +37,10 @@ final class CompletionStreamFilter extends php_user_filter
     #[Override]
     public function filter($in, $out, &$consumed, bool $closing): int
     {
-        while (($bucket = stream_bucket_make_writeable($in)) instanceof StreamBucket) {
-            $consumed += $bucket->datalen;
+        // Before PHP 8.4 the bucket is a plain object, not a StreamBucket: no instanceof here.
+        while (is_object($bucket = stream_bucket_make_writeable($in))) {
+            $length = $bucket->datalen;
+            $consumed += is_int($length) ? $length : 0;
             stream_bucket_append($out, $bucket);
         }
 

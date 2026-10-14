@@ -26,7 +26,7 @@ final class AddMonologDecoratorCompilerPassTest extends TestCase
         $container = new ContainerBuilder();
         $container->setDefinition('monolog.logger.app', new Definition(Logger::class));
 
-        new AddMonologDecoratorCompilerPass()->process($container);
+        (new AddMonologDecoratorCompilerPass())->process($container);
 
         self::assertTrue($container->hasDefinition('monolog.logger.app.decorator.metrics'));
         $decorator = $container->getDefinition('monolog.logger.app.decorator.metrics');
@@ -40,7 +40,7 @@ final class AddMonologDecoratorCompilerPassTest extends TestCase
         $container->setDefinition('monolog.logger.removal_request', new Definition(Logger::class));
         $container->setDefinition('monolog.logger.deprecation', new Definition(Logger::class));
 
-        new AddMonologDecoratorCompilerPass()->process($container);
+        (new AddMonologDecoratorCompilerPass())->process($container);
 
         self::assertFalse($container->hasDefinition('monolog.logger.profiling.decorator.metrics'));
         self::assertFalse($container->hasDefinition('monolog.logger.removal_request.decorator.metrics'));
@@ -52,7 +52,7 @@ final class AddMonologDecoratorCompilerPassTest extends TestCase
         $container = new ContainerBuilder();
         $container->setDefinition('app.service', new Definition(stdClass::class));
 
-        new AddMonologDecoratorCompilerPass()->process($container);
+        (new AddMonologDecoratorCompilerPass())->process($container);
 
         self::assertFalse($container->hasDefinition('app.service.decorator.metrics'));
     }
@@ -62,7 +62,7 @@ final class AddMonologDecoratorCompilerPassTest extends TestCase
         $container = new ContainerBuilder();
         $container->setDefinition('monolog.logger.app.decorator.metrics', new Definition(HandlerDecorator::class));
 
-        new AddMonologDecoratorCompilerPass()->process($container);
+        (new AddMonologDecoratorCompilerPass())->process($container);
 
         self::assertFalse($container->hasDefinition('monolog.logger.app.decorator.metrics.decorator.metrics'));
     }

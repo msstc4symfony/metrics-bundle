@@ -15,36 +15,36 @@ use Override;
  */
 final class QueryLabeller implements QueryLabelling
 {
-    private const string IDENTIFIER = '(?:\w+|"(?:[^"]|"")+"|`(?:[^`]|``)+`|\[[^\]]+\])';
+    private const IDENTIFIER = '(?:\w+|"(?:[^"]|"")+"|`(?:[^`]|``)+`|\[[^\]]+\])';
 
     // Schema and catalog prefixes are matched but not captured: "db.public.users" labels as "users".
-    private const string TABLE = '(?:' . self::IDENTIFIER . '\.)*+(' . self::IDENTIFIER . ')';
+    private const TABLE = '(?:' . self::IDENTIFIER . '\.)*+(' . self::IDENTIFIER . ')';
 
-    private const string NOISE = "/'(?:[^'\\\\]|\\\\.|'')*'|--[^\\n]*|\\/\\*.*?(?:\\*\\/|\\z)/s";
+    private const NOISE = "/'(?:[^'\\\\]|\\\\.|'')*'|--[^\\n]*|\\/\\*.*?(?:\\*\\/|\\z)/s";
 
-    private const string PARENTHESISED = '/\((?:[^()]++|(?R))*+\)/';
+    private const PARENTHESISED = '/\((?:[^()]++|(?R))*+\)/';
 
     // A keyword is neither part of a longer word ("fromage") nor a qualified column ("t.from").
-    private const string KEYWORD_START = '(?<![\w.])';
+    private const KEYWORD_START = '(?<![\w.])';
 
     // Group 1 is a derived table's placeholder "(#n)"; every other group is a table name.
-    private const string STATEMENT = '/' . self::KEYWORD_START . '(?:'
+    private const STATEMENT = '/' . self::KEYWORD_START . '(?:'
         . 'SELECT\b.*?' . self::KEYWORD_START . 'FROM\b\s*(?:(?:ONLY|LATERAL)\b\s*)?(?:\(#(\d+)\)|' . self::TABLE . ')'
         . '|INSERT\s+INTO\s+' . self::TABLE
         . '|DELETE\s+FROM\s+(?:ONLY\b\s*)?' . self::TABLE
         . '|UPDATE\s+(?:ONLY\b\s*)?' . self::TABLE
         . ')/Sis';
 
-    private const string WITH_CLAUSE = '/^\s*WITH\b/Si';
+    private const WITH_CLAUSE = '/^\s*WITH\b/Si';
 
     // Group 1 is the CTE name, group 2 the placeholder of its body.
-    private const string COMMON_TABLE_EXPRESSION = '/(?:\bWITH(?:\s+RECURSIVE)?|,)\s*(' . self::IDENTIFIER . ')'
+    private const COMMON_TABLE_EXPRESSION = '/(?:\bWITH(?:\s+RECURSIVE)?|,)\s*(' . self::IDENTIFIER . ')'
         . '\s*(?:\(#\d+\)\s*)?AS\s+(?:NOT\s+)?(?:MATERIALIZED\s+)?\(#(\d+)\)/Si';
 
     // Bounds regex cost on huge statements (long IN lists, batch inserts); the table name sits near the start.
-    private const int MAX_PARSED_SQL_LENGTH = 16_384;
+    private const MAX_PARSED_SQL_LENGTH = 16_384;
 
-    private const int CACHE_SIZE = 256;
+    private const CACHE_SIZE = 256;
 
     /** @var array<array-key, QueryLabels> least recently used first */
     private array $cache = [];

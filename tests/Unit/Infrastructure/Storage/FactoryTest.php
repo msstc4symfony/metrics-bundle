@@ -41,7 +41,7 @@ final class FactoryTest extends TestCase
             }
         };
 
-        new Factory($logger, ReconnectingRedisAdapter::DEFAULT_BACKOFF_SECONDS)->create($dsn);
+        (new Factory($logger, ReconnectingRedisAdapter::DEFAULT_BACKOFF_SECONDS))->create($dsn);
 
         self::assertSame(
             [],
@@ -169,7 +169,7 @@ final class FactoryTest extends TestCase
     {
         $logger = new CollectingLogger();
 
-        $adapter = new Factory($logger, -1.0)->create('redis://localhost:6379');
+        $adapter = (new Factory($logger, -1.0))->create('redis://localhost:6379');
 
         self::assertInstanceOf(ReconnectingRedisAdapter::class, $adapter);
         self::assertCount(1, $logger->records);

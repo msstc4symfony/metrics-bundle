@@ -27,14 +27,14 @@ use Symfony\Component\HttpFoundation\Request;
  */
 final class MetricsBundleConfigTest extends TestCase
 {
-    private const array ENV_VARS = ['METRICS_STORAGE_DSN', 'APPLICATION_NAME', 'COMPONENT_NAME', 'METRICS_TEST_BACKOFF'];
+    private const ENV_VARS = ['METRICS_STORAGE_DSN', 'APPLICATION_NAME', 'COMPONENT_NAME', 'METRICS_TEST_BACKOFF'];
 
     private ?BundleConfigKernel $kernel = null;
 
     #[Override]
     protected function setUp(): void
     {
-        new Filesystem()->remove(TestKernel::cacheRoot());
+        (new Filesystem())->remove(TestKernel::cacheRoot());
         foreach (self::ENV_VARS as $name) {
             unset($_SERVER[$name], $_ENV[$name]);
         }
@@ -48,7 +48,7 @@ final class MetricsBundleConfigTest extends TestCase
             unset($_SERVER[$name]);
         }
 
-        new Filesystem()->remove(TestKernel::cacheRoot());
+        (new Filesystem())->remove(TestKernel::cacheRoot());
     }
 
     public function testDefaultsWithoutBundleConfig(): void

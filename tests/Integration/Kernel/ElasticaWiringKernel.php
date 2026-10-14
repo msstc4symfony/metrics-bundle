@@ -28,7 +28,7 @@ final class ElasticaWiringKernel extends Kernel
 {
     use MicroKernelTrait;
 
-    public const string CLIENT = 'app.elastica';
+    public const CLIENT = 'app.elastica';
 
     public function __construct(
         private readonly ?bool $sanitizePath,

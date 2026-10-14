@@ -63,7 +63,7 @@ TXT,
         $registry->method('getMetricFamilySamples')->willThrowException(new StorageException("Can't connect to Redis server"));
         $logger = new CollectingLogger();
 
-        $response = new GetMetricsController(new RenderTextFormat(), $registry, $logger)->get();
+        $response = (new GetMetricsController(new RenderTextFormat(), $registry, $logger))->get();
 
         self::assertSame(503, $response->getStatusCode());
         self::assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
@@ -78,6 +78,6 @@ TXT,
         $logger = self::createStub(LoggerInterface::class);
         $logger->method('error')->willThrowException(new RuntimeException('log handler is down'));
 
-        self::assertSame(503, new GetMetricsController(new RenderTextFormat(), $registry, $logger)->get()->getStatusCode());
+        self::assertSame(503, (new GetMetricsController(new RenderTextFormat(), $registry, $logger))->get()->getStatusCode());
     }
 }

@@ -8,7 +8,7 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 
 final class RequestCollector extends AbstractCollector
 {
-    private const string UNKNOWN_ROUTE = 'unknown';
+    private const UNKNOWN_ROUTE = 'unknown';
 
     public function incRequestTotal(string $method, ?string $route): void
     {

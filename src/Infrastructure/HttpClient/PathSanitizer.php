@@ -6,11 +6,11 @@ namespace Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient;
 
 final class PathSanitizer
 {
-    private const string UUID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
+    private const UUID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
 
-    private const string LONG_HEX_PATTERN = '/^[0-9a-f]{24,}$/i';
+    private const LONG_HEX_PATTERN = '/^[0-9a-f]{24,}$/i';
 
-    private const string DIGITS_PATTERN = '/^\d+$/';
+    private const DIGITS_PATTERN = '/^\d+$/';
 
     public static function sanitize(string $path): string
     {

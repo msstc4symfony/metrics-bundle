@@ -32,14 +32,14 @@ final class ElasticsearchMetricsTest extends KernelTestCase
             self::markTestSkipped('ruflin/elastica not installed');
         }
 
-        new Filesystem()->remove(TestKernel::cacheRoot());
+        (new Filesystem())->remove(TestKernel::cacheRoot());
     }
 
     #[Override]
     protected function tearDown(): void
     {
         parent::tearDown();
-        new Filesystem()->remove(TestKernel::cacheRoot());
+        (new Filesystem())->remove(TestKernel::cacheRoot());
     }
 
     #[Override]

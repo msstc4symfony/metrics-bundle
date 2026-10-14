@@ -11,7 +11,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 final class SaveElasticaClientsListPass implements CompilerPassInterface
 {
-    public const string PARAMETER = 'msstc4symfony_metrics.elastica.clients';
+    public const PARAMETER = 'msstc4symfony_metrics.elastica.clients';
 
     #[Override]
     public function process(ContainerBuilder $container): void

@@ -45,7 +45,7 @@ final class TimingTransportTest extends TestCase
         $inner = $this->createMock(AbstractTransport::class);
         $inner->expects(self::once())->method('exec')->willReturn($response);
 
-        $transport = new TimingTransport()->init($inner, $this->collector);
+        $transport = (new TimingTransport())->init($inner, $this->collector);
         $transport->exec($request, []);
 
         self::assertSame(
@@ -60,7 +60,7 @@ final class TimingTransportTest extends TestCase
         $inner = self::createStub(AbstractTransport::class);
         $inner->method('exec')->willReturn(new Response('{}', 200));
 
-        $response = new TimingTransport()->init($inner, $this->collector)->exec(new Request('/index/_search', Request::POST), []);
+        $response = (new TimingTransport())->init($inner, $this->collector)->exec(new Request('/index/_search', Request::POST), []);
 
         self::assertNull($response->getQueryTime());
         self::assertSame(
@@ -77,7 +77,7 @@ final class TimingTransportTest extends TestCase
         $inner = self::createStub(AbstractTransport::class);
         $inner->method('exec')->willThrowException(new RuntimeException('upstream gone'));
 
-        $transport = new TimingTransport()->init($inner, $this->collector);
+        $transport = (new TimingTransport())->init($inner, $this->collector);
 
         $caught = null;
         try {
@@ -112,8 +112,8 @@ final class TimingTransportTest extends TestCase
         $inner->method('exec')->willReturn($response);
 
         $transport = $sanitizePath === null
-            ? new TimingTransport()->init($inner, $this->collector)
-            : new TimingTransport()->init($inner, $this->collector, $sanitizePath);
+            ? (new TimingTransport())->init($inner, $this->collector)
+            : (new TimingTransport())->init($inner, $this->collector, $sanitizePath);
         $transport->exec(new Request('/products/_doc/sku%2F42', Request::GET), []);
 
         self::assertSame([['app', 'cmp', 'GET', $expected]], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_SUCCESS));
@@ -127,8 +127,8 @@ final class TimingTransportTest extends TestCase
         $inner->method('exec')->willThrowException(new RuntimeException('upstream gone'));
 
         $transport = $sanitizePath === null
-            ? new TimingTransport()->init($inner, $this->collector)
-            : new TimingTransport()->init($inner, $this->collector, $sanitizePath);
+            ? (new TimingTransport())->init($inner, $this->collector)
+            : (new TimingTransport())->init($inner, $this->collector, $sanitizePath);
 
         try {
             $transport->exec(new Request('/products/_doc/sku%2F42', Request::GET), []);
@@ -142,6 +142,6 @@ final class TimingTransportTest extends TestCase
     public function testExecBeforeInitThrowsLogicException(): void
     {
         $this->expectException(LogicException::class);
-        new TimingTransport()->exec(new Request('/', Request::GET), []);
+        (new TimingTransport())->exec(new Request('/', Request::GET), []);
     }
 }

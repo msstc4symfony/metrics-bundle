@@ -40,8 +40,8 @@ final class TimingHttpClientTest extends TestCase
     public function testSuccessfulRequestRecordsCountAndDurationWithoutLeadingSlash(): void
     {
         $factory = new Psr17Factory();
-        $inner = new readonly class($factory->createResponse(200)) implements ClientInterface {
-            public function __construct(private ResponseInterface $response)
+        $inner = new class($factory->createResponse(200)) implements ClientInterface {
+            public function __construct(private readonly ResponseInterface $response)
             {
             }
 
@@ -51,7 +51,7 @@ final class TimingHttpClientTest extends TestCase
             }
         };
 
-        new TimingHttpClient($inner, $this->collector)->sendRequest($factory->createRequest('POST', 'http://es:9200/index/_search'));
+        (new TimingHttpClient($inner, $this->collector))->sendRequest($factory->createRequest('POST', 'http://es:9200/index/_search'));
 
         self::assertSame([['app', 'cmp', 'POST', 'index/_search']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_SUCCESS));
         self::assertTrue(RegistrySamples::exists($this->registry, MetricLabelEnum::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS));
@@ -324,7 +324,7 @@ final class TimingHttpClientTest extends TestCase
         };
 
         try {
-            new TimingHttpClient($inner, $this->collector)->sendRequest($factory->createRequest('GET', 'http://es:9200/products/_doc/42'));
+            (new TimingHttpClient($inner, $this->collector))->sendRequest($factory->createRequest('GET', 'http://es:9200/products/_doc/42'));
             self::fail('Expected the client exception to propagate');
         } catch (ClientExceptionInterface) {
         }
@@ -334,8 +334,8 @@ final class TimingHttpClientTest extends TestCase
 
     private function send(ResponseInterface $response, RequestInterface $request, bool $sanitizePath = true): ResponseInterface
     {
-        $inner = new readonly class($response) implements ClientInterface {
-            public function __construct(private ResponseInterface $response)
+        $inner = new class($response) implements ClientInterface {
+            public function __construct(private readonly ResponseInterface $response)
             {
             }
 
@@ -345,7 +345,7 @@ final class TimingHttpClientTest extends TestCase
             }
         };
 
-        return new TimingHttpClient($inner, $this->collector, $sanitizePath)->sendRequest($request);
+        return (new TimingHttpClient($inner, $this->collector, $sanitizePath))->sendRequest($request);
     }
 
     public function testClientExceptionCountsAsFailureAndIsRethrown(): void
@@ -360,7 +360,7 @@ final class TimingHttpClientTest extends TestCase
         };
 
         try {
-            new TimingHttpClient($inner, $this->collector)->sendRequest($factory->createRequest('GET', 'http://es:9200/_cluster/health'));
+            (new TimingHttpClient($inner, $this->collector))->sendRequest($factory->createRequest('GET', 'http://es:9200/_cluster/health'));
             self::fail('Expected the client exception to propagate');
         } catch (ClientExceptionInterface) {
         }

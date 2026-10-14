@@ -23,9 +23,9 @@ final class ElasticsearchKernel extends Kernel
 {
     use MicroKernelTrait;
 
-    public const string URL_ENV = 'ELASTICSEARCH_URL';
+    public const URL_ENV = 'ELASTICSEARCH_URL';
 
-    public const string CLIENT = 'app.elastica';
+    public const CLIENT = 'app.elastica';
 
     public static function url(): ?string
     {

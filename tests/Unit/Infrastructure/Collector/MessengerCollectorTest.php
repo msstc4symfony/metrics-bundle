@@ -53,8 +53,8 @@ final class MessengerCollectorTest extends CollectorTestCase
     public function testAnonymousMessageClassesCollapseToOneLabelValue(): void
     {
         $collector = $this->build();
-        $collector->incMessageSent('async', new class {}::class);
-        $collector->incMessageSent('async', new class extends stdClass {}::class);
+        $collector->incMessageSent('async', (new class {})::class);
+        $collector->incMessageSent('async', (new class extends stdClass {})::class);
 
         self::assertSame(
             [

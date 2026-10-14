@@ -9,7 +9,7 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 #[AutoconfigureTag(self::TAG)]
 interface AssemblerInterface
 {
-    public const string TAG = 'metrics.http_client.url_assembler';
+    public const TAG = 'metrics.http_client.url_assembler';
 
     /**
      * @return array{string, string}|null

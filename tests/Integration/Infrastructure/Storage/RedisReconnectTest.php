@@ -27,7 +27,7 @@ use RuntimeException;
  */
 final class RedisReconnectTest extends TestCase
 {
-    private const string SERVER_SCRIPT = __DIR__ . '/../../../Support/Redis/resp-server.php';
+    private const SERVER_SCRIPT = __DIR__ . '/../../../Support/Redis/resp-server.php';
 
     private int $port;
 
@@ -70,7 +70,7 @@ final class RedisReconnectTest extends TestCase
         }
 
         $logger = new CollectingLogger();
-        $adapter = new Factory($logger, 0.0)->create(\sprintf('%s://user:secret@127.0.0.1:%d%s', $scheme, $this->port, $dsnTail));
+        $adapter = (new Factory($logger, 0.0))->create(\sprintf('%s://user:secret@127.0.0.1:%d%s', $scheme, $this->port, $dsnTail));
         $this->startServer();
         $adapter->updateCounter($this->counter());
         self::assertSame([...$handshake, 'EVAL'], $this->loggedCommands());
@@ -103,7 +103,7 @@ final class RedisReconnectTest extends TestCase
     public function testUnreachableRedisNeverReachesTheApplicationErrorHandler(string $host): void
     {
         $logger = new CollectingLogger();
-        $adapter = new Factory($logger, 0.0)->create(\sprintf('redis://%s:%d?database=5', $host, $this->port));
+        $adapter = (new Factory($logger, 0.0))->create(\sprintf('redis://%s:%d?database=5', $host, $this->port));
 
         $handled = 0;
         // Symfony's ErrorHandler throws PHP warnings as ErrorException (framework.php_errors.throw).
@@ -125,7 +125,7 @@ final class RedisReconnectTest extends TestCase
 
     public function testHundredWritesAgainstAnUnresolvableHostStayFast(): void
     {
-        $adapter = new Factory(new NullLogger(), ReconnectingRedisAdapter::DEFAULT_BACKOFF_SECONDS)->create('redis://metrics-unresolvable.invalid:6379?database=5');
+        $adapter = (new Factory(new NullLogger(), ReconnectingRedisAdapter::DEFAULT_BACKOFF_SECONDS))->create('redis://metrics-unresolvable.invalid:6379?database=5');
         // The one lookup that opens the breaker depends on the runner's resolver; the rest must not repeat it.
         $adapter->updateCounter($this->counter());
 
@@ -145,7 +145,7 @@ final class RedisReconnectTest extends TestCase
     {
         $this->startServer();
         $idle = $this->plainClient();
-        $adapter = new Factory(new CollectingLogger(), 0.0)->create('redis://127.0.0.1:' . $this->port . '?database=1');
+        $adapter = (new Factory(new CollectingLogger(), 0.0))->create('redis://127.0.0.1:' . $this->port . '?database=1');
         $adapter->updateCounter($this->counter());
 
         $this->stopServer();
@@ -185,7 +185,7 @@ final class RedisReconnectTest extends TestCase
         $hanging = stream_socket_server('tcp://127.0.0.1:' . $this->port);
         self::assertIsResource($hanging);
         $timeout = ini_set('default_socket_timeout', '5');
-        $adapter = new Factory(new NullLogger(), ReconnectingRedisAdapter::DEFAULT_BACKOFF_SECONDS)->create('redis://127.0.0.1:' . $this->port . '?database=5&read_timeout=0.5');
+        $adapter = (new Factory(new NullLogger(), ReconnectingRedisAdapter::DEFAULT_BACKOFF_SECONDS))->create('redis://127.0.0.1:' . $this->port . '?database=5&read_timeout=0.5');
 
         try {
             $started = hrtime(true);

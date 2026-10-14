@@ -25,7 +25,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
  */
 final class MessengerMetricsTest extends KernelTestCase
 {
-    private const string DSN_ENV = 'METRICS_STORAGE_DSN';
+    private const DSN_ENV = 'METRICS_STORAGE_DSN';
 
     #[Override]
     protected function setUp(): void
@@ -34,7 +34,7 @@ final class MessengerMetricsTest extends KernelTestCase
             self::markTestSkipped('symfony/messenger or symfony/monolog-bundle not installed');
         }
 
-        new Filesystem()->remove(TestKernel::cacheRoot());
+        (new Filesystem())->remove(TestKernel::cacheRoot());
         $_SERVER[self::DSN_ENV] = 'inmemory://';
     }
 
@@ -43,7 +43,7 @@ final class MessengerMetricsTest extends KernelTestCase
     {
         parent::tearDown();
         unset($_SERVER[self::DSN_ENV]);
-        new Filesystem()->remove(TestKernel::cacheRoot());
+        (new Filesystem())->remove(TestKernel::cacheRoot());
     }
 
     #[Override]
@@ -72,7 +72,7 @@ final class MessengerMetricsTest extends KernelTestCase
         self::assertInstanceOf(MessageBusInterface::class, $bus);
         $bus->dispatch(new TestMessage($outcome));
 
-        $consume = new CommandTester(new Application($kernel)->find('messenger:consume'));
+        $consume = new CommandTester((new Application($kernel))->find('messenger:consume'));
         $consume->execute(['receivers' => [TestKernel::MESSENGER_TRANSPORT], '--limit' => 1, '--time-limit' => 5]);
 
         $registry = $container->get(RegistryInterface::class);

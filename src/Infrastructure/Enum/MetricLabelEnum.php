@@ -8,13 +8,13 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Entity\Label;
 
 enum MetricLabelEnum: string implements MetricLabelEnumInterface
 {
-    private const array HTTP_METHODS = ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'HEAD'];
+    private const HTTP_METHODS = ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'HEAD'];
 
-    private const array HTTP_METHODS_EXTENDED = ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'HEAD', 'OPTIONS'];
+    private const HTTP_METHODS_EXTENDED = ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'HEAD', 'OPTIONS'];
 
-    private const array DOCTRINE_QUERY_TYPES = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'OTHER'];
+    private const DOCTRINE_QUERY_TYPES = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'OTHER'];
 
-    private const array ERROR_LEVEL_NAMES = [
+    private const ERROR_LEVEL_NAMES = [
         'EMERGENCY',
         'ALERT',
         'CRITICAL',

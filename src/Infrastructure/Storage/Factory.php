@@ -21,21 +21,21 @@ use Throwable;
 #[WithMonologChannel(self::LOG_CHANNEL)]
 final readonly class Factory implements FactoryInterface
 {
-    public const string LOG_CHANNEL = 'metrics_bundle';
+    public const LOG_CHANNEL = 'metrics_bundle';
 
-    private const string DEFAULT_REDIS_HOST = '127.0.0.1';
+    private const DEFAULT_REDIS_HOST = '127.0.0.1';
 
-    private const int DEFAULT_REDIS_PORT = 6379;
+    private const DEFAULT_REDIS_PORT = 6379;
 
-    private const int DEFAULT_REDIS_DATABASE = 0;
+    private const DEFAULT_REDIS_DATABASE = 0;
 
-    private const int DEFAULT_REDIS_READ_TIMEOUT = 1;
+    private const DEFAULT_REDIS_READ_TIMEOUT = 1;
 
-    private const float DEFAULT_REDIS_TIMEOUT = 0.1;
+    private const DEFAULT_REDIS_TIMEOUT = 0.1;
 
-    private const bool DEFAULT_REDIS_VERIFY_PEER = true;
+    private const DEFAULT_REDIS_VERIFY_PEER = true;
 
-    private const bool DEFAULT_REDIS_PERSISTENT_CONNECTIONS = false;
+    private const DEFAULT_REDIS_PERSISTENT_CONNECTIONS = false;
 
     /**
      * parse_url() rejects "scheme://" with nothing after it, yet that is the natural
@@ -43,7 +43,7 @@ final readonly class Factory implements FactoryInterface
      *
      * @var list<non-empty-string>
      */
-    private const array HOSTLESS_SCHEMES = ['apc', 'apcng', 'inmemory'];
+    private const HOSTLESS_SCHEMES = ['apc', 'apcng', 'inmemory'];
 
     public function __construct(
         private LoggerInterface $logger,

@@ -42,7 +42,7 @@ final class ConnectionTest extends TestCase
             ->willReturn(self::createStub(StatementInterface::class))
         ;
 
-        $statement = new Connection($inner, $this->collector, 'default')->prepare('SELECT * FROM users');
+        $statement = (new Connection($inner, $this->collector, 'default'))->prepare('SELECT * FROM users');
 
         self::assertInstanceOf(Statement::class, $statement);
         self::assertSame([], RegistrySamples::labels($this->registry, MetricLabelEnum::DOCTRINE_QUERY_EXECUTE));
@@ -54,7 +54,7 @@ final class ConnectionTest extends TestCase
         $inner = $this->createMock(ConnectionInterface::class);
         $inner->expects(self::once())->method('query')->with('SELECT * FROM users')->willReturn($result);
 
-        self::assertSame($result, new Connection($inner, $this->collector, 'default')->query('SELECT * FROM users'));
+        self::assertSame($result, (new Connection($inner, $this->collector, 'default'))->query('SELECT * FROM users'));
         self::assertSame([['app', 'cmp', 'default', 'select', 'users']], RegistrySamples::labels($this->registry, MetricLabelEnum::DOCTRINE_QUERY_EXECUTE));
     }
 
@@ -63,7 +63,7 @@ final class ConnectionTest extends TestCase
         $inner = $this->createMock(ConnectionInterface::class);
         $inner->expects(self::once())->method('exec')->with('DELETE FROM users')->willReturn(3);
 
-        self::assertSame(3, new Connection($inner, $this->collector, 'default')->exec('DELETE FROM users'));
+        self::assertSame(3, (new Connection($inner, $this->collector, 'default'))->exec('DELETE FROM users'));
         self::assertSame([['app', 'cmp', 'default', 'delete', 'users']], RegistrySamples::labels($this->registry, MetricLabelEnum::DOCTRINE_QUERY_EXECUTE));
     }
 }

@@ -36,7 +36,7 @@ final class DecorateElasticaClientsPassTest extends TestCase
     {
         $container = $this->container(new Definition(Client::class, [['hosts' => ['http://es:9200']]]));
 
-        new DecorateElasticaClientsPass()->process($container);
+        (new DecorateElasticaClientsPass())->process($container);
 
         $http = $this->httpClient($container);
         self::assertSame(TimingHttpClient::class, $http->getClass());
@@ -53,7 +53,7 @@ final class DecorateElasticaClientsPassTest extends TestCase
         $container = $this->container(new Definition(Client::class, [['hosts' => ['http://es:9200']]]));
         $container->setParameter(DecorateElasticaClientsPass::SANITIZE_PATH_PARAMETER, false);
 
-        new DecorateElasticaClientsPass()->process($container);
+        (new DecorateElasticaClientsPass())->process($container);
 
         $http = $this->httpClient($container);
         self::assertSame('%' . DecorateElasticaClientsPass::SANITIZE_PATH_PARAMETER . '%', $http->getArgument(2));
@@ -64,7 +64,7 @@ final class DecorateElasticaClientsPassTest extends TestCase
     {
         $container = $this->container(new Definition(Client::class, [['hosts' => ['http://es:9200']]]));
 
-        new DecorateElasticaClientsPass()->process($container);
+        (new DecorateElasticaClientsPass())->process($container);
 
         self::assertCount(2, $this->httpClient($container)->getArguments());
     }
@@ -76,7 +76,7 @@ final class DecorateElasticaClientsPassTest extends TestCase
             'transport_config' => ['http_client' => new Reference('app.psr18'), 'node_pool' => 'kept'],
         ]]));
 
-        new DecorateElasticaClientsPass()->process($container);
+        (new DecorateElasticaClientsPass())->process($container);
 
         self::assertEquals(new Reference('app.psr18'), $this->innerClient($this->httpClient($container))->getArgument(0));
         $transportConfig = $this->config($container)['transport_config'] ?? null;
@@ -88,7 +88,7 @@ final class DecorateElasticaClientsPassTest extends TestCase
     {
         $container = $this->container(new Definition(SubclassedElasticaClient::class, [['hosts' => ['http://es:9200']]]));
 
-        new DecorateElasticaClientsPass()->process($container);
+        (new DecorateElasticaClientsPass())->process($container);
 
         self::assertSame(TimingHttpClient::class, $this->httpClient($container)->getClass());
     }
@@ -97,7 +97,7 @@ final class DecorateElasticaClientsPassTest extends TestCase
     {
         $container = $this->container(new Definition(Client::class));
 
-        new DecorateElasticaClientsPass()->process($container);
+        (new DecorateElasticaClientsPass())->process($container);
 
         self::assertSame(TimingHttpClient::class, $this->httpClient($container)->getClass());
     }
@@ -106,7 +106,7 @@ final class DecorateElasticaClientsPassTest extends TestCase
     {
         $container = $this->container(new Definition(Client::class, ['$config' => ['hosts' => ['http://es:9200']]]));
 
-        new DecorateElasticaClientsPass()->process($container);
+        (new DecorateElasticaClientsPass())->process($container);
 
         $arguments = $container->getDefinition('app.elastica')->getArguments();
         self::assertSame(['$config'], array_keys($arguments));
@@ -122,7 +122,7 @@ final class DecorateElasticaClientsPassTest extends TestCase
     {
         $container = $this->container(new Definition(Client::class, ['http://es:9200']));
 
-        new DecorateElasticaClientsPass()->process($container);
+        (new DecorateElasticaClientsPass())->process($container);
 
         self::assertSame('http://es:9200', $container->getDefinition('app.elastica')->getArgument(0));
         self::assertStringContainsString('Elastica client "app.elastica" is not measured', $this->compilerLog($container));
@@ -139,7 +139,7 @@ final class DecorateElasticaClientsPassTest extends TestCase
             ],
         ]]));
 
-        new DecorateElasticaClientsPass()->process($container);
+        (new DecorateElasticaClientsPass())->process($container);
 
         $inner = $this->innerClient($this->httpClient($container));
         self::assertEquals([new Reference('app.psr18'), ['ssl_verify' => false], ['timeout' => 1]], $inner->getArguments());
@@ -174,8 +174,8 @@ final class DecorateElasticaClientsPassTest extends TestCase
         $container = $this->container($client);
         $container->setDefinition('fos_elastica.client_prototype', $prototype);
 
-        new DecorateElasticaClientsPass()->process($container);
-        new ResolveChildDefinitionsPass()->process($container);
+        (new DecorateElasticaClientsPass())->process($container);
+        (new ResolveChildDefinitionsPass())->process($container);
 
         $resolved = $container->getDefinition('app.elastica');
         self::assertSame(SubclassedElasticaClient::class, $resolved->getClass());
@@ -198,8 +198,8 @@ final class DecorateElasticaClientsPassTest extends TestCase
         $container = $this->container($client);
         $container->setDefinition('app.elastica_prototype', $prototype);
 
-        new DecorateElasticaClientsPass()->process($container);
-        new ResolveChildDefinitionsPass()->process($container);
+        (new DecorateElasticaClientsPass())->process($container);
+        (new ResolveChildDefinitionsPass())->process($container);
 
         self::assertCount(2, $container->getDefinition('app.elastica')->getArguments());
         self::assertSame(TimingHttpClient::class, $this->httpClient($container)->getClass());
@@ -213,10 +213,10 @@ final class DecorateElasticaClientsPassTest extends TestCase
         $container = $this->container(new ChildDefinition('app.elastica_prototype'));
         $container->setDefinition('app.elastica_prototype', $prototype);
 
-        new DecorateElasticaClientsPass()->process($container);
+        (new DecorateElasticaClientsPass())->process($container);
 
         self::assertSame(['hosts' => ['http://es:9200']], $prototype->getArgument(0));
-        new ResolveChildDefinitionsPass()->process($container);
+        (new ResolveChildDefinitionsPass())->process($container);
         self::assertSame(TimingHttpClient::class, $this->httpClient($container)->getClass());
     }
 
@@ -225,7 +225,7 @@ final class DecorateElasticaClientsPassTest extends TestCase
         $config = ['hosts' => ['http://es:9200'], 'transport_config' => '%app.transport%'];
         $container = $this->container(new Definition(Client::class, [$config]));
 
-        new DecorateElasticaClientsPass()->process($container);
+        (new DecorateElasticaClientsPass())->process($container);
 
         self::assertSame($config, $container->getDefinition('app.elastica')->getArgument(0));
         self::assertStringContainsString('Elastica client "app.elastica" is not measured', $this->compilerLog($container));
@@ -236,7 +236,7 @@ final class DecorateElasticaClientsPassTest extends TestCase
         $container = $this->container(new Definition(Client::class, [['hosts' => ['http://es:9200']]]));
         $container->setDefinition('app.other', new Definition(stdClass::class, [['hosts' => ['x']]]));
 
-        new DecorateElasticaClientsPass()->process($container);
+        (new DecorateElasticaClientsPass())->process($container);
 
         self::assertSame([['hosts' => ['x']]], $container->getDefinition('app.other')->getArguments());
     }
@@ -245,7 +245,7 @@ final class DecorateElasticaClientsPassTest extends TestCase
     {
         $container = $this->container(new Definition(Client::class, [['hosts' => ['http://es:9200']]]));
 
-        new SaveElasticaClientsListPass()->process($container);
+        (new SaveElasticaClientsListPass())->process($container);
 
         self::assertSame([], $container->getParameter(SaveElasticaClientsListPass::PARAMETER));
     }

@@ -21,7 +21,7 @@ final class ErrorCollector extends AbstractCollector
     /**
      * @var class-string[]
      */
-    private const array IGNORED_EXCEPTIONS = [
+    private const IGNORED_EXCEPTIONS = [
         NotFoundHttpException::class,
         AccessDeniedHttpException::class,
         MethodNotAllowedHttpException::class,

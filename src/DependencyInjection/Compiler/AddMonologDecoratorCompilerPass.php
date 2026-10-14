@@ -12,7 +12,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 final class AddMonologDecoratorCompilerPass implements CompilerPassInterface
 {
-    private const array EXCLUDE_CHANNELS = [
+    private const EXCLUDE_CHANNELS = [
         'profiling',
         'removal_request',
         'deprecation',

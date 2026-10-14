@@ -8,7 +8,7 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 
 final class ConsoleCollector extends AbstractCollector
 {
-    private const array IGNORED_COMMANDS = [
+    private const IGNORED_COMMANDS = [
         'metrics:',
         'healthcheck:',
         'list',

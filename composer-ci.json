@@ -27,7 +27,7 @@
     }
   },
   "require": {
-    "php": ">=8.4",
+    "php": ">=8.2",
     "ext-redis": "*",
     "composer-runtime-api": ">=2.2",
     "monolog/monolog": "^3.5",
@@ -35,13 +35,14 @@
     "symfony/console": "^7.4|^8.0",
     "symfony/event-dispatcher": "^7.4|^8.0",
     "symfony/framework-bundle": "^7.4|^8.0",
-    "symfony/monolog-bundle": "^3.11|^4.0"
+    "symfony/monolog-bundle": "^3.11|^4.0",
+    "symfony/polyfill-php84": "^1.31"
   },
   "require-dev": {
     "deptrac/deptrac": "^4.6",
     "doctrine/dbal": "^3.0|^4.0",
     "doctrine/doctrine-bundle": "^2.13|^3.0",
-    "friendsofphp/php-cs-fixer": "^3.55",
+    "friendsofphp/php-cs-fixer": "^3.76",
     "infection/infection": "^0.32",
     "mongodb/mongodb": "^2.1",
     "nyholm/psr7": "^1.8",

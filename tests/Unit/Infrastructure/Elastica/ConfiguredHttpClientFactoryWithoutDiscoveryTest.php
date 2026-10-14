@@ -13,7 +13,7 @@ use PHPUnit\Framework\TestCase;
 
 final class ConfiguredHttpClientFactoryWithoutDiscoveryTest extends TestCase
 {
-    private const string CURL_CLIENT = 'Elastic\Transport\Client\Curl';
+    private const CURL_CLIENT = 'Elastic\Transport\Client\Curl';
 
     /**
      * @var list<string> discovery strategy class names, typed as plain strings by php-http/discovery

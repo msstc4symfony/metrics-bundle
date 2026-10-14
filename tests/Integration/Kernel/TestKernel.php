@@ -22,22 +22,22 @@ final class TestKernel extends Kernel
 {
     use MicroKernelTrait;
 
-    public const string HTTP_CLIENT_ALIAS = 'test.http_client';
+    public const HTTP_CLIENT_ALIAS = 'test.http_client';
 
-    public const string SCOPED_CLIENT = 'github.client';
+    public const SCOPED_CLIENT = 'github.client';
 
-    public const string SCOPED_CLIENT_ALIAS = 'test.github.client';
+    public const SCOPED_CLIENT_ALIAS = 'test.github.client';
 
-    public const string MESSENGER_TRANSPORT = 'async';
+    public const MESSENGER_TRANSPORT = 'async';
 
     // Compiler passes of equal priority run in bundle registration order; this env flips it.
-    public const string ENV_METRICS_BUNDLE_FIRST = 'metrics_first';
+    public const ENV_METRICS_BUNDLE_FIRST = 'metrics_first';
 
     // Symfony 7.4+ recipe: config/routes.yaml imports "routing.controllers" only.
-    public const string ENV_ROUTING_CONTROLLERS_ONLY = 'routing_controllers';
+    public const ENV_ROUTING_CONTROLLERS_ONLY = 'routing_controllers';
 
     // An application that kept the manual import after switching to "routing.controllers".
-    public const string ENV_ROUTING_CONTROLLERS_AND_MANUAL_IMPORT = 'routing_controllers_and_manual';
+    public const ENV_ROUTING_CONTROLLERS_AND_MANUAL_IMPORT = 'routing_controllers_and_manual';
 
     // The test connection is sqlite in memory.
     public static function hasDoctrine(): bool

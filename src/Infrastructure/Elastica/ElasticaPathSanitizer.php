@@ -13,7 +13,7 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\PathSanitizer;
  */
 final class ElasticaPathSanitizer
 {
-    private const array DOCUMENT_ENDPOINTS = ['_doc', '_create', '_update', '_source', '_explain', '_termvectors'];
+    private const DOCUMENT_ENDPOINTS = ['_doc', '_create', '_update', '_source', '_explain', '_termvectors'];
 
     public static function sanitize(string $path): string
     {

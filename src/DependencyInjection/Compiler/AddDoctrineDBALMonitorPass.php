@@ -19,11 +19,11 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 final class AddDoctrineDBALMonitorPass implements CompilerPassInterface
 {
     // Must run before DoctrineBundle's MiddlewaresPass (priority 0) regardless of bundle order.
-    public const int PRIORITY = 1;
+    public const PRIORITY = 1;
 
-    public const string MIDDLEWARE_TAG = 'doctrine.middleware';
+    public const MIDDLEWARE_TAG = 'doctrine.middleware';
 
-    public const string MIDDLEWARE_ID_PREFIX = 'msstc4symfony_metrics.doctrine.middleware.';
+    public const MIDDLEWARE_ID_PREFIX = 'msstc4symfony_metrics.doctrine.middleware.';
 
     #[Override]
     public function process(ContainerBuilder $container): void

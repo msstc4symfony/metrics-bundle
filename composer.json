@@ -27,7 +27,7 @@
     }
   },
   "require": {
-    "php": ">=8.4",
+    "php": ">=8.2",
     "ext-redis": "*",
     "composer-runtime-api": ">=2.2",
     "monolog/monolog": "^3.5",
@@ -35,10 +35,11 @@
     "symfony/console": "^7.4|^8.0",
     "symfony/event-dispatcher": "^7.4|^8.0",
     "symfony/framework-bundle": "^7.4|^8.0",
-    "symfony/monolog-bundle": "^3.11|^4.0"
+    "symfony/monolog-bundle": "^3.11|^4.0",
+    "symfony/polyfill-php84": "^1.31"
   },
   "require-dev": {
-    "friendsofphp/php-cs-fixer": "^3.55",
+    "friendsofphp/php-cs-fixer": "^3.76",
     "phpstan/extension-installer": "^1.4",
     "phpstan/phpstan": "^2.1",
     "phpstan/phpstan-beberlei-assert": "^2.0",

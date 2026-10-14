@@ -30,11 +30,11 @@ use function MongoDB\Driver\Monitoring\addSubscriber;
 
 final class MetricsBundle extends AbstractBundle
 {
-    private const string PARAMETER_PREFIX = 'msstc4symfony_metrics.';
+    private const PARAMETER_PREFIX = 'msstc4symfony_metrics.';
 
-    private const string DEFAULT_DSN = 'redis://127.0.0.1:6379';
+    private const DEFAULT_DSN = 'redis://127.0.0.1:6379';
 
-    private const string UNKNOWN = 'unknown';
+    private const UNKNOWN = 'unknown';
 
     protected string $extensionAlias = 'msstc4symfony_metrics';
 
@@ -219,7 +219,7 @@ final class MetricsBundle extends AbstractBundle
                 // transport object that AbstractTransport::create() accepts at runtime.
                 $connection->setParam(
                     'transport',
-                    new TimingTransport()->init($connection->getTransportObject(), $collector, $sanitizePath),
+                    (new TimingTransport())->init($connection->getTransportObject(), $collector, $sanitizePath),
                 );
             }
         }

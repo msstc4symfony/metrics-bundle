@@ -29,7 +29,7 @@ final class AddDoctrineDBALMonitorPassTest extends TestCase
     {
         $container = $this->containerWithDoctrineConnections('default', 'reports');
 
-        new AddDoctrineDBALMonitorPass()->process($container);
+        (new AddDoctrineDBALMonitorPass())->process($container);
 
         foreach (['default', 'reports'] as $name) {
             $definition = $container->getDefinition(AddDoctrineDBALMonitorPass::MIDDLEWARE_ID_PREFIX . $name);
@@ -45,7 +45,7 @@ final class AddDoctrineDBALMonitorPassTest extends TestCase
         $container = new ContainerBuilder();
         $before = array_keys($container->getDefinitions());
 
-        new AddDoctrineDBALMonitorPass()->process($container);
+        (new AddDoctrineDBALMonitorPass())->process($container);
 
         self::assertSame($before, array_keys($container->getDefinitions()));
     }
@@ -56,7 +56,7 @@ final class AddDoctrineDBALMonitorPassTest extends TestCase
         $custom = new Definition(NamedConnectionMiddleware::class);
         $container->setDefinition(AddDoctrineDBALMonitorPass::MIDDLEWARE_ID_PREFIX . 'default', $custom);
 
-        new AddDoctrineDBALMonitorPass()->process($container);
+        (new AddDoctrineDBALMonitorPass())->process($container);
 
         self::assertSame($custom, $container->getDefinition(AddDoctrineDBALMonitorPass::MIDDLEWARE_ID_PREFIX . 'default'));
     }
@@ -69,8 +69,8 @@ final class AddDoctrineDBALMonitorPassTest extends TestCase
 
         $container = $this->containerWithDoctrineConnections('default', 'reports');
 
-        new AddDoctrineDBALMonitorPass()->process($container);
-        new MiddlewaresPass()->process($container);
+        (new AddDoctrineDBALMonitorPass())->process($container);
+        (new MiddlewaresPass())->process($container);
 
         foreach (['default', 'reports'] as $name) {
             $middleware = AddDoctrineDBALMonitorPass::MIDDLEWARE_ID_PREFIX . $name;
@@ -89,7 +89,7 @@ final class AddDoctrineDBALMonitorPassTest extends TestCase
 
         $container = new ContainerBuilder();
         $container->addCompilerPass(new MiddlewaresPass());
-        new MetricsBundle()->build($container);
+        (new MetricsBundle())->build($container);
 
         $order = array_map(get_class(...), $container->getCompilerPassConfig()->getBeforeOptimizationPasses());
 

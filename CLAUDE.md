@@ -22,9 +22,9 @@ PHPUnit is strict: `failOnWarning`, `failOnRisky`, `failOnPhpunitDeprecation`, `
 
 ## Static analysis & style
 
-- **PHPStan**: level 10, `phpVersion: 80400`, analyses `src/` and `tests/` against the CI profile. No `excludePaths`. The baseline holds 8 pre-existing entries; new code must not add to it (no `@phpstan-ignore` either).
+- **PHPStan**: level 10, `phpVersion: {min: 80200, max: 80599}` (the package runs on PHP 8.2+), analyses `src/` and `tests/` against the CI profile. No `excludePaths`. The baseline holds 8 pre-existing entries; new code must not add to it (no `@phpstan-ignore` either).
 - **PHP-CS-Fixer**: config is byte-identical to `bundle-standard/templates/.php-cs-fixer.dist.php` (the verifier enforces it).
-- **Rector**: PHP 8.4 set + Doctrine/Symfony/PHPUnit/MongoDB attribute sets. Skipped rules are listed in `rector.php` — don't reintroduce them.
+- **Rector**: PHP 8.2 set (`withPhpVersion(PHP_82)`) + Doctrine/Symfony/PHPUnit/MongoDB attribute sets. Skipped rules are listed in `rector.php` — don't reintroduce them.
 - **deptrac**: `deptrac.yaml` records the phase-A status quo of the layers (see `.claude/docs/architecture.md`).
 - No Psalm — the standard uses PHPStan only.
 
@@ -71,7 +71,7 @@ One `phpunit.xml.dist`, two suites:
 
 ## CI
 
-`.github/workflows/checks.yml` = the shared `bundle-standard` reusable workflow (pinned tag) with extensions `redis, apcu, mongodb` and `ini-values: apc.enable_cli=1`. The workflow's `PHPUnit without optional libraries` job installs `composer.json` only and proves the `class_exists`/`interface_exists` guards hold without optional libraries. Infection (`infection-min-msi`/`infection-min-covered-msi` = 69, measured 73) is blocking; the Roave BC check is blocking (the standard's default); a `--prefer-lowest` PHPUnit cell (PHP 8.4, Symfony 7.4) tests the declared lower bounds. Codecov is disabled (`run-codecov` defaults to `false`). Details: `.claude/docs/ci.md`.
+`.github/workflows/checks.yml` = the shared `bundle-standard` reusable workflow (pinned tag) with extensions `redis, apcu, mongodb` and `ini-values: apc.enable_cli=1`. The workflow's `PHPUnit without optional libraries` job installs `composer.json` only and proves the `class_exists`/`interface_exists` guards hold without optional libraries. Infection (`infection-min-msi`/`infection-min-covered-msi` = 69, measured 73 on 2026-10-02 UTC, 79 on 2026-10-14 UTC) is blocking; the Roave BC check is blocking (the standard's default); a `--prefer-lowest` PHPUnit cell (PHP 8.2, Symfony 7.4) tests the declared lower bounds. Codecov is disabled (`run-codecov` defaults to `false`). Details: `.claude/docs/ci.md`.
 
 ## Deep references
 

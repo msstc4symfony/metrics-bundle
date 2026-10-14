@@ -13,7 +13,7 @@ use Throwable;
 
 abstract class AbstractCollector
 {
-    private const string DEFAULT_NAMESPACE = 'symfony';
+    private const DEFAULT_NAMESPACE = 'symfony';
 
     protected string $namespace = self::DEFAULT_NAMESPACE;
 

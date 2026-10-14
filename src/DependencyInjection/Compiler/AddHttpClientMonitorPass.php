@@ -21,13 +21,13 @@ use Symfony\Component\HttpClient\Response\AsyncResponse;
  */
 final class AddHttpClientMonitorPass implements CompilerPassInterface
 {
-    public const string TRANSPORT_ID = 'http_client.transport';
+    public const TRANSPORT_ID = 'http_client.transport';
 
-    public const string DECORATOR_ID = self::TRANSPORT_ID . '.decorator.monitor';
+    public const DECORATOR_ID = self::TRANSPORT_ID . '.decorator.monitor';
 
     // Below FrameworkBundle's mock_response_factory decorator (-10): a lower priority is applied
     // later, i.e. further out, so functional tests with a mocked transport still see metrics.
-    private const int DECORATION_PRIORITY = -20;
+    private const DECORATION_PRIORITY = -20;
 
     #[Override]
     public function process(ContainerBuilder $container): void

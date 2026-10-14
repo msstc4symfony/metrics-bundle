@@ -30,11 +30,11 @@ use Throwable;
  */
 final class ReconnectingRedisAdapter implements Adapter
 {
-    public const float DEFAULT_BACKOFF_SECONDS = 5.0;
+    public const DEFAULT_BACKOFF_SECONDS = 5.0;
 
-    private const int CAPTURED_ERRORS = \E_WARNING | \E_NOTICE | \E_USER_WARNING | \E_USER_NOTICE;
+    private const CAPTURED_ERRORS = \E_WARNING | \E_NOTICE | \E_USER_WARNING | \E_USER_NOTICE;
 
-    private const float REPORT_INTERVAL_SECONDS = 60.0;
+    private const REPORT_INTERVAL_SECONDS = 60.0;
 
     private Redis|RedisNg|null $adapter;
 

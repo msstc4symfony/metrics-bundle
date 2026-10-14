@@ -29,7 +29,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final class ContainerCompileTest extends KernelTestCase
 {
-    private const string DSN_ENV = 'METRICS_STORAGE_DSN';
+    private const DSN_ENV = 'METRICS_STORAGE_DSN';
 
     #[Override]
     protected function setUp(): void
@@ -38,7 +38,7 @@ final class ContainerCompileTest extends KernelTestCase
             self::markTestSkipped('symfony/monolog-bundle not installed');
         }
 
-        new Filesystem()->remove(TestKernel::cacheRoot());
+        (new Filesystem())->remove(TestKernel::cacheRoot());
         $_SERVER[self::DSN_ENV] = 'inmemory://';
     }
 
@@ -47,7 +47,7 @@ final class ContainerCompileTest extends KernelTestCase
     {
         parent::tearDown();
         unset($_SERVER[self::DSN_ENV]);
-        new Filesystem()->remove(TestKernel::cacheRoot());
+        (new Filesystem())->remove(TestKernel::cacheRoot());
     }
 
     #[Override]

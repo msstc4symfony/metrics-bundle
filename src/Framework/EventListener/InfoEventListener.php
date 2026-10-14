@@ -14,7 +14,7 @@ use Symfony\Contracts\Cache\CacheInterface;
 #[AsEventListener(event: 'kernel.terminate', method: 'onTerminate', priority: -4096)]
 final readonly class InfoEventListener
 {
-    private const string DEFAULT_PERIOD = 'PT1M';
+    private const DEFAULT_PERIOD = 'PT1M';
 
     private DateInterval $metricsCollectPeriod;
 

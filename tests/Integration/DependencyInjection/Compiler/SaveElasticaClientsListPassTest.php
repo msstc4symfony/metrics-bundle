@@ -30,7 +30,7 @@ final class SaveElasticaClientsListPassTest extends TestCase
         $container->setDefinition('elastica.client.search', new Definition(Client::class));
         $container->setDefinition('app.unrelated', new Definition(stdClass::class));
 
-        new SaveElasticaClientsListPass()->process($container);
+        (new SaveElasticaClientsListPass())->process($container);
 
         self::assertSame(
             ['elastica.client.main', 'elastica.client.search'],
@@ -46,7 +46,7 @@ final class SaveElasticaClientsListPassTest extends TestCase
 
         $container->setDefinition('elastica.client.main', $definition);
 
-        new SaveElasticaClientsListPass()->process($container);
+        (new SaveElasticaClientsListPass())->process($container);
 
         self::assertTrue($container->getDefinition('elastica.client.main')->isPublic());
     }
@@ -55,7 +55,7 @@ final class SaveElasticaClientsListPassTest extends TestCase
     {
         $container = new ContainerBuilder();
 
-        new SaveElasticaClientsListPass()->process($container);
+        (new SaveElasticaClientsListPass())->process($container);
 
         self::assertSame([], $container->getParameter(SaveElasticaClientsListPass::PARAMETER));
     }
@@ -68,7 +68,7 @@ final class SaveElasticaClientsListPassTest extends TestCase
 
         $container->setDefinition('elastica.client.abstract', $abstract);
 
-        new SaveElasticaClientsListPass()->process($container);
+        (new SaveElasticaClientsListPass())->process($container);
 
         self::assertSame([], $container->getParameter(SaveElasticaClientsListPass::PARAMETER));
     }
@@ -78,7 +78,7 @@ final class SaveElasticaClientsListPassTest extends TestCase
         $container = new ContainerBuilder();
         $container->setDefinition('fos_elastica.client.default', new Definition(SubclassedElasticaClient::class));
 
-        new SaveElasticaClientsListPass()->process($container);
+        (new SaveElasticaClientsListPass())->process($container);
 
         self::assertSame(['fos_elastica.client.default'], $container->getParameter(SaveElasticaClientsListPass::PARAMETER));
         self::assertTrue($container->getDefinition('fos_elastica.client.default')->isPublic());
@@ -97,7 +97,7 @@ final class SaveElasticaClientsListPassTest extends TestCase
         $container->setDefinition('fos_elastica.client_prototype', $prototype);
         $container->setDefinition('fos_elastica.client.default', $client);
 
-        new SaveElasticaClientsListPass()->process($container);
+        (new SaveElasticaClientsListPass())->process($container);
 
         self::assertSame(['fos_elastica.client.default'], $container->getParameter(SaveElasticaClientsListPass::PARAMETER));
         self::assertTrue($client->isPublic());

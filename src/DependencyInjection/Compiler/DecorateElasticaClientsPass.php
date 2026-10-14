@@ -22,17 +22,17 @@ use Symfony\Component\DependencyInjection\Reference;
  */
 final class DecorateElasticaClientsPass implements CompilerPassInterface
 {
-    public const string SANITIZE_PATH_PARAMETER = 'msstc4symfony_metrics.elastica.sanitize_path';
+    public const SANITIZE_PATH_PARAMETER = 'msstc4symfony_metrics.elastica.sanitize_path';
 
     /**
      * Where the client's first argument may sit: ChildDefinition::replaceArgument(0) stores "index_0".
      */
-    private const array CONFIG_KEYS = ['index_0', '$config', 0];
+    private const CONFIG_KEYS = ['index_0', '$config', 0];
 
     /**
      * Applied by ConfiguredHttpClientFactory before wrapping; Elastica would reject them on the wrapper.
      */
-    private const array CLIENT_OPTIONS = ['http_client_config', 'http_client_options'];
+    private const CLIENT_OPTIONS = ['http_client_config', 'http_client_options'];
 
     #[Override]
     public function process(ContainerBuilder $container): void
@@ -56,7 +56,7 @@ final class DecorateElasticaClientsPass implements CompilerPassInterface
                 continue;
             }
 
-            $inner = new Definition(ClientInterface::class)
+            $inner = (new Definition(ClientInterface::class))
                 ->setFactory([ConfiguredHttpClientFactory::class, 'create'])
                 ->setArguments([
                     $transportConfig['http_client'] ?? null,

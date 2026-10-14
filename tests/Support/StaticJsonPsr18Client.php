@@ -12,7 +12,7 @@ use Psr\Http\Message\ResponseInterface;
 
 final class StaticJsonPsr18Client implements ClientInterface
 {
-    public const string DOCUMENT = '{"_index":"products","_id":"sku/1","_version":1,"found":true,"_source":{}}';
+    public const DOCUMENT = '{"_index":"products","_id":"sku/1","_version":1,"found":true,"_source":{}}';
 
     #[Override]
     public function sendRequest(RequestInterface $request): ResponseInterface

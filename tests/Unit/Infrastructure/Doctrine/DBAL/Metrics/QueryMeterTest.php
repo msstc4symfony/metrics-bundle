@@ -123,7 +123,7 @@ final class QueryMeterTest extends TestCase
 
     // Shape of PostgreSQLSchemaManager::selectTableColumns() (DBAL 4): a subquery in the select list,
     // a scalar subquery in a JOIN condition and "from" in a trailing comment.
-    private const string POSTGRES_COLUMNS_SQL = <<<'SQL'
+    private const POSTGRES_COLUMNS_SQL = <<<'SQL'
         SELECT quote_ident(n.nspname) AS schema_name,
                quote_ident(c.relname) AS table_name,
                format_type(a.atttypid, a.atttypmod) AS complete_type,
@@ -172,7 +172,7 @@ final class QueryMeterTest extends TestCase
         $registry = new CollectorRegistry(new InMemory());
         $collector = new DoctrineConnectionCollector($registry, new MetricRepository([]), 'app', 'cmp');
         $slowLabeller = new class implements QueryLabelling {
-            public const int PARSING_MICROSECONDS = 100_000;
+            public const PARSING_MICROSECONDS = 100_000;
 
             #[Override]
             public function label(string $sql): QueryLabels
@@ -183,7 +183,7 @@ final class QueryMeterTest extends TestCase
             }
         };
 
-        new QueryMeter($collector, 'default', $slowLabeller)->measure('SELECT * FROM users', static fn (): int => 0);
+        (new QueryMeter($collector, 'default', $slowLabeller))->measure('SELECT * FROM users', static fn (): int => 0);
 
         [[, $duration]] = RegistrySamples::samples($registry, MetricLabelEnum::DOCTRINE_QUERY_DURATION_HISTOGRAM_SECONDS, '_sum');
         // The query itself is instant; any duration near the parsing time means parsing was measured.

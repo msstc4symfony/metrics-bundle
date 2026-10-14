@@ -36,7 +36,7 @@ final readonly class MetricRepositoryFactory
                 continue;
             }
 
-            $backingType = new ReflectionEnum($metricsEnumClassName)->getBackingType();
+            $backingType = (new ReflectionEnum($metricsEnumClassName))->getBackingType();
             if (!$backingType instanceof ReflectionNamedType || $backingType->getName() !== 'string') {
                 continue;
             }

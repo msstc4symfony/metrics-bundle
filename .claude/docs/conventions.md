@@ -1,6 +1,6 @@
 # Конвенции
 
-- PHP 8.4, `declare(strict_types=1)`, `#[Override]` на переопределениях.
+- PHP 8.2 (с 1.4.0; синтаксис 8.2, функции 8.4 — из `symfony/polyfill-php84`), `declare(strict_types=1)`, `#[Override]` на переопределениях.
 - Проверка опциональной библиотеки — по типу символа: `interface_exists()` для
   интерфейсов, `class_exists()` для классов. `class_exists()` на интерфейсе
   всегда `false` — так `AddHttpClientMonitorPass` годами не срабатывал.

@@ -9,7 +9,7 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
 
 final class DoctrineConnectionCollector extends AbstractCollector
 {
-    private const string DEFAULT_TABLE_NAME = 'unknown';
+    private const DEFAULT_TABLE_NAME = 'unknown';
 
     public function incQueryExecute(string $connection, DoctrineQueryTypeEnum $type, ?string $table): void
     {

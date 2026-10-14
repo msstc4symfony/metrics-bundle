@@ -28,7 +28,7 @@ final class AddHttpClientMonitorPassTest extends TestCase
         $container->setDefinition('http_client', new Definition(HttpClientInterface::class));
         $container->setDefinition('github.client', new Definition(HttpClientInterface::class));
 
-        new AddHttpClientMonitorPass()->process($container);
+        (new AddHttpClientMonitorPass())->process($container);
 
         $decorator = $container->getDefinition(AddHttpClientMonitorPass::DECORATOR_ID);
         self::assertSame(HttpClientDecorator::class, $decorator->getClass());
@@ -41,7 +41,7 @@ final class AddHttpClientMonitorPassTest extends TestCase
     {
         $container = new ContainerBuilder();
 
-        new AddHttpClientMonitorPass()->process($container);
+        (new AddHttpClientMonitorPass())->process($container);
 
         self::assertFalse($container->hasDefinition(AddHttpClientMonitorPass::DECORATOR_ID));
     }
@@ -49,9 +49,9 @@ final class AddHttpClientMonitorPassTest extends TestCase
     public function testSkipsAbstractTransport(): void
     {
         $container = new ContainerBuilder();
-        $container->setDefinition(AddHttpClientMonitorPass::TRANSPORT_ID, new Definition(HttpClientInterface::class)->setAbstract(true));
+        $container->setDefinition(AddHttpClientMonitorPass::TRANSPORT_ID, (new Definition(HttpClientInterface::class))->setAbstract(true));
 
-        new AddHttpClientMonitorPass()->process($container);
+        (new AddHttpClientMonitorPass())->process($container);
 
         self::assertFalse($container->hasDefinition(AddHttpClientMonitorPass::DECORATOR_ID));
     }

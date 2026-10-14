@@ -30,14 +30,14 @@ final class ElasticaPathLabelWiringTest extends TestCase
             self::markTestSkipped('ruflin/elastica not installed');
         }
 
-        new Filesystem()->remove(TestKernel::cacheRoot());
+        (new Filesystem())->remove(TestKernel::cacheRoot());
     }
 
     #[Override]
     protected function tearDown(): void
     {
         $this->kernel?->shutdown();
-        new Filesystem()->remove(TestKernel::cacheRoot());
+        (new Filesystem())->remove(TestKernel::cacheRoot());
     }
 
     /**

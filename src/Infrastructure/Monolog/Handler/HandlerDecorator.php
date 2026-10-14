@@ -14,7 +14,7 @@ use Throwable;
 
 final readonly class HandlerDecorator implements LoggerInterface
 {
-    private const array DEFAULT_ALLOWED_LEVELS = [
+    private const DEFAULT_ALLOWED_LEVELS = [
         Level::Emergency,
         Level::Alert,
         Level::Critical,

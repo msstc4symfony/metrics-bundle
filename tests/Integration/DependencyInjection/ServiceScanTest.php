@@ -63,8 +63,8 @@ final class ServiceScanTest extends TestCase
         $container = $this->loadedContainer();
         $container->register(StaticUrlAssembler::class, StaticUrlAssembler::class)->setAutoconfigured(true);
 
-        new RegisterAutoconfigureAttributesPass()->process($container);
-        new ResolveInstanceofConditionalsPass()->process($container);
+        (new RegisterAutoconfigureAttributesPass())->process($container);
+        (new ResolveInstanceofConditionalsPass())->process($container);
 
         self::assertSame([[]], $container->getDefinition(StaticUrlAssembler::class)->getTag(AssemblerInterface::TAG));
     }
@@ -90,7 +90,7 @@ final class ServiceScanTest extends TestCase
         $container->setParameter('kernel.environment', 'test');
         $container->setParameter('kernel.build_dir', sys_get_temp_dir());
 
-        $extension = new MetricsBundle()->getContainerExtension();
+        $extension = (new MetricsBundle())->getContainerExtension();
         self::assertInstanceOf(ExtensionInterface::class, $extension);
         $extension->load([], $container);
 

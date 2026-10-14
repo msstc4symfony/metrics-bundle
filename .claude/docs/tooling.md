@@ -45,7 +45,7 @@ dry-run → deptrac. Запускать как `COMPOSER=composer-ci.json make c
 
 ## Два манифеста и нижние границы
 
-`--prefer-lowest` (CI-ячейка PHP 8.4 + Symfony 7.4) ставит `composer-ci.json`, а шаг «Pin Symfony»
+`--prefer-lowest` (CI-ячейка PHP 8.2 + Symfony 7.4) ставит `composer-ci.json`, а шаг «Pin Symfony»
 переписывает **require** перечисленных `symfony/*` на `7.4.*` — поднять минимальный патч через
 `require` нельзя (верификатор требует там ровно `^7.4|^8.0`), поэтому при нужде минимальный патч
 задаётся через `conflict` (его пин не трогает). Остался один `conflict`,

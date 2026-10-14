@@ -20,9 +20,9 @@ use Throwable;
 #[WithMonologChannel(Factory::LOG_CHANNEL)]
 final class GetMetricsController extends AbstractController
 {
-    public const string ROUTE_NAME = 'metrics-get';
+    public const ROUTE_NAME = 'metrics-get';
 
-    private const array HEADERS = [
+    private const HEADERS = [
         'Content-Type' => RenderTextFormat::MIME_TYPE,
         'Cache-Control' => 'no-store, max-age=0',
     ];

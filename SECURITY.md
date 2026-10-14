@@ -12,7 +12,7 @@ minor on each supported major.
 
 Runtime requirements are tracked in `composer.json`:
 
-- PHP >= 8.4
+- PHP >= 8.2
 - Symfony 7.4 / 8.x
 
 If you are running an older PHP or Symfony version, upgrade before reporting.

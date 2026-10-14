@@ -23,9 +23,9 @@ use Throwable;
  */
 final class ConfiguredHttpClientFactory
 {
-    private const string ADAPTERS = 'Elastic\Elasticsearch\Transport\Adapter\AdapterOptions::HTTP_ADAPTERS';
+    private const ADAPTERS = 'Elastic\Elasticsearch\Transport\Adapter\AdapterOptions::HTTP_ADAPTERS';
 
-    private const string ADAPTER_INTERFACE = 'Elastic\Elasticsearch\Transport\Adapter\AdapterInterface';
+    private const ADAPTER_INTERFACE = 'Elastic\Elasticsearch\Transport\Adapter\AdapterInterface';
 
     /**
      * A property, not a constant: PHPStan resolves a constant to the literal class and rejects it on Elastica 7.
@@ -78,7 +78,7 @@ final class ConfiguredHttpClientFactory
         try {
             return Psr18ClientDiscovery::find();
         } catch (NotFoundException $notFoundException) {
-            $fallback = class_exists(self::$fallbackClientClass) ? new ReflectionClass(self::$fallbackClientClass)->newInstance() : null;
+            $fallback = class_exists(self::$fallbackClientClass) ? (new ReflectionClass(self::$fallbackClientClass))->newInstance() : null;
             if (!$fallback instanceof ClientInterface) {
                 throw $notFoundException;
             }
@@ -89,7 +89,7 @@ final class ConfiguredHttpClientFactory
 
     private static function exception(string $message): Throwable
     {
-        $exception = class_exists(self::$exceptionClass) ? new ReflectionClass(self::$exceptionClass)->newInstance($message) : null;
+        $exception = class_exists(self::$exceptionClass) ? (new ReflectionClass(self::$exceptionClass))->newInstance($message) : null;
 
         return $exception instanceof Throwable ? $exception : new LogicException($message);
     }
