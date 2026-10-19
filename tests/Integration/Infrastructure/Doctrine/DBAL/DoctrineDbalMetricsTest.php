@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\Test\Integration\Infrastructure\Doctrine\DBAL;
 
 use Doctrine\DBAL\Connection;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
+use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\TestKernel;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use Override;
@@ -81,7 +81,7 @@ final class DoctrineDbalMetricsTest extends KernelTestCase
                 'default|other|unknown' => '1',
                 'default|select|users' => '2',
             ],
-            $this->samples($registry, MetricLabelEnum::DOCTRINE_QUERY_EXECUTE),
+            $this->samples($registry, BuiltInMetric::DOCTRINE_QUERY_EXECUTE),
         );
         self::assertSame(
             [
@@ -89,14 +89,14 @@ final class DoctrineDbalMetricsTest extends KernelTestCase
                 'default|other|unknown' => '1',
                 'default|select|users' => '2',
             ],
-            $this->samples($registry, MetricLabelEnum::DOCTRINE_QUERY_DURATION_HISTOGRAM_SECONDS, '_count'),
+            $this->samples($registry, BuiltInMetric::DOCTRINE_QUERY_DURATION_HISTOGRAM_SECONDS, '_count'),
         );
     }
 
     /**
      * @return array<string, string> value by "connection|type|table"
      */
-    private function samples(RegistryInterface $registry, MetricLabelEnum $metric, string $suffix = ''): array
+    private function samples(RegistryInterface $registry, BuiltInMetric $metric, string $suffix = ''): array
     {
         $values = [];
         foreach (RegistrySamples::samples($registry, $metric, $suffix) as [[, , $connection, $type, $table], $value]) {

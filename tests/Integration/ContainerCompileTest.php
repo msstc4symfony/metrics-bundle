@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\Test\Integration;
 
 use ErrorException;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Monolog\Handler\HandlerDecorator;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Storage\Factory;
+use Msstc4Symfony\MetricsBundle\Application\LogChannel;
+use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
+use Msstc4Symfony\MetricsBundle\Framework\Monolog\HandlerDecorator;
 use Msstc4Symfony\MetricsBundle\Presentation\Controller\GetMetricsController;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\TestKernel;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
@@ -129,7 +129,7 @@ final class ContainerCompileTest extends KernelTestCase
         $container = self::getContainer();
 
         self::assertInstanceOf(HandlerDecorator::class, $container->get('logger'));
-        self::assertNotInstanceOf(HandlerDecorator::class, $container->get('monolog.logger.' . Factory::LOG_CHANNEL));
+        self::assertNotInstanceOf(HandlerDecorator::class, $container->get('monolog.logger.' . LogChannel::NAME));
     }
 
     public function testEachHttpRequestIsCountedOnceWithItsRealHost(): void
@@ -153,7 +153,7 @@ final class ContainerCompileTest extends KernelTestCase
         self::assertInstanceOf(RegistryInterface::class, $registry);
 
         $requests = [];
-        foreach (RegistrySamples::samples($registry, MetricLabelEnum::HTTP_CONNECTION_REQUEST) as [[, , , $host, $path], $count]) {
+        foreach (RegistrySamples::samples($registry, BuiltInMetric::HTTP_CONNECTION_REQUEST) as [[, , , $host, $path], $count]) {
             $requests[$host . $path] = $count;
         }
 

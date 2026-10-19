@@ -7,11 +7,12 @@ namespace Msstc4Symfony\MetricsBundle\Test\Integration\Infrastructure\Doctrine\D
 use Doctrine\DBAL\Driver\Connection as ConnectionInterface;
 use Doctrine\DBAL\Driver\Result;
 use Doctrine\DBAL\Driver\Statement as StatementInterface;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\DoctrineConnectionCollector;
+use Msstc4Symfony\MetricsBundle\Application\Collector\DoctrineConnectionCollector;
+use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
+use Msstc4Symfony\MetricsBundle\Application\Metric\MetricRepository;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\Connection;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\Statement;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Prometheus\PrometheusMetricRecorder;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use Override;
 use PHPUnit\Framework\TestCase;
@@ -32,7 +33,7 @@ final class ConnectionTest extends TestCase
         }
 
         $this->registry = new CollectorRegistry(new InMemory());
-        $this->collector = new DoctrineConnectionCollector($this->registry, new MetricRepository([]), 'app', 'cmp');
+        $this->collector = new DoctrineConnectionCollector(new PrometheusMetricRecorder($this->registry, new MetricRepository([]), 'app', 'cmp'));
     }
 
     public function testPrepareWrapsTheStatementWithoutRecordingYet(): void
@@ -45,7 +46,7 @@ final class ConnectionTest extends TestCase
         $statement = (new Connection($inner, $this->collector, 'default'))->prepare('SELECT * FROM users');
 
         self::assertInstanceOf(Statement::class, $statement);
-        self::assertSame([], RegistrySamples::labels($this->registry, MetricLabelEnum::DOCTRINE_QUERY_EXECUTE));
+        self::assertSame([], RegistrySamples::labels($this->registry, BuiltInMetric::DOCTRINE_QUERY_EXECUTE));
     }
 
     public function testQueryWithoutParametersIsRecorded(): void
@@ -55,7 +56,7 @@ final class ConnectionTest extends TestCase
         $inner->expects(self::once())->method('query')->with('SELECT * FROM users')->willReturn($result);
 
         self::assertSame($result, (new Connection($inner, $this->collector, 'default'))->query('SELECT * FROM users'));
-        self::assertSame([['app', 'cmp', 'default', 'select', 'users']], RegistrySamples::labels($this->registry, MetricLabelEnum::DOCTRINE_QUERY_EXECUTE));
+        self::assertSame([['app', 'cmp', 'default', 'select', 'users']], RegistrySamples::labels($this->registry, BuiltInMetric::DOCTRINE_QUERY_EXECUTE));
     }
 
     public function testExecWithoutParametersIsRecorded(): void
@@ -64,6 +65,6 @@ final class ConnectionTest extends TestCase
         $inner->expects(self::once())->method('exec')->with('DELETE FROM users')->willReturn(3);
 
         self::assertSame(3, (new Connection($inner, $this->collector, 'default'))->exec('DELETE FROM users'));
-        self::assertSame([['app', 'cmp', 'default', 'delete', 'users']], RegistrySamples::labels($this->registry, MetricLabelEnum::DOCTRINE_QUERY_EXECUTE));
+        self::assertSame([['app', 'cmp', 'default', 'delete', 'users']], RegistrySamples::labels($this->registry, BuiltInMetric::DOCTRINE_QUERY_EXECUTE));
     }
 }

@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Doctrine\DBAL\Metrics;
 
-use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\DoctrineConnectionCollector;
+use Msstc4Symfony\MetricsBundle\Application\Collector\DoctrineConnectionCollector;
+use Msstc4Symfony\MetricsBundle\Application\Collector\DoctrineQueryType;
+use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
+use Msstc4Symfony\MetricsBundle\Application\Metric\MetricRepository;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\QueryLabeller;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\QueryLabelling;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\QueryLabels;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\QueryMeter;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\DoctrineQueryTypeEnum;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Prometheus\PrometheusMetricRecorder;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -44,7 +45,7 @@ final class QueryMeterTest extends TestCase
 
         $meter->measure($sql, static fn (): int => 0);
 
-        [[, , , $type]] = RegistrySamples::labels($registry, MetricLabelEnum::DOCTRINE_QUERY_EXECUTE);
+        [[, , , $type]] = RegistrySamples::labels($registry, BuiltInMetric::DOCTRINE_QUERY_EXECUTE);
         self::assertSame($expected, $type);
     }
 
@@ -149,7 +150,7 @@ final class QueryMeterTest extends TestCase
 
         $meter->measure($sql, static fn (): int => 0);
 
-        [[, , , , $table]] = RegistrySamples::labels($registry, MetricLabelEnum::DOCTRINE_QUERY_EXECUTE);
+        [[, , , , $table]] = RegistrySamples::labels($registry, BuiltInMetric::DOCTRINE_QUERY_EXECUTE);
         self::assertSame($expected, $table);
     }
 
@@ -159,18 +160,18 @@ final class QueryMeterTest extends TestCase
 
         self::assertSame(42, $meter->measure('SELECT * FROM users', static fn (): int => 42));
 
-        self::assertSame([['app', 'cmp', 'default', 'select', 'users']], RegistrySamples::labels($registry, MetricLabelEnum::DOCTRINE_QUERY_EXECUTE));
+        self::assertSame([['app', 'cmp', 'default', 'select', 'users']], RegistrySamples::labels($registry, BuiltInMetric::DOCTRINE_QUERY_EXECUTE));
 
         self::assertSame(
             [[['app', 'cmp', 'default', 'select', 'users'], '1']],
-            RegistrySamples::samples($registry, MetricLabelEnum::DOCTRINE_QUERY_DURATION_HISTOGRAM_SECONDS, '_count'),
+            RegistrySamples::samples($registry, BuiltInMetric::DOCTRINE_QUERY_DURATION_HISTOGRAM_SECONDS, '_count'),
         );
     }
 
     public function testDurationExcludesLabelParsing(): void
     {
         $registry = new CollectorRegistry(new InMemory());
-        $collector = new DoctrineConnectionCollector($registry, new MetricRepository([]), 'app', 'cmp');
+        $collector = new DoctrineConnectionCollector(new PrometheusMetricRecorder($registry, new MetricRepository([]), 'app', 'cmp'));
         $slowLabeller = new class implements QueryLabelling {
             public const PARSING_MICROSECONDS = 100_000;
 
@@ -179,13 +180,13 @@ final class QueryMeterTest extends TestCase
             {
                 usleep(self::PARSING_MICROSECONDS);
 
-                return new QueryLabels(DoctrineQueryTypeEnum::SELECT, 'users');
+                return new QueryLabels(DoctrineQueryType::SELECT, 'users');
             }
         };
 
         (new QueryMeter($collector, 'default', $slowLabeller))->measure('SELECT * FROM users', static fn (): int => 0);
 
-        [[, $duration]] = RegistrySamples::samples($registry, MetricLabelEnum::DOCTRINE_QUERY_DURATION_HISTOGRAM_SECONDS, '_sum');
+        [[, $duration]] = RegistrySamples::samples($registry, BuiltInMetric::DOCTRINE_QUERY_DURATION_HISTOGRAM_SECONDS, '_sum');
         // The query itself is instant; any duration near the parsing time means parsing was measured.
         self::assertLessThan($slowLabeller::PARSING_MICROSECONDS / 1_000_000 / 2, (float) $duration);
     }
@@ -203,7 +204,7 @@ final class QueryMeterTest extends TestCase
 
         self::assertInstanceOf(RuntimeException::class, $caught);
 
-        self::assertSame([], RegistrySamples::labels($registry, MetricLabelEnum::DOCTRINE_QUERY_EXECUTE));
+        self::assertSame([], RegistrySamples::labels($registry, BuiltInMetric::DOCTRINE_QUERY_EXECUTE));
     }
 
     /**
@@ -212,7 +213,7 @@ final class QueryMeterTest extends TestCase
     private function buildMeter(): array
     {
         $registry = new CollectorRegistry(new InMemory());
-        $collector = new DoctrineConnectionCollector($registry, new MetricRepository([]), 'app', 'cmp');
+        $collector = new DoctrineConnectionCollector(new PrometheusMetricRecorder($registry, new MetricRepository([]), 'app', 'cmp'));
 
         return [$registry, new QueryMeter($collector, 'default', new QueryLabeller())];
     }

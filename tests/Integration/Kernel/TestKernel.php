@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\Test\Integration\Kernel;
 
 use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
+use Msstc4Symfony\MetricsBundle\Application\LogChannel;
 use Msstc4Symfony\MetricsBundle\MetricsBundle;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Messenger\TestMessage;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Messenger\TestMessageHandler;
 use Override;
+use Prometheus\Storage\Adapter;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Bundle\MonologBundle\MonologBundle;
@@ -38,6 +40,9 @@ final class TestKernel extends Kernel
 
     // An application that kept the manual import after switching to "routing.controllers".
     public const ENV_ROUTING_CONTROLLERS_AND_MANUAL_IMPORT = 'routing_controllers_and_manual';
+
+    // Counter writes fail and the app/metrics_bundle channels are kept in TestHandlers.
+    public const ENV_FAILING_STORAGE = 'failing_storage';
 
     // The test connection is sqlite in memory.
     public static function hasDoctrine(): bool
@@ -118,6 +123,18 @@ final class TestKernel extends Kernel
             $container->extension('doctrine', [
                 'dbal' => ['driver' => 'pdo_sqlite', 'memory' => true],
             ]);
+        }
+
+        if ($this->environment === self::ENV_FAILING_STORAGE) {
+            $container->services()->set(Adapter::class, FailingCounterStorage::class);
+            $container->extension('monolog', [
+                'handlers' => [
+                    'metrics' => ['type' => 'test', 'channels' => [LogChannel::NAME]],
+                    'app' => ['type' => 'test', 'channels' => ['app']],
+                ],
+            ]);
+
+            return;
         }
 
         $container->extension('monolog', [

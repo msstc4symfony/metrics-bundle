@@ -8,10 +8,13 @@ use Elastica\Request;
 use Elastica\Response;
 use Elastica\Transport\AbstractTransport;
 use LogicException;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ElasticaCollector;
+use Msstc4Symfony\MetricsBundle\Application\Collector\ElasticaCollector;
 use Override;
 use Throwable;
 
+/**
+ * @internal
+ */
 final class TimingTransport extends AbstractTransport
 {
     private ?AbstractTransport $inner = null;

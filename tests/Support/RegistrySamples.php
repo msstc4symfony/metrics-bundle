@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Test\Support;
 
-use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface;
+use Msstc4Symfony\MetricsBundle\Application\Metric\MetricDefinitionInterface;
 use PHPUnit\Framework\Assert;
 use Prometheus\MetricFamilySamples;
 use Prometheus\RegistryInterface;
 
 final class RegistrySamples
 {
-    public static function exists(RegistryInterface $registry, MetricLabelEnumInterface $metric): bool
+    public static function exists(RegistryInterface $registry, MetricDefinitionInterface $metric): bool
     {
         $name = 'symfony_' . $metric->value;
 
@@ -23,7 +23,7 @@ final class RegistrySamples
      *
      * @return list<list<string>>
      */
-    public static function labels(RegistryInterface $registry, MetricLabelEnumInterface $metric, string $suffix = ''): array
+    public static function labels(RegistryInterface $registry, MetricDefinitionInterface $metric, string $suffix = ''): array
     {
         return array_map(static fn (array $sample): array => $sample[0], self::samples($registry, $metric, $suffix));
     }
@@ -31,7 +31,7 @@ final class RegistrySamples
     /**
      * @return list<array{list<string>, string}> label values and value per sample
      */
-    public static function samples(RegistryInterface $registry, MetricLabelEnumInterface $metric, string $suffix = ''): array
+    public static function samples(RegistryInterface $registry, MetricDefinitionInterface $metric, string $suffix = ''): array
     {
         $name = 'symfony_' . $metric->value;
         $samples = [];

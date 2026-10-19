@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\Test\Integration\Infrastructure\Elastica;
 
 use Elastica\Client;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
+use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\ElasticsearchKernel;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\TestKernel;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
@@ -59,13 +59,13 @@ final class ElasticsearchMetricsTest extends KernelTestCase
 
         $registry = self::getContainer()->get(RegistryInterface::class);
         self::assertInstanceOf(RegistryInterface::class, $registry);
-        $labels = RegistrySamples::labels($registry, MetricLabelEnum::ELASTICA_REQUEST_SUCCESS);
+        $labels = RegistrySamples::labels($registry, BuiltInMetric::ELASTICA_REQUEST_SUCCESS);
         sort($labels);
         self::assertSame(
             [['app', 'cmp', 'GET', '_cluster/health'], ['app', 'cmp', 'GET', '_cluster/state']],
             $labels,
         );
-        self::assertTrue(RegistrySamples::exists($registry, MetricLabelEnum::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS));
-        self::assertFalse(RegistrySamples::exists($registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
+        self::assertTrue(RegistrySamples::exists($registry, BuiltInMetric::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS));
+        self::assertFalse(RegistrySamples::exists($registry, BuiltInMetric::ELASTICA_REQUEST_FAILED));
     }
 }

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\Test\Integration\Infrastructure\Elastica;
 
 use Elastica\Client;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
+use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\ElasticaWiringKernel;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\TestKernel;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
@@ -66,6 +66,6 @@ final class ElasticaPathLabelWiringTest extends TestCase
         self::assertInstanceOf(ContainerInterface::class, $testContainer);
         $registry = $testContainer->get(RegistryInterface::class);
         self::assertInstanceOf(RegistryInterface::class, $registry);
-        self::assertSame([['app', 'cmp', 'GET', $expected]], RegistrySamples::labels($registry, MetricLabelEnum::ELASTICA_REQUEST_SUCCESS));
+        self::assertSame([['app', 'cmp', 'GET', $expected]], RegistrySamples::labels($registry, BuiltInMetric::ELASTICA_REQUEST_SUCCESS));
     }
 }

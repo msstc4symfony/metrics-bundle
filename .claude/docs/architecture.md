@@ -1,32 +1,35 @@
 # Архитектура
 
-## Слои (`src/`)
+## Слои (`src/`, с 2.0 — канон bundle-standard v3, спек B2-metrics)
 
 | Слой | Что внутри | Может зависеть от |
 |---|---|---|
-| `Infrastructure` | коллекторы, `MetricRepository`, `Storage\Factory`, сущности/enum, адаптеры DBAL/ODM/Elastica/HttpClient/Monolog | ничего внутри бандла |
-| `Presentation` | `GetMetricsController` (`GET /_/metrics`), команды `metrics:list`, `metrics:clear` | `Infrastructure` |
-| `Framework` | слушатели kernel/console/Messenger | `Infrastructure`, `Presentation` |
-| `DependencyInjection` | компилер-пассы | `Infrastructure` |
-| `MetricsBundle` (корень) | дерево конфигурации, параметры, регистрация пассов, `boot()` | `DependencyInjection`, `Infrastructure` |
+| `Application/Metric` | определения и модель (`MetricDefinitionInterface`, `BuiltInMetric`, `Metric`, `Label`, `MetricType`, `LabelType`, `MessengerMessageStatus` — его значения перечисляет `BuiltInMetric`, `MetricRepository`+фабрика) — публичный API | — |
+| `Application/Port` | `MetricRecorderInterface`, `MetricStorageInterface`, `MetricExport`, `MetricStorageException` — публичный API | — |
+| `Application/Collector` | 9 коллекторов (`final`, получают `MetricRecorderInterface`), enum `DoctrineQueryType`; публичны `DoctrineConnectionCollector` и `DoctrineQueryType` (ручной DBAL без DoctrineBundle, вместе с `NamedConnectionMiddleware`) | — |
+| `Infrastructure/Prometheus` | `PrometheusMetricRecorder` (префикс лейблов, выбор типа, лог сбоя в `metrics_bundle`), `PrometheusMetricStorage`, `Storage/` (фабрика адаптера, `ReconnectingRedisAdapter`) | `Application` |
+| `Infrastructure/{Doctrine,Elastica,HttpClient}` | адаптеры, вызывающие коллекторы | `Application` |
+| `Framework/Monolog` | `HandlerDecorator` | `Application` |
+| `Presentation` | listener'ы kernel/console/Messenger, `GetMetricsController`, команды — только через порты | `Application` |
+| `DependencyInjection` | pass'ы (`CompilerPass/`), `DefinitionFilter`, `ElasticaClientDefinitions`, `RuntimeIntegrations` (подписчик MongoDB и транспорты Elastica 7 при `boot()`) | `Application`, `Infrastructure`, `Framework` |
+| `MetricsBundle` | конфиг-дерево, параметры, pass'ы, `boot()` → `RuntimeIntegrations::register()` | `Application`, `DependencyInjection` |
 
-Правила зафиксированы в `deptrac.yaml` как статус-кво этапа A (спек 6.2): новые
-направления зависимостей запрещены, перекраска слоёв — этап B.
-`Framework → Presentation` существует ради одного случая: `RequestEventListener`
-не меряет запросы к самому эндпоинту метрик (`GetMetricsController::ROUTE_NAME`).
+Prometheus импортируют только классы `Infrastructure/` (и регистрация в `services.php`). Лог-канал —
+`Application\LogChannel::NAME`: его читают controller и `AddMonologDecoratorCompilerPass`, поэтому константа не в
+Infrastructure. `AbstractCollector` удалён в 2.0: свой коллектор — сервис с `MetricRecorderInterface`.
 
 ## Точки проводки
 
 1. `MetricsBundle` (`AbstractBundle`, алиас `msstc4symfony_metrics`):
    - `configure()` — дерево `storage.{dsn, reconnect_backoff_seconds}`, `application_name`,
      `component_name`, `errors.short_exception_class_name`, `http_client.sanitize_path`,
-     `metric_enums` (каждый класс обязан реализовать `MetricLabelEnumInterface`). Значения по
+     `metric_enums` (каждый класс обязан реализовать `MetricDefinitionInterface`). Значения по
      умолчанию dsn/application/component — env-плейсхолдеры с параметрами
      `msstc4symfony_metrics.default_dsn` / `msstc4symfony_metrics.unknown`;
    - `loadExtension()` — пишет параметры `msstc4symfony_metrics.<путь опции>`
      (`storage.dsn`, `storage.reconnect_backoff_seconds`, `application_name`, `component_name`,
      `errors.short_exception_class_name`, `http_client.sanitize_path`, `metric_enums` =
-     `[MetricLabelEnum::class, ...metric_enums]`) и импортирует `Resources/config/services.php`;
+     `[BuiltInMetric::class, ...metric_enums]`) и импортирует `Resources/config/services.php`;
    - `getPath()` — `src/` (ради `@MetricsBundle/Presentation/Controller/`).
    Контракт для мостов: `msstc4symfony_metrics.metric_enums` (компилер-пассы дописывают в конец),
    `msstc4symfony_metrics.application_name`, `msstc4symfony_metrics.component_name`.
@@ -100,5 +103,3 @@ MongoDB, Elastica, Messenger, APCu. Точка проводки молча вы�
 
 ## Не-final классы
 
-- `AbstractCollector` — базовый класс собственных коллекторов приложения (публичный API:
-  конструктор и protected `incCounter` / `setGauge` / `observeHistogram` / `observeSummary`).

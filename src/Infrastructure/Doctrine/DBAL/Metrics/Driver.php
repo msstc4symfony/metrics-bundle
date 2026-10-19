@@ -6,7 +6,7 @@ namespace Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics;
 
 use Doctrine\DBAL\Driver as DriverInterface;
 use Doctrine\DBAL\Driver\Middleware\AbstractDriverMiddleware;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\DoctrineConnectionCollector;
+use Msstc4Symfony\MetricsBundle\Application\Collector\DoctrineConnectionCollector;
 use Override;
 use SensitiveParameter;
 

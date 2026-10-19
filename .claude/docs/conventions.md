@@ -1,5 +1,9 @@
 # Конвенции
 
+- Раскладка и правила семейства — спеки этапа B (`docs/superpowers/specs/2026-10-17-stage-b-conventions-design.md`) и
+  metrics 2.0 (`2026-10-19-metrics-2-hex-design.md`) в корне msstc4symfony: канонические слои, порты записи/хранилища,
+  `@internal` вне Public API, `#[\Override]` везде (PHPStan `method.missingOverride`).
+
 - PHP 8.2 (с 1.4.0; синтаксис 8.2, функции 8.4 — из `symfony/polyfill-php84`), `declare(strict_types=1)`, `#[Override]` на переопределениях.
 - Проверка опциональной библиотеки — по типу символа: `interface_exists()` для
   интерфейсов, `class_exists()` для классов. `class_exists()` на интерфейсе
@@ -18,7 +22,7 @@
 - В компилер-пассах — `new TaggedIteratorArgument(...)`, а не функция
   `tagged_iterator()`: она определена в файле конфигуратора и вне загрузки
   PHP-конфигов не существует.
-- Метрики бандла — кейсы `MetricLabelEnum`; приложение добавляет свой enum через
+- Метрики бандла — кейсы `BuiltInMetric`; приложение добавляет свой enum через
   `msstc4symfony_metrics.metric_enums` (конфиг), мосты — дописывая параметр с тем же именем в
   компилер-пассе. Имя метрики объявляется один раз — дубликат валит `MetricRepositoryFactory`.
   Значения лейблов нормализуются (кардинальность). Контракт каталога (тип, лейблы, бакеты)

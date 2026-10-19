@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Test\Integration\Infrastructure\HttpClient;
 
-use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ExternalConnectionCollector;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
+use Msstc4Symfony\MetricsBundle\Application\Collector\ExternalConnectionCollector;
+use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
+use Msstc4Symfony\MetricsBundle\Application\Metric\MetricRepository;
 use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\HttpClientDecorator;
 use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\URLAssembler\AssemblerInterface;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Prometheus\PrometheusMetricRecorder;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Infrastructure\HttpClient\Fixture\ResettableClient;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
+use Override;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
 use Prometheus\Storage\InMemory;
@@ -30,6 +32,7 @@ final class HttpClientDecoratorTest extends TestCase
 
     private ExternalConnectionCollector $collector;
 
+    #[Override]
     protected function setUp(): void
     {
         if (!class_exists(MockHttpClient::class)) {
@@ -37,7 +40,7 @@ final class HttpClientDecoratorTest extends TestCase
         }
 
         $this->registry = new CollectorRegistry(new InMemory());
-        $this->collector = new ExternalConnectionCollector($this->registry, new MetricRepository([]), 'app', 'cmp');
+        $this->collector = new ExternalConnectionCollector(new PrometheusMetricRecorder($this->registry, new MetricRepository([]), 'app', 'cmp'));
     }
 
     public function testRecordsRequestResponseAndDurationOnce(): void
@@ -48,24 +51,24 @@ final class HttpClientDecoratorTest extends TestCase
 
         self::assertSame(
             [[['app', 'cmp', 'GET', 'api.example.com', '/users/:id'], '1']],
-            RegistrySamples::samples($this->registry, MetricLabelEnum::HTTP_CONNECTION_REQUEST),
+            RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_CONNECTION_REQUEST),
         );
         self::assertSame(
             [[['app', 'cmp', 'GET', 'api.example.com', '/users/:id', '201'], '1']],
-            RegistrySamples::samples($this->registry, MetricLabelEnum::HTTP_CONNECTION_RESPONSE),
+            RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_CONNECTION_RESPONSE),
         );
-        self::assertTrue(RegistrySamples::exists($this->registry, MetricLabelEnum::HTTP_CONNECTION_DURATION_HISTOGRAM_SECONDS));
+        self::assertTrue(RegistrySamples::exists($this->registry, BuiltInMetric::HTTP_CONNECTION_DURATION_HISTOGRAM_SECONDS));
     }
 
     public function testResponseIsRecordedOnlyWhenTheCallerReadsIt(): void
     {
         $response = $this->decorator(new MockHttpClient(new MockResponse('ok')))->request('GET', 'https://api.example.com/a');
 
-        self::assertSame([], RegistrySamples::samples($this->registry, MetricLabelEnum::HTTP_CONNECTION_RESPONSE), 'request() must not wait for the response');
+        self::assertSame([], RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_CONNECTION_RESPONSE), 'request() must not wait for the response');
 
         $response->getStatusCode();
 
-        self::assertCount(1, RegistrySamples::samples($this->registry, MetricLabelEnum::HTTP_CONNECTION_RESPONSE));
+        self::assertCount(1, RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_CONNECTION_RESPONSE));
     }
 
     public function testTransportErrorReachesTheCallerWithoutResponseMetric(): void
@@ -80,8 +83,8 @@ final class HttpClientDecoratorTest extends TestCase
         } catch (TransportException) {
         }
 
-        self::assertCount(1, RegistrySamples::samples($this->registry, MetricLabelEnum::HTTP_CONNECTION_REQUEST));
-        self::assertSame([], RegistrySamples::samples($this->registry, MetricLabelEnum::HTTP_CONNECTION_RESPONSE));
+        self::assertCount(1, RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_CONNECTION_REQUEST));
+        self::assertSame([], RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_CONNECTION_RESPONSE));
     }
 
     public function testKeepsRawPathWhenSanitizeDisabled(): void
@@ -92,13 +95,14 @@ final class HttpClientDecoratorTest extends TestCase
 
         self::assertSame(
             [[['app', 'cmp', 'GET', 'api.example.com', '/users/42'], '1']],
-            RegistrySamples::samples($this->registry, MetricLabelEnum::HTTP_CONNECTION_REQUEST),
+            RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_CONNECTION_REQUEST),
         );
     }
 
     public function testUrlAssemblerOverridesParsing(): void
     {
         $assembler = new class implements AssemblerInterface {
+            #[Override]
             public function assemble(string $url): array
             {
                 return ['custom-host', '/custom-path'];
@@ -110,7 +114,7 @@ final class HttpClientDecoratorTest extends TestCase
 
         self::assertSame(
             [[['app', 'cmp', 'GET', 'custom-host', '/custom-path'], '1']],
-            RegistrySamples::samples($this->registry, MetricLabelEnum::HTTP_CONNECTION_REQUEST),
+            RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_CONNECTION_REQUEST),
         );
     }
 
@@ -122,7 +126,7 @@ final class HttpClientDecoratorTest extends TestCase
 
         self::assertSame(
             [[['app', 'cmp', 'GET', 'svc.example.com', '/v1/items'], '1']],
-            RegistrySamples::samples($this->registry, MetricLabelEnum::HTTP_CONNECTION_REQUEST),
+            RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_CONNECTION_REQUEST),
         );
     }
 
@@ -171,7 +175,7 @@ final class HttpClientDecoratorTest extends TestCase
 
         self::assertSame(
             [[['app', 'cmp', 'GET', 'api.example.com', '/missing', '404'], '1']],
-            RegistrySamples::samples($this->registry, MetricLabelEnum::HTTP_CONNECTION_RESPONSE),
+            RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_CONNECTION_RESPONSE),
         );
     }
 
@@ -187,7 +191,7 @@ final class HttpClientDecoratorTest extends TestCase
         } catch (ServerExceptionInterface) {
         }
 
-        self::assertCount(1, RegistrySamples::samples($this->registry, MetricLabelEnum::HTTP_CONNECTION_RESPONSE));
+        self::assertCount(1, RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_CONNECTION_RESPONSE));
     }
 
     public function testUnreadResponseStillRecordsItsStatus(): void
@@ -198,7 +202,7 @@ final class HttpClientDecoratorTest extends TestCase
 
         self::assertSame(
             [[['app', 'cmp', 'POST', 'api.example.com', '/fire-and-forget', '202'], '1']],
-            RegistrySamples::samples($this->registry, MetricLabelEnum::HTTP_CONNECTION_RESPONSE),
+            RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_CONNECTION_RESPONSE),
         );
     }
 
@@ -244,7 +248,7 @@ final class HttpClientDecoratorTest extends TestCase
 
         self::assertSame(
             [[['app', 'cmp', 'GET', 'api.example.com', '/a', '200'], '1']],
-            RegistrySamples::samples($this->registry, MetricLabelEnum::HTTP_CONNECTION_RESPONSE),
+            RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_CONNECTION_RESPONSE),
         );
         self::assertSame('1', $this->durationCount());
     }
@@ -254,7 +258,7 @@ final class HttpClientDecoratorTest extends TestCase
         $response = $this->decorator(new MockHttpClient(new MockResponse('ok')))->request('GET', 'https://api.example.com/a');
         $response->cancel();
 
-        self::assertFalse(RegistrySamples::exists($this->registry, MetricLabelEnum::HTTP_CONNECTION_DURATION_HISTOGRAM_SECONDS));
+        self::assertFalse(RegistrySamples::exists($this->registry, BuiltInMetric::HTTP_CONNECTION_DURATION_HISTOGRAM_SECONDS));
     }
 
     public function testBaseUriFromWithOptionsIsUsedForTheHost(): void
@@ -267,7 +271,7 @@ final class HttpClientDecoratorTest extends TestCase
 
         self::assertSame(
             [[['app', 'cmp', 'GET', 'svc.example.com', '/v1/items'], '1']],
-            RegistrySamples::samples($this->registry, MetricLabelEnum::HTTP_CONNECTION_REQUEST),
+            RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_CONNECTION_REQUEST),
         );
     }
 
@@ -282,7 +286,7 @@ final class HttpClientDecoratorTest extends TestCase
 
         $response->getContent();
 
-        self::assertCount(1, RegistrySamples::samples($this->registry, MetricLabelEnum::HTTP_CONNECTION_RESPONSE));
+        self::assertCount(1, RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_CONNECTION_RESPONSE));
         self::assertSame('1', $this->durationCount());
     }
 
@@ -302,7 +306,7 @@ final class HttpClientDecoratorTest extends TestCase
 
     private function durationCount(): ?string
     {
-        return RegistrySamples::samples($this->registry, MetricLabelEnum::HTTP_CONNECTION_DURATION_HISTOGRAM_SECONDS, '_count')[0][1] ?? null;
+        return RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_CONNECTION_DURATION_HISTOGRAM_SECONDS, '_count')[0][1] ?? null;
     }
 
     private function decorator(HttpClientInterface $inner): HttpClientDecorator

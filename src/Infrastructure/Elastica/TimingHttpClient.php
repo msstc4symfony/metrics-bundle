@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Infrastructure\Elastica;
 
-use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ElasticaCollector;
+use Msstc4Symfony\MetricsBundle\Application\Collector\ElasticaCollector;
 use Override;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestInterface;
@@ -12,6 +12,9 @@ use Psr\Http\Message\ResponseInterface;
 use stdClass;
 use Throwable;
 
+/**
+ * @internal
+ */
 final readonly class TimingHttpClient implements ClientInterface
 {
     public function __construct(

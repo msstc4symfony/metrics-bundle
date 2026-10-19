@@ -6,12 +6,13 @@ namespace Msstc4Symfony\MetricsBundle\Test\Integration\Infrastructure\Doctrine\D
 
 use Doctrine\DBAL\Driver\Result;
 use Doctrine\DBAL\Driver\Statement as StatementInterface;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\DoctrineConnectionCollector;
+use Msstc4Symfony\MetricsBundle\Application\Collector\DoctrineConnectionCollector;
+use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
+use Msstc4Symfony\MetricsBundle\Application\Metric\MetricRepository;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\QueryLabeller;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\QueryMeter;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\Statement;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Prometheus\PrometheusMetricRecorder;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use Override;
 use PHPUnit\Framework\TestCase;
@@ -35,10 +36,10 @@ final class StatementTest extends TestCase
         $inner->expects(self::once())->method('execute')->willReturn($result);
 
         $registry = new CollectorRegistry(new InMemory());
-        $collector = new DoctrineConnectionCollector($registry, new MetricRepository([]), 'app', 'cmp');
+        $collector = new DoctrineConnectionCollector(new PrometheusMetricRecorder($registry, new MetricRepository([]), 'app', 'cmp'));
 
         self::assertSame($result, (new Statement($inner, new QueryMeter($collector, 'default', new QueryLabeller()), 'SELECT * FROM users'))->execute());
 
-        self::assertSame([['app', 'cmp', 'default', 'select', 'users']], RegistrySamples::labels($registry, MetricLabelEnum::DOCTRINE_QUERY_EXECUTE));
+        self::assertSame([['app', 'cmp', 'default', 'select', 'users']], RegistrySamples::labels($registry, BuiltInMetric::DOCTRINE_QUERY_EXECUTE));
     }
 }

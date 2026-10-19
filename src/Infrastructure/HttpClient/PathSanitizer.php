@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient;
 
+/**
+ * @internal
+ */
 final class PathSanitizer
 {
     private const UUID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';

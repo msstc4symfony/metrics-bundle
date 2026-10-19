@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient;
 
 use Generator;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ExternalConnectionCollector;
+use Msstc4Symfony\MetricsBundle\Application\Collector\ExternalConnectionCollector;
 use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\URLAssembler\AssemblerInterface;
 use Override;
 use Psr\Log\LoggerAwareInterface;
@@ -24,6 +24,8 @@ use Symfony\Contracts\Service\ResetInterface;
  * Metrics are recorded when the caller reaches the status or the end of the body, never in
  * request(): reading the status there would serialize concurrent requests and disable the
  * destructor-time status check of unconsumed responses.
+ *
+ * @internal
  */
 final class HttpClientDecorator implements HttpClientInterface, ResetInterface, LoggerAwareInterface
 {

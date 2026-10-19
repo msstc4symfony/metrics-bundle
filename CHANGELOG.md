@@ -4,6 +4,59 @@ All notable changes to this bundle are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions follow
 [Semantic Versioning](https://semver.org/); dates are UTC.
 
+## [2.0.0-rc.1] - 2026-10-19
+
+### Added
+
+- Ports `Application\Port\MetricRecorderInterface` (`increment`/`set`/`observe`; storage failures are logged on the
+  `metrics_bundle` channel, never thrown; a metric of another type throws `InvalidArgumentException`) and
+  `Application\Port\MetricStorageInterface` (`export(): MetricExport`,
+  `clear()`, both throw `MetricStorageException`), with Prometheus adapters in `Infrastructure\Prometheus\`.
+- `Application\LogChannel::NAME` (`metrics_bundle`).
+- README "Public API": the classes, configuration keys, parameters, route and commands applications may rely on.
+
+### Changed
+
+- Classes moved and renamed (namespace `Msstc4Symfony\MetricsBundle\`):
+  - `Infrastructure\Enum\MetricLabelEnumInterface` → `Application\Metric\MetricDefinitionInterface`;
+  - `Infrastructure\Enum\MetricLabelEnum` → `Application\Metric\BuiltInMetric`;
+  - `Infrastructure\Enum\MetricTypeEnum` → `Application\Metric\MetricType`;
+  - `Infrastructure\Enum\MetricLabelTypeEnum` → `Application\Metric\LabelType`;
+  - `Infrastructure\Entity\{Metric,Label}` → `Application\Metric\{Metric,Label}`;
+  - `Infrastructure\Repository\{MetricRepositoryInterface,MetricRepository}`,
+    `Infrastructure\Factory\MetricRepositoryFactory` →
+    `Application\Metric\…`;
+  - `Infrastructure\Enum\DoctrineQueryTypeEnum` → `Application\Collector\DoctrineQueryType`;
+  - `Infrastructure\Enum\MessengerMessageStatusEnum` → `Application\Metric\MessengerMessageStatus`;
+  - `Infrastructure\Collector\<X>Collector` → `Application\Collector\<X>Collector` (they take a
+    `MetricRecorderInterface`);
+  - `Infrastructure\Storage\*` → `Infrastructure\Prometheus\Storage\*`; `Factory::LOG_CHANNEL` →
+    `Application\LogChannel::NAME`;
+  - `Infrastructure\Monolog\Handler\HandlerDecorator` → `Framework\Monolog\HandlerDecorator`;
+  - `Framework\EventListener\*` → `Presentation\EventListener\*`;
+  - `DependencyInjection\Compiler\*Pass` → `DependencyInjection\CompilerPass\*Pass`;
+    `DependencyInjection\Compiler\{DefinitionFilter,ElasticaClientDefinitions}` → `DependencyInjection\…`.
+- Removed `AbstractCollector`: a custom collector is a service with `MetricRecorderInterface` and an enum implementing
+  `MetricDefinitionInterface` (README "Adding a custom metric").
+- `ErrorCollector::incError()` takes the level name (`string`) instead of `Monolog\Level`.
+- `GetMetricsController` and `metrics:clear` work through `MetricStorageInterface`; the MongoDB/Elastica 7 runtime
+  wiring of `MetricsBundle::boot()` moved to the internal `DependencyInjection\RuntimeIntegrations`.
+- A failed metric write is logged on the `metrics_bundle` channel instead of the application's default logger (`app`):
+  it no longer appears in the application log and no longer increments `symfony_error{level="ERROR"}` — move alerts
+  that matched it to the `metrics_bundle` channel. `ErrorCollector` now logs its own write failures too (1.x dropped
+  them silently).
+- `metrics:clear` fails on any storage error and `/_/metrics` answers 503 on any export error: the storage adapter wraps
+  every `Throwable` in `MetricStorageException` (1.x: `metrics:clear` caught only `StorageException`).
+- `HandlerDecorator` does not count a record logged through the same logger while it is counting one (second guard
+  against recursion).
+- `msstc4symfony_metrics.metric_enums` rejects enums that are not string-backed (1.x skipped them silently).
+- `MetricDefinitionInterface::getLabels()` / `getBatches()` and `MetricRepositoryInterface::findAll()` are typed
+  `list<Label>` / `list<float>` / `list<Metric>`.
+- Classes outside the README "Public API" are `@internal`.
+- PHPStan enforces `#[\Override]` (`checkMissingOverrideMethodAttribute`); adopts bundle-standard v3 (canonical
+  layers, anchored deptrac `BundleRoot`).
+- Metric names, labels, the `/_/metrics` route, the commands and the configuration keys are unchanged.
+
 ## [1.4.0] - 2026-10-14
 
 ### Added
@@ -103,6 +156,7 @@ First release of `msstc4symfony/metrics-bundle` (namespace `Msstc4Symfony\Metric
 - Optional: Doctrine DBAL / DoctrineBundle, `mongodb/mongodb`, `ruflin/elastica` ^7.3|^8.0, Symfony
   HttpClient, Messenger, APCu.
 
+[2.0.0-rc.1]: https://github.com/msstc4symfony/metrics-bundle/compare/v1.4.0...v2.0.0-rc.1
 [1.4.0]: https://github.com/msstc4symfony/metrics-bundle/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/msstc4symfony/metrics-bundle/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/msstc4symfony/metrics-bundle/compare/v1.1.0...v1.2.0

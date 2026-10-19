@@ -7,7 +7,8 @@ minor on each supported major.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.x     | :white_check_mark: |
+| 2.x     | :white_check_mark: |
+| 1.x     | :white_check_mark: (until 2.0.0 is final) |
 | < 1.0   | :x:                |
 
 Runtime requirements are tracked in `composer.json`:

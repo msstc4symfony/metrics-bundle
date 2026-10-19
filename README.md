@@ -30,7 +30,8 @@ Span durations from `msstc4symfony/profiling-bundle` are exported by
 
 | Bundle  | PHP   | Symfony           |
 | ------- | ----- | ----------------- |
-| 1.4+    | 8.2+  | 7.4, 8.x          |
+| 2.0     | 8.2+  | 7.4, 8.x          |
+| 1.4     | 8.2+  | 7.4, 8.x          |
 | 1.0–1.3 | 8.4+  | 7.4, 8.x          |
 
 Symfony 8.x needs PHP 8.4; on PHP 8.2 and 8.3 Composer installs Symfony 7.4.
@@ -148,7 +149,7 @@ msstc4symfony_metrics:
         # Replace document ids (products/_doc/sku-1 -> products/_doc/:id) and id/uuid/hash segments
         # in the "path" label of the elastica_request_* metrics. false keeps the raw request path.
         sanitize_path: true
-    # Extra metric catalogs (see "Adding a custom metric"), appended after the bundle's MetricLabelEnum.
+    # Extra metric catalogs (see "Adding a custom metric"), appended after the bundle's BuiltInMetric.
     metric_enums: []
 ```
 
@@ -205,7 +206,7 @@ through a worker and are not counted by `messenger_message_handled`; messages ro
 `sync://` transport are counted as sent only. `messenger_message_sent` is recorded right before
 the transports send, so a send that throws is still counted.
 
-The metrics are declared by `MetricLabelEnum`, so `metrics:list` shows them whether or not
+The metrics are declared by `BuiltInMetric`, so `metrics:list` shows them whether or not
 Messenger is installed; without Messenger they are never recorded and `/_/metrics` does not show them.
 
 Cardinality: the histogram writes 16 series (14 buckets, `_sum`, `_count`) per
@@ -281,33 +282,38 @@ Differences and limits on Elastica 8 and 9 ("8" below means both):
 
 ## Adding a custom metric
 
-1. Implement a string-backed enum on `Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface` describing your metrics:
+1. Implement a string-backed enum on `Msstc4Symfony\MetricsBundle\Application\Metric\MetricDefinitionInterface` describing your metrics:
 
     ```php
-    use Msstc4Symfony\MetricsBundle\Infrastructure\Entity\Label;
-    use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface;
-    use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelTypeEnum;
-    use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricTypeEnum;
+    use Msstc4Symfony\MetricsBundle\Application\Metric\Label;
+    use Msstc4Symfony\MetricsBundle\Application\Metric\MetricDefinitionInterface;
+    use Msstc4Symfony\MetricsBundle\Application\Metric\LabelType;
+    use Msstc4Symfony\MetricsBundle\Application\Metric\MetricType;
+    use Override;
 
-    enum AppMetrics: string implements MetricLabelEnumInterface
+    enum AppMetrics: string implements MetricDefinitionInterface
     {
         case ORDER_CREATED = 'order_created_total';
 
-        public function getType(): MetricTypeEnum
+        #[Override]
+        public function getType(): MetricType
         {
-            return MetricTypeEnum::COUNTER;
+            return MetricType::COUNTER;
         }
 
+        #[Override]
         public function getDescription(): string
         {
             return 'Successfully created orders';
         }
 
+        #[Override]
         public function getLabels(): array
         {
-            return [new Label('channel', MetricLabelTypeEnum::STRING)];
+            return [new Label('channel', LabelType::STRING)];
         }
 
+        #[Override]
         public function getBatches(): array
         {
             return [];
@@ -324,29 +330,53 @@ Differences and limits on Elastica 8 and 9 ("8" below means both):
             - App\Metrics\AppMetrics
     ```
 
-3. Write a service that extends `Msstc4Symfony\MetricsBundle\Infrastructure\Collector\AbstractCollector` and exposes the methods you'll call from your code. The base collector takes care of registering the metric, applying the `application`/`component` labels, and catching storage errors. Its `$applicationName` / `$componentName` constructor arguments are not autowired in your application — the bundle binds them only for its own services — so bind them to the bundle's parameters:
+3. Record values through the bundle's recorder port: inject
+   `Msstc4Symfony\MetricsBundle\Application\Port\MetricRecorderInterface` and pass the enum case with the values of
+   its own labels, in order — the bundle adds the `application`/`component` labels and logs storage failures on the
+   `metrics_bundle` channel instead of throwing:
 
-    ```yaml
-    # config/services.yaml
-    services:
-        _defaults:
-            bind:
-                $applicationName: '%msstc4symfony_metrics.application_name%'
-                $componentName: '%msstc4symfony_metrics.component_name%'
+    ```php
+    final readonly class CheckoutMetrics
+    {
+        public function __construct(private MetricRecorderInterface $recorder)
+        {
+        }
+
+        public function orderCreated(string $channel): void
+        {
+            $this->recorder->increment(AppMetrics::ORDER_CREATED, [$channel]);
+        }
+    }
     ```
 
-These extension points are public API and follow semantic versioning within a major:
-`MetricLabelEnumInterface`, `Label`, `MetricLabelTypeEnum`, `MetricTypeEnum`,
-`AbstractCollector` (constructor and protected `incCounter` / `setGauge` / `observeHistogram`)
-and the `msstc4symfony_metrics.metric_enums`, `msstc4symfony_metrics.application_name` and
-`msstc4symfony_metrics.component_name` container parameters. Packages such as
-`msstc4symfony/metrics-bridge-profiling` build on them and append their enum to `msstc4symfony_metrics.metric_enums` in a
+   `increment()` takes counters, `set()` gauges and `observe()` histograms or summaries; any other type throws
+   `InvalidArgumentException`.
+
+## Public API
+
+Applications and bridges use or implement only these; every other class is `@internal` and may change in a minor
+release.
+
+| Namespace `Msstc4Symfony\MetricsBundle\` | Classes |
+|---|---|
+| `Application\Metric` | `MetricDefinitionInterface`, `BuiltInMetric`, `MetricType`, `LabelType`, `Metric`, `Label`, `MessengerMessageStatus`, `MetricRepositoryInterface`, `MetricRepository` |
+| `Application\Collector` | `DoctrineConnectionCollector`, `DoctrineQueryType` (wiring DBAL metrics without DoctrineBundle) |
+| `Infrastructure\Doctrine\DBAL\Metrics` | `NamedConnectionMiddleware` |
+| `Application\Port` | `MetricRecorderInterface`, `MetricStorageInterface`, `MetricExport`, `MetricStorageException` |
+| `Application` | `LogChannel` (`metrics_bundle`) |
+| `Infrastructure\HttpClient\URLAssembler` | `AssemblerInterface` |
+| (root) | `MetricsBundle` |
+
+The configuration keys under `msstc4symfony_metrics` (including `metric_enums`), the container parameters
+`msstc4symfony_metrics.metric_enums`, `.application_name`, `.component_name`, the route `/_/metrics` and the commands
+`metrics:list` / `metrics:clear` are public too. Packages such as `msstc4symfony/metrics-bridge-profiling` append their
+enum to `msstc4symfony_metrics.metric_enums` in a
 compiler pass. Every metric name must be declared once: if two enums declare the same name, building
 the metric repository throws a `LogicException` naming both cases.
 
 ## How it works
 
-Collectors measure at well-known integration points (Symfony kernel events, console events, Monolog handler decorator, Doctrine DBAL middleware, MongoDB driver subscriber, Elastica transport adapter on 7 / PSR-18 client decorator on 8 and 9, `symfony/http-client` decorator). They write to a Prometheus `RegistryInterface` backed by the configured storage adapter (Redis by default). Prometheus periodically scrapes the `/_/metrics` controller, which renders the registry as text/plain.
+Collectors measure at well-known integration points (Symfony kernel events, console events, Monolog handler decorator, Doctrine DBAL middleware, MongoDB driver subscriber, Elastica transport adapter on 7 / PSR-18 client decorator on 8 and 9, `symfony/http-client` decorator). They record through `MetricRecorderInterface`, whose Prometheus adapter writes to a `RegistryInterface` backed by the configured storage adapter (Redis by default). Prometheus periodically scrapes the `/_/metrics` controller, which exports the storage through `MetricStorageInterface` as text/plain.
 
 Metric state lives in Redis indefinitely (or until `metrics:clear` is run / the app is redeployed and the keys are flushed). Each scrape returns the full current state — Prometheus overwrites its own series on every scrape, so a stale Redis simply produces stale values, not duplicates.
 

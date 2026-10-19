@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\Test\Integration\Infrastructure\Doctrine\ODM\Metrics;
 
 use MongoDB\Driver\Monitoring\CommandSubscriber;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\MongoDbCollector;
+use Msstc4Symfony\MetricsBundle\Application\Collector\MongoDbCollector;
+use Msstc4Symfony\MetricsBundle\Application\Metric\MetricRepository;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\ODM\Metrics\TimingSubscriber;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Prometheus\PrometheusMetricRecorder;
+use Override;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
 use Prometheus\Storage\InMemory;
@@ -21,6 +23,7 @@ use Prometheus\Storage\InMemory;
  */
 final class TimingSubscriberTest extends TestCase
 {
+    #[Override]
     protected function setUp(): void
     {
         if (!interface_exists(CommandSubscriber::class)) {
@@ -30,7 +33,7 @@ final class TimingSubscriberTest extends TestCase
 
     public function testSubscriberImplementsCommandSubscriberInterface(): void
     {
-        $collector = new MongoDbCollector(new CollectorRegistry(new InMemory()), new MetricRepository([]), 'app', 'cmp');
+        $collector = new MongoDbCollector(new PrometheusMetricRecorder(new CollectorRegistry(new InMemory()), new MetricRepository([]), 'app', 'cmp'));
 
         self::assertInstanceOf(CommandSubscriber::class, new TimingSubscriber($collector));
     }

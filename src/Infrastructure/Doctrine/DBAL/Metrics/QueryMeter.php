@@ -6,7 +6,7 @@ namespace Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics;
 
 use Closure;
 use Doctrine\DBAL\Driver\Result as ResultInterface;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\DoctrineConnectionCollector;
+use Msstc4Symfony\MetricsBundle\Application\Collector\DoctrineConnectionCollector;
 
 /** @internal Shared by the connection and statement middlewares. */
 final readonly class QueryMeter

@@ -8,11 +8,13 @@ use Elastica\Request;
 use Elastica\Response;
 use Elastica\Transport\AbstractTransport;
 use LogicException;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ElasticaCollector;
+use Msstc4Symfony\MetricsBundle\Application\Collector\ElasticaCollector;
+use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
+use Msstc4Symfony\MetricsBundle\Application\Metric\MetricRepository;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Elastica\TimingTransport;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Prometheus\PrometheusMetricRecorder;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
+use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
@@ -25,6 +27,7 @@ final class TimingTransportTest extends TestCase
 
     private ElasticaCollector $collector;
 
+    #[Override]
     protected function setUp(): void
     {
         if (!class_exists(AbstractTransport::class)) {
@@ -32,7 +35,7 @@ final class TimingTransportTest extends TestCase
         }
 
         $this->registry = new CollectorRegistry(new InMemory());
-        $this->collector = new ElasticaCollector($this->registry, new MetricRepository([]), 'app', 'cmp');
+        $this->collector = new ElasticaCollector(new PrometheusMetricRecorder($this->registry, new MetricRepository([]), 'app', 'cmp'));
     }
 
     public function testSuccessfulRequestRecordsCountAndDuration(): void
@@ -50,9 +53,9 @@ final class TimingTransportTest extends TestCase
 
         self::assertSame(
             [['app', 'cmp', 'POST', '/index/_search']],
-            RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_SUCCESS),
+            RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_SUCCESS),
         );
-        self::assertTrue(RegistrySamples::exists($this->registry, MetricLabelEnum::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS));
+        self::assertTrue(RegistrySamples::exists($this->registry, BuiltInMetric::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS));
     }
 
     public function testResponseWithoutQueryTimeFallsBackToMeasuredDuration(): void
@@ -65,9 +68,9 @@ final class TimingTransportTest extends TestCase
         self::assertNull($response->getQueryTime());
         self::assertSame(
             [['app', 'cmp', 'POST', '/index/_search']],
-            RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS, '_count'),
+            RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS, '_count'),
         );
-        self::assertSame([], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
+        self::assertSame([], RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_FAILED));
     }
 
     public function testFailedRequestRecordsFailureAndRethrows(): void
@@ -89,7 +92,7 @@ final class TimingTransportTest extends TestCase
         self::assertNotNull($caught);
         self::assertSame(
             [['app', 'cmp', 'POST', '/index/_search']],
-            RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED),
+            RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_FAILED),
         );
     }
 
@@ -116,8 +119,8 @@ final class TimingTransportTest extends TestCase
             : (new TimingTransport())->init($inner, $this->collector, $sanitizePath);
         $transport->exec(new Request('/products/_doc/sku%2F42', Request::GET), []);
 
-        self::assertSame([['app', 'cmp', 'GET', $expected]], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_SUCCESS));
-        self::assertSame([['app', 'cmp', 'GET', $expected]], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS, '_count'));
+        self::assertSame([['app', 'cmp', 'GET', $expected]], RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_SUCCESS));
+        self::assertSame([['app', 'cmp', 'GET', $expected]], RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS, '_count'));
     }
 
     #[DataProvider('sanitizePathProvider')]
@@ -136,7 +139,7 @@ final class TimingTransportTest extends TestCase
         } catch (RuntimeException) {
         }
 
-        self::assertSame([['app', 'cmp', 'GET', $expected]], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
+        self::assertSame([['app', 'cmp', 'GET', $expected]], RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_FAILED));
     }
 
     public function testExecBeforeInitThrowsLogicException(): void

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Test\Integration\Infrastructure\Messenger;
 
-use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
+use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Messenger\TestMessage;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Messenger\TestMessageOutcome;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\TestKernel;
@@ -81,15 +81,15 @@ final class MessengerMetricsTest extends KernelTestCase
         $labels = ['unknown', 'unknown', TestKernel::MESSENGER_TRANSPORT, 'TestMessage'];
         self::assertSame(
             [[$labels, '1']],
-            RegistrySamples::samples($registry, MetricLabelEnum::MESSENGER_MESSAGE_SENT),
+            RegistrySamples::samples($registry, BuiltInMetric::MESSENGER_MESSAGE_SENT),
         );
         self::assertSame(
             [[[...$labels, $status], '1']],
-            RegistrySamples::samples($registry, MetricLabelEnum::MESSENGER_MESSAGE_HANDLED),
+            RegistrySamples::samples($registry, BuiltInMetric::MESSENGER_MESSAGE_HANDLED),
         );
         self::assertSame(
             [[[...$labels, $status], '1']],
-            RegistrySamples::samples($registry, MetricLabelEnum::MESSENGER_MESSAGE_HANDLING_DURATION_HISTOGRAM_SECONDS, '_count'),
+            RegistrySamples::samples($registry, BuiltInMetric::MESSENGER_MESSAGE_HANDLING_DURATION_HISTOGRAM_SECONDS, '_count'),
         );
     }
 }

@@ -1,6 +1,6 @@
 ---
 name: metrics-bundle-reviewer
-description: Project-specific reviewer for msstc4symfony/metrics-bundle. Verifies architectural invariants — collector hierarchy, MetricLabelEnum catalog, compiler-pass wiring, storage DSN handling, and PHPStan baseline hygiene. Use PROACTIVELY when changes touch src/Infrastructure/Collector, src/Framework, src/DependencyInjection, src/Infrastructure/{Doctrine,Elastica,HttpClient,Monolog}, src/Infrastructure/Storage or MetricLabelEnum.
+description: Project-specific reviewer for msstc4symfony/metrics-bundle. Verifies architectural invariants — hex layers and ports, BuiltInMetric catalog, compiler-pass wiring, storage DSN handling, and PHPStan baseline hygiene. Use PROACTIVELY when changes touch src/Application, src/Presentation, src/Framework, src/DependencyInjection, src/Infrastructure or BuiltInMetric.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
@@ -15,25 +15,26 @@ Auto-collects runtime metrics (HTTP, console, exceptions, Doctrine DBAL, MongoDB
 
 ## Architectural invariants you MUST check
 
-### 1. Collector contract (`Infrastructure/Collector/AbstractCollector`)
-- Every concrete collector extends `AbstractCollector` and uses its `incCounter()` / similar helpers — never calls `$registry->getOrRegisterCounter()` directly. The helper guarantees the `application`/`component` labels are prepended; bypassing it produces samples with mismatched cardinality and breaks Prometheus.
-- `prepareLabelValues()` adds exactly two implicit labels (`application`, `component`). Any new `MetricLabelEnumInterface::getLabels()` must return only the *additional* labels — no duplicates of those two.
-- `$this->namespace` defaults to `'symfony'`. Renaming it changes every exported metric name — that's a breaking API change for downstream Prometheus configs and dashboards.
+### 1. Layers and ports (bundle-standard v3, 2.0)
+- `Application/` (metric model, ports, collectors) imports no `Prometheus\*`; only `Infrastructure/` does (and `services.php`). Collectors are `final` services that receive `MetricRecorderInterface` — never a registry. `AbstractCollector` no longer exists; do not reintroduce a base class.
+- `PrometheusMetricRecorder` adds exactly two implicit label values (`application`, `component`). Any new `MetricDefinitionInterface::getLabels()` must return only the *additional* labels — no duplicates of those two. Its namespace `'symfony'` prefixes every exported name — changing it breaks dashboards.
+- The recorder never throws on storage failure; it logs on `LogChannel::NAME` (`metrics_bundle`), which `AddMonologDecoratorCompilerPass` must keep excluded (otherwise a failing write recurses through `HandlerDecorator` → `ErrorCollector`; `NoRecursionTest` guards it).
+- Presentation reaches storage only through `MetricStorageInterface`; deptrac ruleset is narrowed from the template — never widen it.
 
-### 2. Metric catalog (`Infrastructure/Enum/MetricLabelEnum` + `MetricLabelEnumInterface`)
-- New metrics must be string-backed enums implementing `MetricLabelEnumInterface` (which extends `BackedEnum`). The `msstc4symfony_metrics.metric_enums` config option rejects classes that do not implement the interface; `MetricRepositoryFactory` still skips non-string-backed enums. A metric name declared by two enums throws `LogicException` when the repository is built — flag any change that reintroduces silent collapsing.
-- Enum case *values* become Prometheus metric names (`symfony_<value>`). Renaming a value = breaking change. Bundle metrics (Messenger included) are cases of `MetricLabelEnum`. `tests/Unit/Infrastructure/Enum/MetricCatalogTest` pins type, labels and buckets of every case — a diff there is a contract change.
+### 2. Metric catalog (`Application/Metric/BuiltInMetric` + `MetricDefinitionInterface`)
+- New metrics must be string-backed enums implementing `MetricDefinitionInterface` (which extends `BackedEnum`). The `msstc4symfony_metrics.metric_enums` config option rejects classes that do not implement the interface; `MetricRepositoryFactory` still skips non-string-backed enums. A metric name declared by two enums throws `LogicException` when the repository is built — flag any change that reintroduces silent collapsing.
+- Enum case *values* become Prometheus metric names (`symfony_<value>`). Renaming a value = breaking change. Bundle metrics (Messenger included) are cases of `BuiltInMetric`. `tests/Unit/Application/Metric/MetricCatalogTest` pins type, labels and buckets of every case — a diff there is a contract change.
 - Histograms must define `getBatches()` (buckets); for other types it returns `[]`. Catch missing buckets on histogram cases.
-- Downstream apps extend the catalog through the `metric_enums` config option; bridges append FQCNs to the `msstc4symfony_metrics.metric_enums` container parameter in a compiler pass (the parameters `msstc4symfony_metrics.application_name` / `component_name` are part of the same contract). Don't break that contract (e.g., don't hardcode `MetricLabelEnum::cases()` somewhere — use the repository).
+- Downstream apps extend the catalog through the `metric_enums` config option; bridges append FQCNs to the `msstc4symfony_metrics.metric_enums` container parameter in a compiler pass (the parameters `msstc4symfony_metrics.application_name` / `component_name` are part of the same contract). Don't break that contract (e.g., don't hardcode `BuiltInMetric::cases()` somewhere — use the repository).
 
-### 3. Compiler passes (`DependencyInjection/Compiler/*`)
-- `AddMonologDecoratorCompilerPass` excludes channels `profiling`, `removal_request`, `deprecation`. Adding a channel to that list must be intentional — silent log volume drops are hard to debug.
+### 3. Compiler passes (`DependencyInjection/CompilerPass/*`)
+- `AddMonologDecoratorCompilerPass` excludes channels `profiling`, `removal_request`, `deprecation`, `metrics_bundle`. Adding a channel to that list must be intentional — silent log volume drops are hard to debug.
 - `AddDoctrineDBALMonitorPass` (priority 1, before DoctrineBundle's `MiddlewaresPass`) registers one `NamedConnectionMiddleware` per DoctrineBundle connection (`$connectionName`, `doctrine.middleware` tag with `connection: <name>`) and nothing without DoctrineBundle. Flag changes to the priority or the tag — `DoctrineDbalMetricsTest` (real kernel, both bundle orders) must keep passing.
 - `AddHttpClientMonitorPass` runs at priority `-256` (late) — preserve that priority; raising it can race with other decorators of `symfony/http-client`.
-- `SaveElasticaClientsListPass` populates the `msstc4symfony_metrics.elastica.clients` container parameter (`SaveElasticaClientsListPass::PARAMETER`); `MetricsBundle::boot()` reads it. Both sides must stay in sync.
-- `MetricsBundle::boot()` guards MongoDB/Elastica wiring with `class_exists()` and `NULL_ON_INVALID_REFERENCE`. Never remove those guards — the bundle is meant to work without those optional libraries.
+- `SaveElasticaClientsListPass` populates the `msstc4symfony_metrics.elastica.clients` container parameter (`SaveElasticaClientsListPass::PARAMETER`); `DependencyInjection\RuntimeIntegrations` (called from `MetricsBundle::boot()`) reads it. Both sides must stay in sync.
+- `RuntimeIntegrations` guards MongoDB/Elastica wiring with `class_exists()` and `NULL_ON_INVALID_REFERENCE`. Never remove those guards — the bundle is meant to work without those optional libraries.
 
-### 4. Storage (`Infrastructure/Storage/Factory`)
+### 4. Storage (`Infrastructure/Prometheus/Storage/Factory`)
 - The factory falls back to `InMemory` when the adapter cannot be **constructed** (malformed DSN, unknown scheme, missing class/extension) and logs it on the `metrics_bundle` channel. An unreachable or restarting Redis does not trigger the fallback: `ReconnectingRedisAdapter` drops writes with a rate-limited log, throws `StorageException` on reads (`/_/metrics` → 503) and reconnects at most once per `msstc4symfony_metrics.storage.reconnect_backoff_seconds`. If a PR adds schemes or changes parsing, keep both the fallback and its log.
 - `parse_url()` is the only validator. Don't accept user-controlled DSNs without env-level protection.
 

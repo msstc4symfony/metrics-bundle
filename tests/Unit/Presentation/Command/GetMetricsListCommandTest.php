@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Test\Unit\Presentation\Command;
 
-use Msstc4Symfony\MetricsBundle\Infrastructure\Entity\Metric;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepositoryInterface;
+use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
+use Msstc4Symfony\MetricsBundle\Application\Metric\Metric;
+use Msstc4Symfony\MetricsBundle\Application\Metric\MetricRepositoryInterface;
 use Msstc4Symfony\MetricsBundle\Presentation\Command\GetMetricsListCommand;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -21,11 +21,11 @@ final class GetMetricsListCommandTest extends TestCase
             ->willReturn(
                 [
                     new Metric(
-                        MetricLabelEnum::HTTP_REQUEST,
-                        MetricLabelEnum::HTTP_REQUEST->getType(),
-                        MetricLabelEnum::HTTP_REQUEST->getDescription(),
-                        MetricLabelEnum::HTTP_REQUEST->getLabels(),
-                        MetricLabelEnum::HTTP_REQUEST->getBatches(),
+                        BuiltInMetric::HTTP_REQUEST,
+                        BuiltInMetric::HTTP_REQUEST->getType(),
+                        BuiltInMetric::HTTP_REQUEST->getDescription(),
+                        BuiltInMetric::HTTP_REQUEST->getLabels(),
+                        BuiltInMetric::HTTP_REQUEST->getBatches(),
                     ),
                 ],
             )

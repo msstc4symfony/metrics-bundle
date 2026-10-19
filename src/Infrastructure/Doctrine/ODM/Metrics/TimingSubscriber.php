@@ -8,10 +8,13 @@ use MongoDB\Driver\Monitoring\CommandFailedEvent;
 use MongoDB\Driver\Monitoring\CommandStartedEvent;
 use MongoDB\Driver\Monitoring\CommandSubscriber;
 use MongoDB\Driver\Monitoring\CommandSucceededEvent;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\MongoDbCollector;
+use Msstc4Symfony\MetricsBundle\Application\Collector\MongoDbCollector;
 use Override;
 use Symfony\Component\DependencyInjection\Attribute\Autoconfigure;
 
+/**
+ * @internal
+ */
 #[Autoconfigure(tags: ['container.service_initializer'], public: true)]
 final readonly class TimingSubscriber implements CommandSubscriber
 {

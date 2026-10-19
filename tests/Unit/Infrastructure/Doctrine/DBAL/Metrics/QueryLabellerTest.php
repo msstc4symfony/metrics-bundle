@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Doctrine\DBAL\Metrics;
 
+use Msstc4Symfony\MetricsBundle\Application\Collector\DoctrineQueryType;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\QueryLabeller;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\DoctrineQueryTypeEnum;
 use PHPUnit\Framework\TestCase;
 
 final class QueryLabellerTest extends TestCase
@@ -16,7 +16,7 @@ final class QueryLabellerTest extends TestCase
 
         $labels = $labeller->label('SELECT * FROM users');
 
-        self::assertSame(DoctrineQueryTypeEnum::SELECT, $labels->type);
+        self::assertSame(DoctrineQueryType::SELECT, $labels->type);
         self::assertSame('users', $labels->table);
         self::assertSame($labels, $labeller->label('SELECT * FROM users'));
     }

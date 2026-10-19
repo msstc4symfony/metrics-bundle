@@ -13,7 +13,7 @@
 - Метрику профилирования объявляет и пишет только мост; своего кода профилирования у бандла нет.
   Дубликат имени метрики — `LogicException` в `MetricRepositoryFactory::create()` (с обоими
   кейсами в сообщении); один и тот же enum в списке дважды дубликатом не считается.
-- Кейсы `MESSENGER_*` — в `MetricLabelEnum`, отдельного enum и пасса для Messenger нет. Без
+- Кейсы `MESSENGER_*` — в `BuiltInMetric`, отдельного enum и пасса для Messenger нет. Без
   Messenger они есть в `metrics:list`, но не в `/_/metrics` (метрики регистрируются в реестре
   лениво, при первой записи).
 - DBAL: метка `connection` — имя соединения DoctrineBundle. `AddDoctrineDBALMonitorPass`
@@ -284,8 +284,8 @@ Roave BC check (дефолт `bundle-standard`) блокирующий и сра
 
 ### Messenger
 
-Метрики — кейсы `MESSENGER_*` в `MetricLabelEnum`.
-`AbstractCollector` находит метрику через `MetricRepository::find()` для любого enum, список
+Метрики — кейсы `MESSENGER_*` в `BuiltInMetric`.
+`PrometheusMetricRecorder` находит метрику через `MetricRepository::find()` для любого enum, список
 нужен только `findAll()`.
 
 `MessengerEventListener`: `SendMessageToTransportsEvent` → `messenger_message_sent` по каждому
@@ -355,9 +355,9 @@ Predis бандл не поддерживает (схемы `predis://` нет).
 проверяет `isConnected()` в каждом `ensureOpenConnection()`, а Predis после `CommunicationException`
 сам рвёт соединение — он восстановился бы без обёртки. APCu/InMemory соединений не держат.
 
-Тесты: `tests/Unit/Infrastructure/Storage/ReconnectingRedisAdapterTest` (фейк
+Тесты: `tests/Unit/Infrastructure/Prometheus/Storage/ReconnectingRedisAdapterTest` (фейк
 `tests/Support/Redis/FailingOnceDownRedis` моделирует FAILED-состояние phpredis) и
-`tests/Integration/Infrastructure/Storage/RedisReconnectTest` — настоящий phpredis против
+`tests/Integration/Infrastructure/Prometheus/Storage/RedisReconnectTest` — настоящий phpredis против
 `tests/Support/Redis/resp-server.php` (RESP-сервер на PHP, отвечает `+OK`, пишет команды в лог),
 который убивается и поднимается на том же порту; проверяет AUTH + SELECT (из query и из пути DSN,
 а также с `persistent_connections=1`) + `EVAL` до и после рестарта.
@@ -397,9 +397,9 @@ warning**, потом бросает `RedisException`. Symfony `ErrorHandler` с
 - Запись (`update*`) не бросает **никогда**: сэмпл теряется, ошибка пишется в логгер `Factory` (канал
   `metrics_bundle`, исключён из `HandlerDecorator`, поэтому рекурсии через `ErrorCollector` нет).
   Чтение (`collect`, `wipeStorage`) бросает `StorageException`.
-- `GetMetricsController` ловит `Throwable` → `503` text/plain + лог в `metrics_bundle`
+- `GetMetricsController` ловит `MetricStorageException` (адаптер оборачивает любой `Throwable`) → `503` text/plain + лог в `metrics_bundle`
   (`#[WithMonologChannel]`, логгер — обязательный аргумент конструктора).
-- `AbstractCollector::processException` и адаптер глотают исключения самого логгера.
+- `PrometheusMetricRecorder` и адаптер хранилища глотают исключения самого логгера.
 - Ревью: логи во время простоя ограничены по частоте. Первая ошибка пишется как `error`, дальше
   раз в 60 с идёт `warning` с числом потерянных сэмплов, при восстановлении — `info`. Часы
   монотонные (`hrtime`), в тестах подменяются через третий аргумент конструктора. Без этого каждый
@@ -666,3 +666,13 @@ vendor/bin/phpunit --filter testUnreachableRedisNeverTurnsRequestsInto500` в lo
   (см. выше); после этого `make fix` (Rector `StringClassNameToClassConstantRector`) превращает строковые имена
   классов Elastica 8 в `::class`, и PHPStan на lock с Elastica 7 падает `class.notFound`. Обновлять точечно
   (`composer update <пакеты>`) и держать vendor = lock (`composer install`) перед `make fix`.
+
+## Перенос 2.0 (2026-10-19 UTC)
+
+- Пути в `services.php` (`exclude`), `phpstan-baseline.neon` и относительные `__DIR__`-пути тестов — строки: скрипт
+  переноса их не переписывает. `tests/Unit/Resources/ServicesConfigTest` сторожит `exclude`; `RedisReconnectTest`
+  сломался на `__DIR__ . '/../../../Support/...'` после переезда на уровень глубже.
+- Рекурсию «сбой записи → лог → `HandlerDecorator` → `ErrorCollector` → сбой» предотвращает только исключение канала
+  `metrics_bundle` из декорирования (`AddMonologDecoratorCompilerPass::EXCLUDE_CHANNELS`); `NoRecursionTest` (env
+  `failing_storage` тестового ядра) проверяет это, убрать канал из списка — тест падает.
+

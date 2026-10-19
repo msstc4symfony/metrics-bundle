@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Test\Integration\DependencyInjection;
 
-use Msstc4Symfony\MetricsBundle\Framework\EventListener\MessengerEventListener;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ErrorCollector;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Application\Collector\ErrorCollector;
+use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
+use Msstc4Symfony\MetricsBundle\Application\Metric\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Presentation\EventListener\MessengerEventListener;
 use Msstc4Symfony\MetricsBundle\Test\Integration\DependencyInjection\Fixture\ExtraMetricEnum;
+use Msstc4Symfony\MetricsBundle\Test\Integration\DependencyInjection\Fixture\IntBackedMetricEnum;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\BundleConfigKernel;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\TestKernel;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
@@ -62,7 +63,7 @@ final class MetricsBundleConfigTest extends TestCase
         self::assertFalse($container->getParameter('msstc4symfony_metrics.errors.short_exception_class_name'));
         self::assertTrue($container->getParameter('msstc4symfony_metrics.http_client.sanitize_path'));
         self::assertTrue($container->getParameter('msstc4symfony_metrics.elastica.sanitize_path'));
-        self::assertSame([MetricLabelEnum::class], $container->getParameter('msstc4symfony_metrics.metric_enums'));
+        self::assertSame([BuiltInMetric::class], $container->getParameter('msstc4symfony_metrics.metric_enums'));
     }
 
     public function testEnvironmentVariablesFeedTheDefaults(): void
@@ -98,7 +99,7 @@ final class MetricsBundleConfigTest extends TestCase
         self::assertFalse($container->getParameter('msstc4symfony_metrics.http_client.sanitize_path'));
         self::assertFalse($container->getParameter('msstc4symfony_metrics.elastica.sanitize_path'));
         self::assertSame(
-            [MetricLabelEnum::class, ExtraMetricEnum::class],
+            [BuiltInMetric::class, ExtraMetricEnum::class],
             $container->getParameter('msstc4symfony_metrics.metric_enums'),
         );
     }
@@ -110,7 +111,7 @@ final class MetricsBundleConfigTest extends TestCase
             MetricRepository::class,
         );
 
-        self::assertSame(\count(MetricLabelEnum::cases()) + 1, \count($repository->findAll()));
+        self::assertSame(\count(BuiltInMetric::cases()) + 1, \count($repository->findAll()));
         self::assertSame(ExtraMetricEnum::EXTRA, $repository->find(ExtraMetricEnum::EXTRA)->name);
     }
 
@@ -120,6 +121,14 @@ final class MetricsBundleConfigTest extends TestCase
         $this->expectExceptionMessage(stdClass::class);
 
         $this->bootKernel(['metric_enums' => [stdClass::class]]);
+    }
+
+    public function testRejectsAnEnumThatIsNotStringBacked(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('IntBackedMetricEnum" is not a string-backed enum');
+
+        $this->bootKernel(['metric_enums' => [IntBackedMetricEnum::class]]);
     }
 
     public function testRejectsNegativeReconnectBackoff(): void
@@ -149,7 +158,7 @@ final class MetricsBundleConfigTest extends TestCase
 
         self::assertSame(
             [['unknown', 'unknown', 'RuntimeException']],
-            RegistrySamples::labels($this->service($container, RegistryInterface::class), MetricLabelEnum::EXCEPTION),
+            RegistrySamples::labels($this->service($container, RegistryInterface::class), BuiltInMetric::EXCEPTION),
         );
     }
 

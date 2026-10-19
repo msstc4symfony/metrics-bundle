@@ -4,29 +4,22 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle;
 
-use Elastica\Client as ElasticaClient;
-use Elastica\Transport\AbstractTransport;
 use LogicException;
-use MongoDB\Client;
-use Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler\AddDoctrineDBALMonitorPass;
-use Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler\AddHttpClientMonitorPass;
-use Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler\AddMonologDecoratorCompilerPass;
-use Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler\DecorateElasticaClientsPass;
-use Msstc4Symfony\MetricsBundle\DependencyInjection\Compiler\SaveElasticaClientsListPass;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ElasticaCollector;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\ODM\Metrics\TimingSubscriber;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Elastica\TimingTransport;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface;
+use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
+use Msstc4Symfony\MetricsBundle\Application\Metric\MetricDefinitionInterface;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\AddDoctrineDBALMonitorPass;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\AddHttpClientMonitorPass;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\AddMonologDecoratorCompilerPass;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\DecorateElasticaClientsPass;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\SaveElasticaClientsListPass;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\RuntimeIntegrations;
 use Override;
+use ReflectionEnum;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
-use Throwable;
-
-use function MongoDB\Driver\Monitoring\addSubscriber;
 
 final class MetricsBundle extends AbstractBundle
 {
@@ -108,13 +101,21 @@ final class MetricsBundle extends AbstractBundle
                     ->info("Extra metric catalogs, appended after the bundle's own.")
                     ->scalarPrototype()
                         ->validate()
-                            ->ifTrue(static fn (mixed $class): bool => !is_string($class) || !is_a($class, MetricLabelEnumInterface::class, true))
-                            ->thenInvalid('%s is not an enum implementing ' . MetricLabelEnumInterface::class . '.')
+                            ->ifTrue(static fn (mixed $class): bool => !self::isStringBackedMetricEnum($class))
+                            ->thenInvalid('%s is not a string-backed enum implementing ' . MetricDefinitionInterface::class . '.')
                         ->end()
                     ->end()
                 ->end()
             ->end()
         ;
+    }
+
+    private static function isStringBackedMetricEnum(mixed $class): bool
+    {
+        // MetricDefinitionInterface extends BackedEnum, so only an enum gets past is_a().
+        return \is_string($class)
+            && is_a($class, MetricDefinitionInterface::class, true)
+            && (string) (new ReflectionEnum($class))->getBackingType() === 'string';
     }
 
     /**
@@ -137,7 +138,7 @@ final class MetricsBundle extends AbstractBundle
             ->set(self::PARAMETER_PREFIX . 'errors.short_exception_class_name', $this->section($config, 'errors')['short_exception_class_name'] ?? null)
             ->set(self::PARAMETER_PREFIX . 'http_client.sanitize_path', $this->section($config, 'http_client')['sanitize_path'] ?? null)
             ->set(DecorateElasticaClientsPass::SANITIZE_PATH_PARAMETER, $this->section($config, 'elastica')['sanitize_path'] ?? null)
-            ->set(self::PARAMETER_PREFIX . 'metric_enums', [MetricLabelEnum::class, ...array_values($this->section($config, 'metric_enums'))])
+            ->set(self::PARAMETER_PREFIX . 'metric_enums', [BuiltInMetric::class, ...array_values($this->section($config, 'metric_enums'))])
         ;
 
         $container->import(__DIR__ . '/Resources/config/services.php');
@@ -165,64 +166,7 @@ final class MetricsBundle extends AbstractBundle
             return;
         }
 
-        $this->registerMongoDbSubscriber($container);
-        $this->wireElasticaTransports($container);
-    }
-
-    private function registerMongoDbSubscriber(ContainerInterface $container): void
-    {
-        if (!class_exists(Client::class)) {
-            return;
-        }
-
-        $subscriber = $container->get(TimingSubscriber::class, ContainerInterface::NULL_ON_INVALID_REFERENCE);
-        if (!$subscriber instanceof TimingSubscriber) {
-            return;
-        }
-
-        addSubscriber($subscriber);
-    }
-
-    private function wireElasticaTransports(ContainerInterface $container): void
-    {
-        // TimingTransport hooks the Elastica 7 connection/transport API, which Elastica 8 and 9 do not have.
-        if (!class_exists(AbstractTransport::class)) {
-            return;
-        }
-
-        try {
-            $ids = $container->getParameter(SaveElasticaClientsListPass::PARAMETER);
-        } catch (Throwable) {
-            // SaveElasticaClientsListPass did not run (Elastica not installed) — nothing to wire.
-            return;
-        }
-
-        if (!is_array($ids) || $ids === []) {
-            return;
-        }
-
-        $collector = $container->get(ElasticaCollector::class, ContainerInterface::NULL_ON_INVALID_REFERENCE);
-        if (!$collector instanceof ElasticaCollector) {
-            return;
-        }
-
-        $sanitizePath = !$container->hasParameter(DecorateElasticaClientsPass::SANITIZE_PATH_PARAMETER) || $container->getParameter(DecorateElasticaClientsPass::SANITIZE_PATH_PARAMETER) !== false;
-
-        foreach ($ids as $id) {
-            $client = is_string($id) ? $container->get($id, ContainerInterface::NULL_ON_INVALID_REFERENCE) : null;
-            if (!$client instanceof ElasticaClient) {
-                continue;
-            }
-
-            foreach ($client->getConnections() as $connection) {
-                // Elastica 7 phpdoc narrows setTransport() to array|string; setParam() takes the
-                // transport object that AbstractTransport::create() accepts at runtime.
-                $connection->setParam(
-                    'transport',
-                    (new TimingTransport())->init($connection->getTransportObject(), $collector, $sanitizePath),
-                );
-            }
-        }
+        RuntimeIntegrations::register($container);
     }
 
     /**

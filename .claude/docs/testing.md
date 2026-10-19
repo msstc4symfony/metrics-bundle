@@ -59,8 +59,8 @@ PHPUnit параллельно, а `setUp()` чистит каталог.
 гистограммы. Собственные `labelValuesFor()`/`familyExists()` убраны: они возвращали
 `array<array>` с `mixed`-значениями лейблов и не проходили PHPStan level 10.
 
-`tests/Unit/Infrastructure/Enum/MetricCatalogTest` — снимок контракта каталога (тип, лейблы с
-перечислениями, бакеты) для `MetricLabelEnum`; `testEveryCaseIsPinned`
+`tests/Unit/Application/Metric/MetricCatalogTest` — снимок контракта каталога (тип, лейблы с
+перечислениями, бакеты) для `BuiltInMetric`; `testEveryCaseIsPinned`
 ловит новый кейс без строки в провайдере.
 
 ## prefer-lowest локально
@@ -82,3 +82,9 @@ PHPUnit параллельно, а `setUp()` чистит каталог.
 Elastica разделены по версии: `SaveElasticaClientsListPassTest` пропускается без
 `AbstractTransport` (7), `DecorateElasticaClientsPassTest` — без `Elastic\Transport\Transport` (8);
 локально 8 гонять в копии с `composer update` (лок на 7).
+
+- Коллекторы тестируются на `tests/Support/RecordingMetricRecorder` (`$calls` = `[метод, метрика, значение|null,
+  лейблы]`, без префикса application/component); префикс и выбор типа — `PrometheusMetricRecorderTest`. Тесты
+  адаптеров/listener'ов оборачивают реальный registry в `PrometheusMetricRecorder` и проверяют сэмплы через
+  `RegistrySamples`.
+

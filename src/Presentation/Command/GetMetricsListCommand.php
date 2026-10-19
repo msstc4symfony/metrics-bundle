@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Presentation\Command;
 
-use Msstc4Symfony\MetricsBundle\Infrastructure\Entity\Label;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelTypeEnum;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepositoryInterface;
+use Msstc4Symfony\MetricsBundle\Application\Metric\Label;
+use Msstc4Symfony\MetricsBundle\Application\Metric\LabelType;
+use Msstc4Symfony\MetricsBundle\Application\Metric\MetricRepositoryInterface;
 use Override;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -15,6 +15,9 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Contracts\Service\Attribute\Required;
 
+/**
+ * @internal
+ */
 #[AsCommand(name: 'metrics:list', description: 'Get metrics list')]
 final class GetMetricsListCommand extends Command
 {
@@ -49,14 +52,14 @@ final class GetMetricsListCommand extends Command
     }
 
     /**
-     * @param Label[] $labels
+     * @param list<Label> $labels
      */
     private function prepareLabels(array $labels): string
     {
         $result = [];
         foreach ($labels as $label) {
             $line = $label->name . "\t" . $label->type->value;
-            if ($label->type === MetricLabelTypeEnum::ENUM) {
+            if ($label->type === LabelType::ENUM) {
                 $line .= ' [' . implode(', ', $label->enums) . ']';
             }
 

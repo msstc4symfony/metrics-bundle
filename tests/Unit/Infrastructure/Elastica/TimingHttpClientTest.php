@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\Elastica;
 
-use Msstc4Symfony\MetricsBundle\Infrastructure\Collector\ElasticaCollector;
+use Msstc4Symfony\MetricsBundle\Application\Collector\ElasticaCollector;
+use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
+use Msstc4Symfony\MetricsBundle\Application\Metric\MetricRepository;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Elastica\TimingHttpClient;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnum;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Prometheus\PrometheusMetricRecorder;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use Nyholm\Psr7\Factory\Psr17Factory;
+use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
@@ -27,6 +29,7 @@ final class TimingHttpClientTest extends TestCase
 
     private ElasticaCollector $collector;
 
+    #[Override]
     protected function setUp(): void
     {
         if (!interface_exists(ClientInterface::class) || !class_exists(Psr17Factory::class)) {
@@ -34,7 +37,7 @@ final class TimingHttpClientTest extends TestCase
         }
 
         $this->registry = new CollectorRegistry(new InMemory());
-        $this->collector = new ElasticaCollector($this->registry, new MetricRepository([]), 'app', 'cmp');
+        $this->collector = new ElasticaCollector(new PrometheusMetricRecorder($this->registry, new MetricRepository([]), 'app', 'cmp'));
     }
 
     public function testSuccessfulRequestRecordsCountAndDurationWithoutLeadingSlash(): void
@@ -45,6 +48,7 @@ final class TimingHttpClientTest extends TestCase
             {
             }
 
+            #[Override]
             public function sendRequest(RequestInterface $request): ResponseInterface
             {
                 return $this->response;
@@ -53,10 +57,10 @@ final class TimingHttpClientTest extends TestCase
 
         (new TimingHttpClient($inner, $this->collector))->sendRequest($factory->createRequest('POST', 'http://es:9200/index/_search'));
 
-        self::assertSame([['app', 'cmp', 'POST', 'index/_search']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_SUCCESS));
-        self::assertTrue(RegistrySamples::exists($this->registry, MetricLabelEnum::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS));
+        self::assertSame([['app', 'cmp', 'POST', 'index/_search']], RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_SUCCESS));
+        self::assertTrue(RegistrySamples::exists($this->registry, BuiltInMetric::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS));
 
-        $samples = RegistrySamples::samples($this->registry, MetricLabelEnum::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS, '_sum');
+        $samples = RegistrySamples::samples($this->registry, BuiltInMetric::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS, '_sum');
         self::assertCount(1, $samples);
         self::assertGreaterThanOrEqual(0.0, (float) $samples[0][1]);
         self::assertLessThan(1.0, (float) $samples[0][1]);
@@ -70,8 +74,8 @@ final class TimingHttpClientTest extends TestCase
         $returned = $this->send($response, $factory->createRequest('GET', 'http://es:9200/missing/_doc/1'));
 
         self::assertSame($response, $returned);
-        self::assertSame([['app', 'cmp', 'GET', 'missing/_doc/:id']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
-        self::assertFalse(RegistrySamples::exists($this->registry, MetricLabelEnum::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS));
+        self::assertSame([['app', 'cmp', 'GET', 'missing/_doc/:id']], RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_FAILED));
+        self::assertFalse(RegistrySamples::exists($this->registry, BuiltInMetric::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS));
     }
 
     public function testStatus400WithErrorBodyIsFailure(): void
@@ -80,8 +84,8 @@ final class TimingHttpClientTest extends TestCase
 
         $this->send($factory->createResponse(400)->withBody($factory->createStream('{"error":"bad"}')), $factory->createRequest('GET', 'http://es:9200/bad'));
 
-        self::assertSame([['app', 'cmp', 'GET', 'bad']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
-        self::assertFalse(RegistrySamples::exists($this->registry, MetricLabelEnum::ELASTICA_REQUEST_SUCCESS));
+        self::assertSame([['app', 'cmp', 'GET', 'bad']], RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_FAILED));
+        self::assertFalse(RegistrySamples::exists($this->registry, BuiltInMetric::ELASTICA_REQUEST_SUCCESS));
     }
 
     public function testNotFoundDocumentWithoutErrorKeyIsSuccess(): void
@@ -90,9 +94,9 @@ final class TimingHttpClientTest extends TestCase
 
         $this->send($factory->createResponse(404)->withBody($factory->createStream('{"_index":"i","_id":"1","found":false}')), $factory->createRequest('GET', 'http://es:9200/i/_doc/1'));
 
-        self::assertSame([['app', 'cmp', 'GET', 'i/_doc/:id']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_SUCCESS));
-        self::assertTrue(RegistrySamples::exists($this->registry, MetricLabelEnum::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS));
-        self::assertFalse(RegistrySamples::exists($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
+        self::assertSame([['app', 'cmp', 'GET', 'i/_doc/:id']], RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_SUCCESS));
+        self::assertTrue(RegistrySamples::exists($this->registry, BuiltInMetric::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS));
+        self::assertFalse(RegistrySamples::exists($this->registry, BuiltInMetric::ELASTICA_REQUEST_FAILED));
     }
 
     public function testHeadNotFoundWithEmptyBodyIsSuccess(): void
@@ -101,8 +105,8 @@ final class TimingHttpClientTest extends TestCase
 
         $this->send($factory->createResponse(404), $factory->createRequest('HEAD', 'http://es:9200/index'));
 
-        self::assertSame([['app', 'cmp', 'HEAD', 'index']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_SUCCESS));
-        self::assertTrue(RegistrySamples::exists($this->registry, MetricLabelEnum::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS));
+        self::assertSame([['app', 'cmp', 'HEAD', 'index']], RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_SUCCESS));
+        self::assertTrue(RegistrySamples::exists($this->registry, BuiltInMetric::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS));
     }
 
     public function testNonJsonObjectErrorBodyIsFailure(): void
@@ -111,7 +115,7 @@ final class TimingHttpClientTest extends TestCase
 
         $this->send($factory->createResponse(502)->withBody($factory->createStream('<html>Bad Gateway</html>')), $factory->createRequest('GET', 'http://es:9200/x'));
 
-        self::assertSame([['app', 'cmp', 'GET', 'x']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
+        self::assertSame([['app', 'cmp', 'GET', 'x']], RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_FAILED));
     }
 
     public function testJsonListBodyOnErrorStatusIsFailure(): void
@@ -120,7 +124,7 @@ final class TimingHttpClientTest extends TestCase
 
         $this->send($factory->createResponse(500)->withBody($factory->createStream('[1]')), $factory->createRequest('GET', 'http://es:9200/x'));
 
-        self::assertSame([['app', 'cmp', 'GET', 'x']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
+        self::assertSame([['app', 'cmp', 'GET', 'x']], RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_FAILED));
     }
 
     public function testBodyStaysFullyReadableAfterInspection(): void
@@ -141,7 +145,7 @@ final class TimingHttpClientTest extends TestCase
 
         $this->send($factory->createResponse(404)->withBody($stream), $factory->createRequest('GET', 'http://es:9200/i'));
 
-        self::assertSame([['app', 'cmp', 'GET', 'i']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
+        self::assertSame([['app', 'cmp', 'GET', 'i']], RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_FAILED));
     }
 
     public function testNonSeekableErrorBodyIsFailureAndNotConsumed(): void
@@ -150,6 +154,7 @@ final class TimingHttpClientTest extends TestCase
         $stream = new class implements StreamInterface {
             public bool $read = false;
 
+            #[Override]
             public function __toString(): string
             {
                 $this->read = true;
@@ -157,58 +162,70 @@ final class TimingHttpClientTest extends TestCase
                 return '{"found":false}';
             }
 
+            #[Override]
             public function close(): void
             {
             }
 
+            #[Override]
             public function detach()
             {
                 return null;
             }
 
+            #[Override]
             public function getSize(): ?int
             {
                 return null;
             }
 
+            #[Override]
             public function tell(): int
             {
                 return 0;
             }
 
+            #[Override]
             public function eof(): bool
             {
                 return false;
             }
 
+            #[Override]
             public function isSeekable(): bool
             {
                 return false;
             }
 
+            #[Override]
             public function seek(int $offset, int $whence = SEEK_SET): void
             {
             }
 
+            #[Override]
             public function rewind(): void
             {
             }
 
+            #[Override]
             public function isWritable(): bool
             {
                 return false;
             }
 
+            #[Override]
             public function write(string $string): int
             {
                 return 0;
             }
 
+            #[Override]
             public function isReadable(): bool
             {
                 return true;
             }
 
+            #[Override]
             public function read(int $length): string
             {
                 $this->read = true;
@@ -216,6 +233,7 @@ final class TimingHttpClientTest extends TestCase
                 return '';
             }
 
+            #[Override]
             public function getContents(): string
             {
                 $this->read = true;
@@ -223,6 +241,7 @@ final class TimingHttpClientTest extends TestCase
                 return '';
             }
 
+            #[Override]
             public function getMetadata(?string $key = null)
             {
                 return null;
@@ -232,7 +251,7 @@ final class TimingHttpClientTest extends TestCase
         $this->send($factory->createResponse(404)->withBody($stream), $factory->createRequest('GET', 'http://es:9200/i/_doc/1'));
 
         self::assertFalse($stream->read);
-        self::assertSame([['app', 'cmp', 'GET', 'i/_doc/:id']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
+        self::assertSame([['app', 'cmp', 'GET', 'i/_doc/:id']], RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_FAILED));
     }
 
     public function testUnreadableErrorBodyIsFailureAndDoesNotEscape(): void
@@ -246,8 +265,8 @@ final class TimingHttpClientTest extends TestCase
         $returned = $this->send($response, $factory->createRequest('GET', 'http://es:9200/x'));
 
         self::assertSame($response, $returned);
-        self::assertSame([['app', 'cmp', 'GET', 'x']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
-        self::assertFalse(RegistrySamples::exists($this->registry, MetricLabelEnum::ELASTICA_REQUEST_SUCCESS));
+        self::assertSame([['app', 'cmp', 'GET', 'x']], RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_FAILED));
+        self::assertFalse(RegistrySamples::exists($this->registry, BuiltInMetric::ELASTICA_REQUEST_SUCCESS));
     }
 
     public function testBodyIsRewoundAgainAfterAFailedRead(): void
@@ -270,7 +289,7 @@ final class TimingHttpClientTest extends TestCase
 
         $this->send($factory->createResponse(404)->withBody($stream), $factory->createRequest('GET', 'http://es:9200/x'));
 
-        self::assertSame([['app', 'cmp', 'GET', 'x']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
+        self::assertSame([['app', 'cmp', 'GET', 'x']], RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_FAILED));
     }
 
     public function testQueryStringIsNotPartOfThePathLabel(): void
@@ -279,7 +298,7 @@ final class TimingHttpClientTest extends TestCase
 
         $this->send($factory->createResponse(200), $factory->createRequest('GET', 'http://es:9200/index/_search?size=1'));
 
-        self::assertSame([['app', 'cmp', 'GET', 'index/_search']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_SUCCESS));
+        self::assertSame([['app', 'cmp', 'GET', 'index/_search']], RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_SUCCESS));
     }
 
     /**
@@ -298,8 +317,8 @@ final class TimingHttpClientTest extends TestCase
 
         $this->send($factory->createResponse(200), $factory->createRequest('GET', 'http://es:9200/products/_doc/sku%2F42'), $sanitizePath);
 
-        self::assertSame([['app', 'cmp', 'GET', $expected]], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_SUCCESS));
-        self::assertSame([['app', 'cmp', 'GET', $expected]], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS, '_count'));
+        self::assertSame([['app', 'cmp', 'GET', $expected]], RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_SUCCESS));
+        self::assertSame([['app', 'cmp', 'GET', $expected]], RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS, '_count'));
     }
 
     #[DataProvider('sanitizePathProvider')]
@@ -309,13 +328,14 @@ final class TimingHttpClientTest extends TestCase
 
         $this->send($factory->createResponse(500)->withBody($factory->createStream('{"error":"x"}')), $factory->createRequest('GET', 'http://es:9200/products/_doc/sku%2F42'), $sanitizePath);
 
-        self::assertSame([['app', 'cmp', 'GET', $expected]], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
+        self::assertSame([['app', 'cmp', 'GET', $expected]], RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_FAILED));
     }
 
     public function testThrownRequestPathLabelIsSanitized(): void
     {
         $factory = new Psr17Factory();
         $inner = new class implements ClientInterface {
+            #[Override]
             public function sendRequest(RequestInterface $request): ResponseInterface
             {
                 throw new class('down') extends RuntimeException implements ClientExceptionInterface {
@@ -329,7 +349,7 @@ final class TimingHttpClientTest extends TestCase
         } catch (ClientExceptionInterface) {
         }
 
-        self::assertSame([['app', 'cmp', 'GET', 'products/_doc/:id']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
+        self::assertSame([['app', 'cmp', 'GET', 'products/_doc/:id']], RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_FAILED));
     }
 
     private function send(ResponseInterface $response, RequestInterface $request, bool $sanitizePath = true): ResponseInterface
@@ -339,6 +359,7 @@ final class TimingHttpClientTest extends TestCase
             {
             }
 
+            #[Override]
             public function sendRequest(RequestInterface $request): ResponseInterface
             {
                 return $this->response;
@@ -352,6 +373,7 @@ final class TimingHttpClientTest extends TestCase
     {
         $factory = new Psr17Factory();
         $inner = new class implements ClientInterface {
+            #[Override]
             public function sendRequest(RequestInterface $request): ResponseInterface
             {
                 throw new class('down') extends RuntimeException implements ClientExceptionInterface {
@@ -365,6 +387,6 @@ final class TimingHttpClientTest extends TestCase
         } catch (ClientExceptionInterface) {
         }
 
-        self::assertSame([['app', 'cmp', 'GET', '_cluster/health']], RegistrySamples::labels($this->registry, MetricLabelEnum::ELASTICA_REQUEST_FAILED));
+        self::assertSame([['app', 'cmp', 'GET', '_cluster/health']], RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_FAILED));
     }
 }

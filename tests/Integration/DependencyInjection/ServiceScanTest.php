@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\Test\Integration\DependencyInjection;
 
 use MongoDB\Driver\Monitoring\CommandSubscriber;
-use Msstc4Symfony\MetricsBundle\Framework\EventListener\MessengerEventListener;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\ODM\Metrics\TimingSubscriber;
 use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\CompletionStreamFilter;
 use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\HttpClientDecorator;
@@ -13,6 +12,7 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\MonitoredResponse;
 use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\PathSanitizer;
 use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\URLAssembler\AssemblerInterface;
 use Msstc4Symfony\MetricsBundle\MetricsBundle;
+use Msstc4Symfony\MetricsBundle\Presentation\EventListener\MessengerEventListener;
 use Msstc4Symfony\MetricsBundle\Test\Integration\DependencyInjection\Fixture\StaticUrlAssembler;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;

@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Test\Integration\DependencyInjection\Fixture;
 
-use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricLabelEnumInterface;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\MetricTypeEnum;
+use Msstc4Symfony\MetricsBundle\Application\Metric\MetricDefinitionInterface;
+use Msstc4Symfony\MetricsBundle\Application\Metric\MetricType;
 use Override;
 
-enum ExtraMetricEnum: string implements MetricLabelEnumInterface
+enum ExtraMetricEnum: string implements MetricDefinitionInterface
 {
     case EXTRA = 'config_test_extra';
 
     #[Override]
-    public function getType(): MetricTypeEnum
+    public function getType(): MetricType
     {
-        return MetricTypeEnum::COUNTER;
+        return MetricType::COUNTER;
     }
 
     #[Override]

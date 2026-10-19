@@ -3,11 +3,15 @@
 declare(strict_types=1);
 
 use MongoDB\Driver\Monitoring\CommandSubscriber;
-use Msstc4Symfony\MetricsBundle\Framework\EventListener\MessengerEventListener;
+use Msstc4Symfony\MetricsBundle\Application\Metric\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Application\Metric\MetricRepositoryFactory;
+use Msstc4Symfony\MetricsBundle\Application\Port\MetricRecorderInterface;
+use Msstc4Symfony\MetricsBundle\Application\Port\MetricStorageInterface;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\ODM\Metrics\TimingSubscriber;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Factory\MetricRepositoryFactory;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Repository\MetricRepository;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Storage\FactoryInterface;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Prometheus\PrometheusMetricRecorder;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Prometheus\PrometheusMetricStorage;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Prometheus\Storage\FactoryInterface;
+use Msstc4Symfony\MetricsBundle\Presentation\EventListener\MessengerEventListener;
 use Prometheus\CollectorRegistry;
 use Prometheus\RegistryInterface;
 use Prometheus\RendererInterface;
@@ -33,12 +37,12 @@ return static function (ContainerConfigurator $container): void {
     $services->load('Msstc4Symfony\MetricsBundle\\', '../../')
         ->exclude([
             '../../DependencyInjection/',
-            '../../Framework/EventListener/MessengerEventListener.php',
+            '../../Presentation/EventListener/MessengerEventListener.php',
             '../../Infrastructure/Doctrine/',
             // URLAssembler/ stays scanned: AssemblerInterface carries the #[AutoconfigureTag] for application assemblers.
             '../../Infrastructure/HttpClient/*.php',
             '../../Infrastructure/Elastica/',
-            '../../Infrastructure/Monolog/',
+            '../../Framework/Monolog/',
             '../../Resources/',
             '../../MetricsBundle.php',
         ])
@@ -66,4 +70,7 @@ return static function (ContainerConfigurator $container): void {
     ;
 
     $services->set(RendererInterface::class, RenderTextFormat::class);
+
+    $services->alias(MetricRecorderInterface::class, PrometheusMetricRecorder::class);
+    $services->alias(MetricStorageInterface::class, PrometheusMetricStorage::class);
 };

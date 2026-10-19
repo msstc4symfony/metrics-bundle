@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics;
 
-use Msstc4Symfony\MetricsBundle\Infrastructure\Enum\DoctrineQueryTypeEnum;
+use Msstc4Symfony\MetricsBundle\Application\Collector\DoctrineQueryType;
 use Override;
 
 /**
@@ -69,13 +69,13 @@ final class QueryLabeller implements QueryLabelling
         return $this->cache[$key] = $labels;
     }
 
-    private function assembleType(string $sql): DoctrineQueryTypeEnum
+    private function assembleType(string $sql): DoctrineQueryType
     {
         if (preg_match('/^\s*(SELECT|INSERT|UPDATE|DELETE)\s+/Si', $sql, $match) !== 1) {
-            return DoctrineQueryTypeEnum::OTHER;
+            return DoctrineQueryType::OTHER;
         }
 
-        return DoctrineQueryTypeEnum::from(strtolower($match[1]));
+        return DoctrineQueryType::from(strtolower($match[1]));
     }
 
     private function assembleTableName(string $sql): ?string
