@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "adc0fde55ee9abc05250c3734335ea20",
+    "content-hash": "01daa48319b35a29a893537fcb136c6b",
     "packages": [
         {
             "name": "monolog/monolog",
@@ -110,6 +110,67 @@
                 }
             ],
             "time": "2026-09-29T19:21:12+00:00"
+        },
+        {
+            "name": "msstc4symfony/sql-labeller",
+            "version": "v1.0.0",
+            "source": {
+                "type": "git",
+                "url": "git@github.com:msstc4symfony/sql-labeller.git",
+                "reference": "1bd8a3214d983f888673ef6c82752db35d645a46"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/msstc4symfony/sql-labeller/zipball/1bd8a3214d983f888673ef6c82752db35d645a46",
+                "reference": "1bd8a3214d983f888673ef6c82752db35d645a46",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.2"
+            },
+            "require-dev": {
+                "friendsofphp/php-cs-fixer": "^3.76",
+                "phpstan/extension-installer": "^1.4",
+                "phpstan/phpstan": "^2.1",
+                "phpstan/phpstan-strict-rules": "^2.0",
+                "phpunit/phpunit": ">=11.0",
+                "rector/rector": "^2.1",
+                "roave/security-advisories": "dev-latest"
+            },
+            "type": "library",
+            "extra": {
+                "bundle-standard": {
+                    "kind": "library"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Msstc4Symfony\\SqlLabeller\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Msstc4Symfony\\SqlLabeller\\Test\\": "tests/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Maxim Shamaev",
+                    "email": "maxim.shamaev@gmail.com"
+                }
+            ],
+            "description": "Statement type and table of an SQL string, for metric labels and span names",
+            "keywords": [
+                "doctrine",
+                "metrics",
+                "php",
+                "profiling",
+                "sql"
+            ],
+            "time": "2026-10-22T12:05:55+00:00"
         },
         {
             "name": "promphp/prometheus_client_php",

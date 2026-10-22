@@ -31,6 +31,7 @@
     "ext-redis": "*",
     "composer-runtime-api": ">=2.2",
     "monolog/monolog": "^3.5",
+    "msstc4symfony/sql-labeller": "^1.0",
     "promphp/prometheus_client_php": "^2.13",
     "symfony/console": "^7.4|^8.0",
     "symfony/event-dispatcher": "^7.4|^8.0",
@@ -94,5 +95,11 @@
       "allow-contrib": false,
       "require": "^7.4|^8.0"
     }
-  }
+  },
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/msstc4symfony/sql-labeller"
+    }
+  ]
 }

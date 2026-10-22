@@ -8,12 +8,13 @@ use Msstc4Symfony\MetricsBundle\Application\Collector\DoctrineConnectionCollecto
 use Msstc4Symfony\MetricsBundle\Application\Collector\DoctrineQueryType;
 use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
 use Msstc4Symfony\MetricsBundle\Application\Metric\MetricRepository;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\QueryLabeller;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\QueryLabelling;
-use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\QueryLabels;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\DBAL\Metrics\QueryMeter;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Prometheus\PrometheusMetricRecorder;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
+use Msstc4Symfony\SqlLabeller\Domain\Enum\StatementType;
+use Msstc4Symfony\SqlLabeller\Domain\Helper\SqlLabeller;
+use Msstc4Symfony\SqlLabeller\Domain\Helper\SqlLabelling;
+use Msstc4Symfony\SqlLabeller\Domain\ValueObject\SqlLabels;
 use Override;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -57,6 +58,13 @@ final class QueryMeterTest extends TestCase
         yield 'leading whitespace' => ["  \n  SELECT 1", 'select'];
         yield 'unknown becomes OTHER' => ['CREATE TABLE foo (id INT)', 'other'];
         yield 'empty becomes OTHER' => ['', 'other'];
+    }
+
+    public function testEveryStatementTypeOfTheLabellerIsAMetricType(): void
+    {
+        foreach (StatementType::cases() as $type) {
+            self::assertNotNull(DoctrineQueryType::tryFrom($type->value), $type->value);
+        }
     }
 
     #[DataProvider('typeProvider')]
@@ -172,15 +180,15 @@ final class QueryMeterTest extends TestCase
     {
         $registry = new CollectorRegistry(new InMemory());
         $collector = new DoctrineConnectionCollector(new PrometheusMetricRecorder($registry, new MetricRepository([]), 'app', 'cmp'));
-        $slowLabeller = new class implements QueryLabelling {
+        $slowLabeller = new class implements SqlLabelling {
             public const PARSING_MICROSECONDS = 100_000;
 
             #[Override]
-            public function label(string $sql): QueryLabels
+            public function label(string $sql): SqlLabels
             {
                 usleep(self::PARSING_MICROSECONDS);
 
-                return new QueryLabels(DoctrineQueryType::SELECT, 'users');
+                return new SqlLabels(StatementType::SELECT, 'users');
             }
         };
 
@@ -215,6 +223,6 @@ final class QueryMeterTest extends TestCase
         $registry = new CollectorRegistry(new InMemory());
         $collector = new DoctrineConnectionCollector(new PrometheusMetricRecorder($registry, new MetricRepository([]), 'app', 'cmp'));
 
-        return [$registry, new QueryMeter($collector, 'default', new QueryLabeller())];
+        return [$registry, new QueryMeter($collector, 'default', new SqlLabeller())];
     }
 }

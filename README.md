@@ -42,9 +42,11 @@ to `AUTH` from 2.13). The lowest declared versions are tested in CI (`--prefer-l
 
 ## Installation
 
-The package is not on Packagist yet, so register its GitHub repository first:
+The packages are not on Packagist yet, so register the GitHub repositories of the bundle and of the SQL labeller it
+uses first:
 
 ```sh
+composer config repositories.msstc4symfony-sql-labeller vcs https://github.com/msstc4symfony/sql-labeller
 composer config repositories.msstc4symfony-metrics vcs https://github.com/msstc4symfony/metrics-bundle
 composer require msstc4symfony/metrics-bundle
 ```
@@ -162,18 +164,12 @@ DoctrineBundle nothing is registered: add
 connection's middlewares yourself, passing the `DoctrineConnectionCollector` service and the name to use as
 the label. With DoctrineBundle do not add it by hand as well: every query would be counted twice.
 
-The `table` label of the `doctrine_query_*` metrics is the first table of the statement's own `FROM`
-(`SELECT`/`DELETE`), `INSERT INTO` or `UPDATE`, without schema/catalog prefixes or identifier quotes. A
-`FROM` inside parentheses (function arguments such as `EXTRACT(EPOCH FROM ...)`, subqueries in the select
-list or in conditions), comments and string literals is ignored, and a derived table
-(`FROM (SELECT ... FROM orders) t`) is labelled with its inner table. The same holds for a
-common table expression (`WITH x AS (SELECT ... FROM orders) SELECT ... FROM x` gives `orders`; a recursive
-CTE that only reads itself gives its own name), a parenthesised `UNION` as built by DBAL's `QueryBuilder`
-on PostgreSQL and MySQL is labelled with the table of its first part, and `ONLY`/`LATERAL` are skipped.
-Statements without a recognisable table, or whose `FROM` lies beyond the first 16 KiB, are labelled
-`unknown`. Known limitations: a table function in `FROM` (`generate_series(...)`, `unnest(...)`) is
-labelled with the function name, and PostgreSQL `E'...'` escapes, dollar-quoted strings and MySQL `#`
-comments are not recognised as literals or comments.
+The `type` and `table` labels of the `doctrine_query_*` metrics come from
+[msstc4symfony/sql-labeller](https://github.com/msstc4symfony/sql-labeller), whose README has the full rules and
+limits: `type` by the statement's first keyword (`other` for anything else, including a type the labeller adds later),
+`table` the first table of the statement's own `FROM`, `INSERT INTO` or `UPDATE`, without schema prefixes or quotes,
+following derived tables, common table expressions and a parenthesised `UNION`. A statement without a recognisable
+table is labelled `unknown`.
 
 ## Redis restarts in long-running workers
 

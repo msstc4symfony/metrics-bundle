@@ -9,6 +9,7 @@ use Doctrine\DBAL\Driver\Middleware\AbstractConnectionMiddleware;
 use Doctrine\DBAL\Driver\Result as ResultInterface;
 use Doctrine\DBAL\Driver\Statement as DriverStatement;
 use Msstc4Symfony\MetricsBundle\Application\Collector\DoctrineConnectionCollector;
+use Msstc4Symfony\SqlLabeller\Domain\Helper\SqlLabeller;
 use Override;
 
 final class Connection extends AbstractConnectionMiddleware
@@ -22,7 +23,7 @@ final class Connection extends AbstractConnectionMiddleware
         string $connectionName,
     ) {
         parent::__construct($connection);
-        $this->meter = new QueryMeter($collector, $connectionName, new QueryLabeller());
+        $this->meter = new QueryMeter($collector, $connectionName, new SqlLabeller());
     }
 
     #[Override]
