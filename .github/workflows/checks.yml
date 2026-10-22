@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   standard:
-    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v3.1.0
+    uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v3.2.0
     with:
       slug: msstc4symfony/metrics-bundle
       extensions: 'mbstring, xml, ctype, iconv, intl, redis, apcu, mongodb, pdo_sqlite'
@@ -27,6 +27,9 @@ jobs:
       # Measured MSI 73 (2026-10-02 UTC); the gate sits about four points below it.
       infection-min-msi: 69
       infection-min-covered-msi: 69
+      # The Elastica 7 transport and the Elastica 8/9 client are both in src/: no single install analyses them, and
+      # the fresh one of the PHPUnit cells has Elastica 9.
+      run-phpstan-per-symfony: false
       elasticsearch: >-
         [
           {"elastica": "^7.3", "image": "docker.elastic.co/elasticsearch/elasticsearch:7.17.29"},
