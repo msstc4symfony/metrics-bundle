@@ -352,23 +352,6 @@ final class TimingHttpClientTest extends TestCase
         self::assertSame([['app', 'cmp', 'GET', 'products/_doc/:id']], RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_FAILED));
     }
 
-    private function send(ResponseInterface $response, RequestInterface $request, bool $sanitizePath = true): ResponseInterface
-    {
-        $inner = new class($response) implements ClientInterface {
-            public function __construct(private readonly ResponseInterface $response)
-            {
-            }
-
-            #[Override]
-            public function sendRequest(RequestInterface $request): ResponseInterface
-            {
-                return $this->response;
-            }
-        };
-
-        return (new TimingHttpClient($inner, $this->collector, $sanitizePath))->sendRequest($request);
-    }
-
     public function testClientExceptionCountsAsFailureAndIsRethrown(): void
     {
         $factory = new Psr17Factory();
@@ -388,5 +371,22 @@ final class TimingHttpClientTest extends TestCase
         }
 
         self::assertSame([['app', 'cmp', 'GET', '_cluster/health']], RegistrySamples::labels($this->registry, BuiltInMetric::ELASTICA_REQUEST_FAILED));
+    }
+
+    private function send(ResponseInterface $response, RequestInterface $request, bool $sanitizePath = true): ResponseInterface
+    {
+        $inner = new class($response) implements ClientInterface {
+            public function __construct(private readonly ResponseInterface $response)
+            {
+            }
+
+            #[Override]
+            public function sendRequest(RequestInterface $request): ResponseInterface
+            {
+                return $this->response;
+            }
+        };
+
+        return (new TimingHttpClient($inner, $this->collector, $sanitizePath))->sendRequest($request);
     }
 }

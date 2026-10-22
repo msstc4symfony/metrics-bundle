@@ -110,14 +110,6 @@ final class MetricsBundle extends AbstractBundle
         ;
     }
 
-    private static function isStringBackedMetricEnum(mixed $class): bool
-    {
-        // MetricDefinitionInterface extends BackedEnum, so only an enum gets past is_a().
-        return \is_string($class)
-            && is_a($class, MetricDefinitionInterface::class, true)
-            && (string) (new ReflectionEnum($class))->getBackingType() === 'string';
-    }
-
     /**
      * @param array<array-key, mixed> $config processed by configure()
      */
@@ -167,6 +159,14 @@ final class MetricsBundle extends AbstractBundle
         }
 
         RuntimeIntegrations::register($container);
+    }
+
+    private static function isStringBackedMetricEnum(mixed $class): bool
+    {
+        // MetricDefinitionInterface extends BackedEnum, so only an enum gets past is_a().
+        return \is_string($class)
+            && is_a($class, MetricDefinitionInterface::class, true)
+            && (string) (new ReflectionEnum($class))->getBackingType() === 'string';
     }
 
     /**

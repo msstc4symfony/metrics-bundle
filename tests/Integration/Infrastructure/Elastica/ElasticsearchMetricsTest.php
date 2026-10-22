@@ -42,12 +42,6 @@ final class ElasticsearchMetricsTest extends KernelTestCase
         (new Filesystem())->remove(TestKernel::cacheRoot());
     }
 
-    #[Override]
-    protected static function getKernelClass(): string
-    {
-        return ElasticsearchKernel::class;
-    }
-
     public function testARealRequestIsRecorded(): void
     {
         self::bootKernel();
@@ -67,5 +61,11 @@ final class ElasticsearchMetricsTest extends KernelTestCase
         );
         self::assertTrue(RegistrySamples::exists($registry, BuiltInMetric::ELASTICA_REQUEST_DURATION_HISTOGRAM_SECONDS));
         self::assertFalse(RegistrySamples::exists($registry, BuiltInMetric::ELASTICA_REQUEST_FAILED));
+    }
+
+    #[Override]
+    protected static function getKernelClass(): string
+    {
+        return ElasticsearchKernel::class;
     }
 }

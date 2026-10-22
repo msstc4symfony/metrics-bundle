@@ -42,12 +42,6 @@ final class DoctrineDbalMetricsTest extends KernelTestCase
         (new Filesystem())->remove(TestKernel::cacheRoot());
     }
 
-    #[Override]
-    protected static function getKernelClass(): string
-    {
-        return TestKernel::class;
-    }
-
     /**
      * @return iterable<string, array{non-empty-string}>
      */
@@ -91,6 +85,12 @@ final class DoctrineDbalMetricsTest extends KernelTestCase
             ],
             $this->samples($registry, BuiltInMetric::DOCTRINE_QUERY_DURATION_HISTOGRAM_SECONDS, '_count'),
         );
+    }
+
+    #[Override]
+    protected static function getKernelClass(): string
+    {
+        return TestKernel::class;
     }
 
     /**

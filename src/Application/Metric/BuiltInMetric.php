@@ -8,21 +8,6 @@ use Override;
 
 enum BuiltInMetric: string implements MetricDefinitionInterface
 {
-    private const HTTP_METHODS = ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'HEAD'];
-
-    private const HTTP_METHODS_EXTENDED = ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'HEAD', 'OPTIONS'];
-
-    private const DOCTRINE_QUERY_TYPES = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'OTHER'];
-
-    private const ERROR_LEVEL_NAMES = [
-        'EMERGENCY',
-        'ALERT',
-        'CRITICAL',
-        'ERROR',
-        'WARNING',
-        'NOTICE',
-    ];
-
     case CONSOLE_COMMAND_START = 'console_command_start';
     case CONSOLE_COMMAND_FINISH = 'console_command_finish';
     case CONSOLE_COMMAND_DURATION_HISTOGRAM_SECONDS = 'console_command_duration_histogram_seconds';
@@ -61,6 +46,21 @@ enum BuiltInMetric: string implements MetricDefinitionInterface
     case MESSENGER_MESSAGE_SENT = 'messenger_message_sent';
     case MESSENGER_MESSAGE_HANDLED = 'messenger_message_handled';
     case MESSENGER_MESSAGE_HANDLING_DURATION_HISTOGRAM_SECONDS = 'messenger_message_handling_duration_histogram_seconds';
+
+    private const HTTP_METHODS = ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'HEAD'];
+
+    private const HTTP_METHODS_EXTENDED = ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'HEAD', 'OPTIONS'];
+
+    private const DOCTRINE_QUERY_TYPES = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'OTHER'];
+
+    private const ERROR_LEVEL_NAMES = [
+        'EMERGENCY',
+        'ALERT',
+        'CRITICAL',
+        'ERROR',
+        'WARNING',
+        'NOTICE',
+    ];
 
     #[Override]
     public function getType(): MetricType

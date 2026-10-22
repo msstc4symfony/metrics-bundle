@@ -58,18 +58,6 @@ final class MonitoredResponse implements ResponseInterface, StreamableInterface
         $this->recordStatusSafely();
     }
 
-    /**
-     * A destructor runs at an arbitrary point of the caller's code: a metrics storage failure
-     * (e.g. Redis down) must not surface there for a request the caller never touched.
-     */
-    private function recordStatusSafely(): void
-    {
-        try {
-            $this->recordStatus();
-        } catch (Throwable) {
-        }
-    }
-
     public function inner(): ResponseInterface
     {
         return $this->inner;
@@ -207,6 +195,18 @@ final class MonitoredResponse implements ResponseInterface, StreamableInterface
         $totalTime = $this->inner->getInfo('total_time');
         if (is_float($totalTime) || is_int($totalTime)) {
             ($this->onComplete)((float) $totalTime);
+        }
+    }
+
+    /**
+     * A destructor runs at an arbitrary point of the caller's code: a metrics storage failure
+     * (e.g. Redis down) must not surface there for a request the caller never touched.
+     */
+    private function recordStatusSafely(): void
+    {
+        try {
+            $this->recordStatus();
+        } catch (Throwable) {
         }
     }
 }

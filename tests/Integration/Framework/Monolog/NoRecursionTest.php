@@ -33,12 +33,6 @@ final class NoRecursionTest extends KernelTestCase
         (new Filesystem())->remove(TestKernel::cacheRoot());
     }
 
-    #[Override]
-    protected static function getKernelClass(): string
-    {
-        return TestKernel::class;
-    }
-
     public function testStorageFailureWhileCountingAnErrorLogsOnceWithoutRecursion(): void
     {
         self::bootKernel(['environment' => TestKernel::ENV_FAILING_STORAGE]);
@@ -52,5 +46,11 @@ final class NoRecursionTest extends KernelTestCase
         self::assertInstanceOf(TestHandler::class, $metrics);
         self::assertCount(1, $metrics->getRecords());
         self::assertStringStartsWith('Cannot save metric "error"', $metrics->getRecords()[0]->message);
+    }
+
+    #[Override]
+    protected static function getKernelClass(): string
+    {
+        return TestKernel::class;
     }
 }

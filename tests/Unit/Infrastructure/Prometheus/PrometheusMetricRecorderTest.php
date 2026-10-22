@@ -41,22 +41,6 @@ final class PrometheusMetricRecorderTest extends TestCase
         $this->registry = new CollectorRegistry(new InMemory());
     }
 
-    private function recorder(?RegistryInterface $registry = null, ?LoggerInterface $logger = null): PrometheusMetricRecorder
-    {
-        return new PrometheusMetricRecorder($registry ?? $this->registry, new MetricRepository(BuiltInMetric::cases()), 'app', 'cmp', $logger);
-    }
-
-    private function gaugeMetric(): BuiltInMetric
-    {
-        foreach (BuiltInMetric::cases() as $case) {
-            if ($case->getType() === MetricType::GAUGE) {
-                return $case;
-            }
-        }
-
-        self::fail('BuiltInMetric declares no gauge');
-    }
-
     public function testIncrementsACounterWithPrefixedLabels(): void
     {
         $this->recorder()->increment(BuiltInMetric::HTTP_REQUEST, ['GET', 'order_show']);
@@ -179,5 +163,21 @@ final class PrometheusMetricRecorderTest extends TestCase
         $this->recorder($registry, $logger)->increment(BuiltInMetric::HTTP_REQUEST, ['GET', 'x']);
 
         $this->addToAssertionCount(1);
+    }
+
+    private function recorder(?RegistryInterface $registry = null, ?LoggerInterface $logger = null): PrometheusMetricRecorder
+    {
+        return new PrometheusMetricRecorder($registry ?? $this->registry, new MetricRepository(BuiltInMetric::cases()), 'app', 'cmp', $logger);
+    }
+
+    private function gaugeMetric(): BuiltInMetric
+    {
+        foreach (BuiltInMetric::cases() as $case) {
+            if ($case->getType() === MetricType::GAUGE) {
+                return $case;
+            }
+        }
+
+        self::fail('BuiltInMetric declares no gauge');
     }
 }

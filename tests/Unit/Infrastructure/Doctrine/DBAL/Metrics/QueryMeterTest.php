@@ -23,6 +23,27 @@ use RuntimeException;
 
 final class QueryMeterTest extends TestCase
 {
+    // Shape of PostgreSQLSchemaManager::selectTableColumns() (DBAL 4): a subquery in the select list,
+    // a scalar subquery in a JOIN condition and "from" in a trailing comment.
+    private const POSTGRES_COLUMNS_SQL = <<<'SQL'
+        SELECT quote_ident(n.nspname) AS schema_name,
+               quote_ident(c.relname) AS table_name,
+               format_type(a.atttypid, a.atttypmod) AS complete_type,
+               (SELECT pg_get_expr(adbin, adrelid)
+                FROM pg_attrdef
+                WHERE c.oid = pg_attrdef.adrelid AND pg_attrdef.adnum = a.attnum) AS "default"
+        FROM pg_attribute a
+                 JOIN pg_class c ON c.oid = a.attrelid
+                 LEFT JOIN pg_depend dep
+                           ON dep.objid = c.oid
+                               AND dep.classid = (SELECT oid FROM pg_class WHERE relname = 'pg_class')
+        WHERE c.relname = ?
+          -- 'r' for regular tables - 'p' for partitioned tables
+          AND c.relkind IN ('r', 'p')
+          -- exclude partitions (tables that inherit from partitioned tables)
+          AND dep.refobjid IS NULL
+        SQL;
+
     /**
      * @return iterable<string, array{string, string}>
      */
@@ -121,27 +142,6 @@ final class QueryMeterTest extends TestCase
         yield 'bracketed identifiers' => ['SELECT * FROM [dbo].[users]', 'users'];
         yield 'escaped backtick in an identifier' => ['SELECT * FROM `my``tbl`', 'my`tbl'];
     }
-
-    // Shape of PostgreSQLSchemaManager::selectTableColumns() (DBAL 4): a subquery in the select list,
-    // a scalar subquery in a JOIN condition and "from" in a trailing comment.
-    private const POSTGRES_COLUMNS_SQL = <<<'SQL'
-        SELECT quote_ident(n.nspname) AS schema_name,
-               quote_ident(c.relname) AS table_name,
-               format_type(a.atttypid, a.atttypmod) AS complete_type,
-               (SELECT pg_get_expr(adbin, adrelid)
-                FROM pg_attrdef
-                WHERE c.oid = pg_attrdef.adrelid AND pg_attrdef.adnum = a.attnum) AS "default"
-        FROM pg_attribute a
-                 JOIN pg_class c ON c.oid = a.attrelid
-                 LEFT JOIN pg_depend dep
-                           ON dep.objid = c.oid
-                               AND dep.classid = (SELECT oid FROM pg_class WHERE relname = 'pg_class')
-        WHERE c.relname = ?
-          -- 'r' for regular tables - 'p' for partitioned tables
-          AND c.relkind IN ('r', 'p')
-          -- exclude partitions (tables that inherit from partitioned tables)
-          AND dep.refobjid IS NULL
-        SQL;
 
     #[DataProvider('tableNameProvider')]
     public function testRecordsTableName(string $sql, string $expected): void

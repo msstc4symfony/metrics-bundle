@@ -50,12 +50,6 @@ final class ContainerCompileTest extends KernelTestCase
         (new Filesystem())->remove(TestKernel::cacheRoot());
     }
 
-    #[Override]
-    protected static function getKernelClass(): string
-    {
-        return TestKernel::class;
-    }
-
     public function testMetricsEndpointServesPrometheusText(): void
     {
         $kernel = self::bootKernel();
@@ -160,5 +154,11 @@ final class ContainerCompileTest extends KernelTestCase
         ksort($requests);
 
         self::assertSame(['api.github.com/users/:id' => '1', 'example.com/a' => '1'], $requests);
+    }
+
+    #[Override]
+    protected static function getKernelClass(): string
+    {
+        return TestKernel::class;
     }
 }

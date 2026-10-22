@@ -46,12 +46,6 @@ final class MessengerMetricsTest extends KernelTestCase
         (new Filesystem())->remove(TestKernel::cacheRoot());
     }
 
-    #[Override]
-    protected static function getKernelClass(): string
-    {
-        return TestKernel::class;
-    }
-
     /**
      * @return iterable<string, array{TestMessageOutcome, 'handled'|'retried'|'failed'}>
      */
@@ -91,5 +85,11 @@ final class MessengerMetricsTest extends KernelTestCase
             [[[...$labels, $status], '1']],
             RegistrySamples::samples($registry, BuiltInMetric::MESSENGER_MESSAGE_HANDLING_DURATION_HISTOGRAM_SECONDS, '_count'),
         );
+    }
+
+    #[Override]
+    protected static function getKernelClass(): string
+    {
+        return TestKernel::class;
     }
 }
