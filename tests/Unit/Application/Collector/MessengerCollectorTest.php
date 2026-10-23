@@ -62,6 +62,22 @@ final class MessengerCollectorTest extends RecorderTestCase
         );
     }
 
+    public function testQueueDepthAndItsSampleTimeAreGaugesPerTransport(): void
+    {
+        $collector = new MessengerCollector($this->recorder);
+
+        $collector->setQueueDepth('async', 12);
+        $collector->setQueueDepthSampledAt('async', 1_793_000_000);
+
+        self::assertSame(
+            [
+                ['set', BuiltInMetric::MESSENGER_QUEUE_DEPTH, 12, ['async']],
+                ['set', BuiltInMetric::MESSENGER_QUEUE_DEPTH_SAMPLED_AT, 1_793_000_000, ['async']],
+            ],
+            $this->recorder->calls,
+        );
+    }
+
     private function build(): MessengerCollector
     {
         return new MessengerCollector($this->recorder);

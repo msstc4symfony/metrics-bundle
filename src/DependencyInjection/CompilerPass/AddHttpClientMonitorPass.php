@@ -6,9 +6,7 @@ namespace Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass;
 
 use Msstc4Symfony\MetricsBundle\DependencyInjection\DefinitionFilter;
 use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\HttpClientDecorator;
-use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\URLAssembler\AssemblerInterface;
 use Override;
-use Symfony\Component\DependencyInjection\Argument\TaggedIteratorArgument;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Reference;
@@ -46,7 +44,6 @@ final class AddHttpClientMonitorPass implements CompilerPassInterface
         $container->register(self::DECORATOR_ID, HttpClientDecorator::class)
             ->setAutowired(true)
             ->setArgument('$inner', new Reference(self::DECORATOR_ID . '.inner'))
-            ->setArgument('$urlAssemblers', new TaggedIteratorArgument(AssemblerInterface::TAG))
             ->setDecoratedService(self::TRANSPORT_ID, null, self::DECORATION_PRIORITY)
         ;
     }

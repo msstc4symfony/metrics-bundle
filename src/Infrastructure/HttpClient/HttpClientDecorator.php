@@ -6,12 +6,11 @@ namespace Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient;
 
 use Generator;
 use Msstc4Symfony\MetricsBundle\Application\Collector\ExternalConnectionCollector;
-use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\URLAssembler\AssemblerInterface;
+use Msstc4Symfony\MetricsBundle\Infrastructure\OutgoingHttp\OutgoingRequestLabels;
 use Override;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerInterface;
 use SplObjectStorage;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpClient\DecoratorTrait;
 use Symfony\Component\HttpClient\Response\ResponseStream;
 use Symfony\Contracts\HttpClient\ChunkInterface;
@@ -31,15 +30,10 @@ final class HttpClientDecorator implements HttpClientInterface, ResetInterface, 
 {
     use DecoratorTrait;
 
-    /**
-     * @param iterable<AssemblerInterface> $urlAssemblers
-     */
     public function __construct(
         HttpClientInterface $inner,
         private readonly ExternalConnectionCollector $collector,
-        private readonly iterable $urlAssemblers,
-        #[Autowire(param: 'msstc4symfony_metrics.http_client.sanitize_path')]
-        private readonly bool $sanitizePath,
+        private readonly OutgoingRequestLabels $labels,
     ) {
         $this->client = $inner;
     }
@@ -55,7 +49,7 @@ final class HttpClientDecorator implements HttpClientInterface, ResetInterface, 
         // The inner response knows its resolved URL immediately, including a base_uri set
         // through withOptions() that this decorator never sees in $options.
         $resolvedUrl = $response->getInfo('url');
-        [$host, $path] = $this->labels(is_string($resolvedUrl) && $resolvedUrl !== '' ? $resolvedUrl : $url);
+        [$host, $path] = $this->labels->of(is_string($resolvedUrl) && $resolvedUrl !== '' ? $resolvedUrl : $url);
 
         $this->collector->incHTTPConnectionRequest($method, $host, $path);
 
@@ -121,24 +115,5 @@ final class HttpClientDecorator implements HttpClientInterface, ResetInterface, 
 
             yield $wrapper ?? $response => $chunk;
         }
-    }
-
-    /**
-     * @return array{string, string}
-     */
-    private function labels(string $url): array
-    {
-        foreach ($this->urlAssemblers as $urlAssembler) {
-            $result = $urlAssembler->assemble($url);
-            if ($result !== null) {
-                return $result;
-            }
-        }
-
-        $parts = parse_url($url);
-        $host = is_array($parts) && isset($parts['host']) ? $parts['host'] : '';
-        $path = is_array($parts) && isset($parts['path']) && $parts['path'] !== '' ? $parts['path'] : '/';
-
-        return [$host, $this->sanitizePath ? PathSanitizer::sanitize($path) : $path];
     }
 }

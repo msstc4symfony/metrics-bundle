@@ -63,10 +63,11 @@ deptrac:
         Presentation:
             - Application
 
-        # Passes decorate services with adapters by class.
+        # Passes decorate services with adapters and register optional listeners by class.
         DependencyInjection:
             - Application
             - Infrastructure
+            - Presentation
             - Framework
 
         BundleRoot:

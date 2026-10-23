@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Infrastructure\Elastica;
 
-use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\PathSanitizer;
+use Msstc4Symfony\MetricsBundle\Infrastructure\OutgoingHttp\PathSanitizer;
 
 /**
  * Bounds the "path" label of Elastica requests: the id of a document endpoint becomes ":id", then the generic rules apply.

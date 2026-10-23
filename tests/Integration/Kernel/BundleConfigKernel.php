@@ -27,6 +27,8 @@ use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
  *     http_client?: array{sanitize_path?: bool},
  *     elastica?: array{sanitize_path?: bool},
  *     metric_enums?: list<string>,
+ *     cache?: array{pools?: list<string>},
+ *     messenger?: array{queue_depth?: bool|array{enabled?: bool, transports?: list<string>, period?: string}},
  * }
  */
 final class BundleConfigKernel extends Kernel

@@ -5,8 +5,12 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\Test\Integration\Kernel;
 
 use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
+use GuzzleHttp\Client;
+use GuzzleHttp\ClientInterface as GuzzleClientInterface;
+use GuzzleHttp\HandlerStack;
 use Msstc4Symfony\MetricsBundle\Application\LogChannel;
 use Msstc4Symfony\MetricsBundle\MetricsBundle;
+use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Guzzle\GuzzleClientFactory;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Messenger\TestMessage;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Messenger\TestMessageHandler;
 use Override;
@@ -20,6 +24,8 @@ use Symfony\Component\HttpKernel\Kernel;
 use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
 use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
 
+use function Symfony\Component\DependencyInjection\Loader\Configurator\inline_service;
+
 final class TestKernel extends Kernel
 {
     use MicroKernelTrait;
@@ -31,6 +37,10 @@ final class TestKernel extends Kernel
     public const SCOPED_CLIENT_ALIAS = 'test.github.client';
 
     public const MESSENGER_TRANSPORT = 'async';
+
+    public const GUZZLE_CLIENT = 'test.guzzle.configured';
+
+    public const GUZZLE_FACTORY_CLIENT = 'test.guzzle.factory_built';
 
     // Compiler passes of equal priority run in bundle registration order; this env flips it.
     public const ENV_METRICS_BUNDLE_FIRST = 'metrics_first';
@@ -119,6 +129,18 @@ final class TestKernel extends Kernel
             $services->alias(self::HTTP_CLIENT_ALIAS, 'http_client')->public();
             $services->alias(self::SCOPED_CLIENT_ALIAS, self::SCOPED_CLIENT)->public();
         }
+        if (interface_exists(GuzzleClientInterface::class)) {
+            $services = $container->services();
+            $services->set(self::GUZZLE_CLIENT, Client::class)
+                ->args([['handler' => inline_service(HandlerStack::class)->factory(GuzzleClientFactory::stack(...))]])
+                ->public()
+            ;
+            $services->set(self::GUZZLE_FACTORY_CLIENT, Client::class)
+                ->factory(GuzzleClientFactory::create(...))
+                ->public()
+            ;
+        }
+
         if (self::hasDoctrine()) {
             $container->extension('doctrine', [
                 'dbal' => ['driver' => 'pdo_sqlite', 'memory' => true],

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<roave-bc-check xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:noNamespaceSchemaLocation="vendor/roave/backward-compatibility-check/Resources/schema.xsd">
+    <baseline>
+        <!-- New metrics are minor additions to the catalog; README "Public API" asks applications to match its cases with a default arm. -->
+        <ignored-regex>#^\[BC\] ADDED: Case Msstc4Symfony\\MetricsBundle\\Application\\Metric\\BuiltInMetric::[A-Z0-9_]+ was added$#</ignored-regex>
+    </baseline>
+</roave-bc-check>

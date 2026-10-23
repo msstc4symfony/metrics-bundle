@@ -33,6 +33,8 @@
     "monolog/monolog": "^3.5",
     "msstc4symfony/sql-labeller": "^1.0",
     "promphp/prometheus_client_php": "^2.13",
+    "symfony/cache": "^7.4|^8.0",
+    "symfony/cache-contracts": "^3.6",
     "symfony/console": "^7.4|^8.0",
     "symfony/event-dispatcher": "^7.4|^8.0",
     "symfony/framework-bundle": "^7.4|^8.0",
@@ -57,6 +59,7 @@
     "doctrine/doctrine-bundle": "To register the DBAL query metrics middleware on its connections",
     "ext-apcu": "To store metrics in APCu (apc:// and apcng:// storage DSNs)",
     "ext-mongodb": "To collect MongoDB driver command metrics",
+    "guzzlehttp/guzzle": "To collect outbound HTTP request metrics of Guzzle clients",
     "mongodb/mongodb": "To use MongoDB ODM TimingSubscriber",
     "ruflin/elastica": "To collect Elastica request metrics",
     "symfony/http-client": "To collect outbound HTTP request metrics",
@@ -70,6 +73,7 @@
     "sort-packages": true
   },
   "conflict": {
+    "guzzlehttp/guzzle": "<7.8",
     "symfony/symfony": "*"
   },
   "extra": {

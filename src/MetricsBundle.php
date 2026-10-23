@@ -4,18 +4,27 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle;
 
+use DateInterval;
+use DateTimeImmutable;
+use Exception;
+use InvalidArgumentException;
 use LogicException;
 use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
 use Msstc4Symfony\MetricsBundle\Application\Metric\MetricDefinitionInterface;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\AddDoctrineDBALMonitorPass;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\AddGuzzleMonitorPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\AddHttpClientMonitorPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\AddMonologDecoratorCompilerPass;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\DecorateCachePoolsPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\DecorateElasticaClientsPass;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\KeepCachePoolsReversiblePass;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\RegisterMessengerQueueDepthPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\SaveElasticaClientsListPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\RuntimeIntegrations;
 use Override;
 use ReflectionEnum;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
+use Symfony\Component\DependencyInjection\Compiler\PassConfig;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
@@ -97,6 +106,54 @@ final class MetricsBundle extends AbstractBundle
                         ->end()
                     ->end()
                 ->end()
+                ->arrayNode('cache')
+                    ->addDefaultsIfNotSet()
+                    ->children()
+                        ->arrayNode('pools')
+                            ->info('Cache pools (service ids) whose lookups are counted in the cache_request metric, by hit and miss.')
+                            ->scalarPrototype()
+                                ->cannotBeEmpty()
+                                ->validate()
+                                    ->ifTrue(static fn (mixed $pool): bool => !\is_string($pool))
+                                    ->thenInvalid('A cache pool must be a service id, %s given.')
+                                ->end()
+                                ->validate()
+                                    ->ifInArray(array_keys(DecorateCachePoolsPass::UNMEASURABLE_POOLS))
+                                    ->then($this->rejectUnmeasurablePool(...))
+                                ->end()
+                            ->end()
+                        ->end()
+                    ->end()
+                ->end()
+                ->arrayNode('messenger')
+                    ->addDefaultsIfNotSet()
+                    ->children()
+                        ->arrayNode('queue_depth')
+                            ->info('Samples the number of messages waiting in each transport that can count them (messenger_queue_depth).')
+                            ->canBeEnabled()
+                            ->children()
+                                ->arrayNode('transports')
+                                    ->info('Transport names to sample; empty samples every transport.')
+                                    ->scalarPrototype()
+                                        ->cannotBeEmpty()
+                                        ->validate()
+                                            ->ifTrue(static fn (mixed $transport): bool => !\is_string($transport))
+                                            ->thenInvalid('A transport must be a name, %s given.')
+                                        ->end()
+                                    ->end()
+                                ->end()
+                                ->stringNode('period')
+                                    ->info('ISO 8601 interval: the transports are sampled at most once per period across all processes sharing the metrics.cache pool.')
+                                    ->defaultValue('PT1M')
+                                    ->validate()
+                                        ->ifTrue(static fn (string $period): bool => !self::isPositiveInterval($period))
+                                        ->thenInvalid('%s is not an ISO 8601 interval longer than zero, such as "PT1M".')
+                                    ->end()
+                                ->end()
+                            ->end()
+                        ->end()
+                    ->end()
+                ->end()
                 ->arrayNode('metric_enums')
                     ->info("Extra metric catalogs, appended after the bundle's own.")
                     ->scalarPrototype()
@@ -118,6 +175,7 @@ final class MetricsBundle extends AbstractBundle
     {
         $storage = $this->section($config, 'storage');
         $backoff = $storage['reconnect_backoff_seconds'] ?? null;
+        $queueDepth = $this->section($this->section($config, 'messenger'), 'queue_depth');
 
         $container->parameters()
             ->set(self::PARAMETER_PREFIX . 'default_dsn', self::DEFAULT_DSN)
@@ -131,6 +189,10 @@ final class MetricsBundle extends AbstractBundle
             ->set(self::PARAMETER_PREFIX . 'http_client.sanitize_path', $this->section($config, 'http_client')['sanitize_path'] ?? null)
             ->set(DecorateElasticaClientsPass::SANITIZE_PATH_PARAMETER, $this->section($config, 'elastica')['sanitize_path'] ?? null)
             ->set(self::PARAMETER_PREFIX . 'metric_enums', [BuiltInMetric::class, ...array_values($this->section($config, 'metric_enums'))])
+            ->set(DecorateCachePoolsPass::POOLS_PARAMETER, $this->uniqueStrings($this->section($this->section($config, 'cache'), 'pools')))
+            ->set(RegisterMessengerQueueDepthPass::ENABLED_PARAMETER, $queueDepth['enabled'] ?? null)
+            ->set(RegisterMessengerQueueDepthPass::TRANSPORTS_PARAMETER, $this->uniqueStrings($this->section($queueDepth, 'transports')))
+            ->set(RegisterMessengerQueueDepthPass::PERIOD_PARAMETER, $queueDepth['period'] ?? null)
         ;
 
         $container->import(__DIR__ . '/Resources/config/services.php');
@@ -143,6 +205,10 @@ final class MetricsBundle extends AbstractBundle
 
         $container->addCompilerPass(new AddMonologDecoratorCompilerPass());
         $container->addCompilerPass(new AddHttpClientMonitorPass(), priority: -256);
+        $container->addCompilerPass(new AddGuzzleMonitorPass(), PassConfig::TYPE_BEFORE_REMOVING);
+        $container->addCompilerPass(new DecorateCachePoolsPass(), priority: DecorateCachePoolsPass::PRIORITY);
+        $container->addCompilerPass(new KeepCachePoolsReversiblePass(), PassConfig::TYPE_BEFORE_REMOVING);
+        $container->addCompilerPass(new RegisterMessengerQueueDepthPass(), priority: RegisterMessengerQueueDepthPass::PRIORITY);
         $container->addCompilerPass(new AddDoctrineDBALMonitorPass(), priority: AddDoctrineDBALMonitorPass::PRIORITY);
         $container->addCompilerPass(new SaveElasticaClientsListPass());
         $container->addCompilerPass(new DecorateElasticaClientsPass());
@@ -167,6 +233,37 @@ final class MetricsBundle extends AbstractBundle
         return \is_string($class)
             && is_a($class, MetricDefinitionInterface::class, true)
             && (string) (new ReflectionEnum($class))->getBackingType() === 'string';
+    }
+
+    /**
+     * @param array<array-key, mixed> $values
+     *
+     * @return list<string>
+     */
+    private function uniqueStrings(array $values): array
+    {
+        return array_values(array_unique(array_filter($values, \is_string(...))));
+    }
+
+    /**
+     * @param key-of<DecorateCachePoolsPass::UNMEASURABLE_POOLS> $pool
+     */
+    private function rejectUnmeasurablePool(string $pool): never
+    {
+        throw new InvalidArgumentException(\sprintf('The "%s" pool cannot be listed in msstc4symfony_metrics.cache.pools: %s.', $pool, DecorateCachePoolsPass::UNMEASURABLE_POOLS[$pool]));
+    }
+
+    private static function isPositiveInterval(string $period): bool
+    {
+        try {
+            $interval = new DateInterval($period);
+        } catch (Exception) {
+            return false;
+        }
+
+        $epoch = new DateTimeImmutable('@0');
+
+        return $epoch->add($interval) > $epoch;
     }
 
     /**

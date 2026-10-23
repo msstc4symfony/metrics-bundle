@@ -7,7 +7,7 @@
 - `composer-ci.json` — тот же runtime + опциональные библиотеки
   (`symfony/http-client`, `symfony/messenger`, `doctrine/dbal`, `doctrine/doctrine-bundle`, `mongodb/mongodb` ^2,
   `ruflin/elastica` `^7.3|^8.0|^9.0`, лок на 7 — см. known-issues, `php-http/discovery`, `psr/http-client`,
-  `nyholm/psr7`) + deptrac, infection, Roave BC check. Лок —
+  `nyholm/psr7`, `guzzlehttp/guzzle` `^7.8|^8.0` — с 2.2, лок 8.3.0; в обоих манифестах `conflict` `<7.8` и `suggest`) + deptrac, infection, Roave BC check. Лок —
   `composer-ci.lock`, коммитится.
 - `config.platform.ext-mongodb` в `composer-ci.json` = версия расширения на
   раннере CI. Без этого лок, собранный локально с `ext-mongodb` 1.x, не
@@ -70,3 +70,18 @@ dry-run → deptrac. Запускать как `COMPOSER=composer-ci.json make c
   docker.elastic.co/elasticsearch/elasticsearch:<тег>`, затем
   `ELASTICSEARCH_URL=http://localhost:9200 vendor/bin/phpunit --group elasticsearch`. Без
   `ELASTICSEARCH_URL` тест группы пропускается.
+
+## Обновление `composer-ci.lock` под новый пакет
+
+`COMPOSER=composer-ci.json composer update <пакет> --with-dependencies --minimal-changes --ignore-platform-req=php`
+(локальный PHP 8.4.17 конфликтует с `roave/security-advisories`), затем сравнить список пакетов лока до/после —
+должны добавиться только новые (для Guzzle 2.2: guzzle, psr7, promises, `symfony/polyfill-php82`), и
+`COMPOSER=composer-ci.json composer validate` — лок актуален.
+
+Изменился только `require` (пакет уже в локе) — `COMPOSER=composer-ci.json composer update --lock`: `--minimal-changes`
+всё равно поднимает патч самого пакета.
+
+## `.roave-backward-compatibility-check.xml`
+
+Baseline Roave: игнорируются только добавленные кейсы `BuiltInMetric` (см. known-issues «BC check»). Другие записи не
+добавлять без решения владельца.

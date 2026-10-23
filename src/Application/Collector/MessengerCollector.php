@@ -55,6 +55,16 @@ final readonly class MessengerCollector
         );
     }
 
+    public function setQueueDepth(string $transport, int $messages): void
+    {
+        $this->recorder->set(BuiltInMetric::MESSENGER_QUEUE_DEPTH, $messages, [$transport]);
+    }
+
+    public function setQueueDepthSampledAt(string $transport, int $unixSeconds): void
+    {
+        $this->recorder->set(BuiltInMetric::MESSENGER_QUEUE_DEPTH_SAMPLED_AT, $unixSeconds, [$transport]);
+    }
+
     /**
      * Anonymous class names embed the file path and a per-declaration suffix; cut them so
      * each anonymous message type yields one bounded label value.

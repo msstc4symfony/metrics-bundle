@@ -5,13 +5,13 @@
 | Слой | Что внутри | Может зависеть от |
 |---|---|---|
 | `Application/Metric` | определения и модель (`MetricDefinitionInterface`, `BuiltInMetric`, `Metric`, `Label`, `MetricType`, `LabelType`, `MessengerMessageStatus` — его значения перечисляет `BuiltInMetric`, `MetricRepository`+фабрика) — публичный API | — |
-| `Application/Port` | `MetricRecorderInterface`, `MetricStorageInterface`, `MetricExport`, `MetricStorageException` — публичный API | — |
-| `Application/Collector` | 9 коллекторов (`final`, получают `MetricRecorderInterface`), enum `DoctrineQueryType`; публичны `DoctrineConnectionCollector` и `DoctrineQueryType` (ручной DBAL без DoctrineBundle, вместе с `NamedConnectionMiddleware`) | — |
+| `Application/Port` | `MetricRecorderInterface`, `MetricBatchRecorderInterface` (2.2: `incrementBy()` — новый интерфейс, а не метод в старом: Roave BC), `MetricStorageInterface`, `MetricExport`, `MetricStorageException` — публичный API | — |
+| `Application/Collector` | 10 коллекторов (`final`, получают `MetricRecorderInterface`; `CacheCollector` — единственный со состоянием: счёт hit/miss в памяти, `flush()` пишет через `MetricBatchRecorderInterface`), enum `DoctrineQueryType`; публичны `DoctrineConnectionCollector` и `DoctrineQueryType` (ручной DBAL без DoctrineBundle, вместе с `NamedConnectionMiddleware`) | — |
 | `Infrastructure/Prometheus` | `PrometheusMetricRecorder` (префикс лейблов, выбор типа, лог сбоя в `metrics_bundle`), `PrometheusMetricStorage`, `Storage/` (фабрика адаптера, `ReconnectingRedisAdapter`) | `Application` |
-| `Infrastructure/{Doctrine,Elastica,HttpClient}` | адаптеры, вызывающие коллекторы | `Application` |
+| `Infrastructure/{Doctrine,Elastica,HttpClient,Guzzle,Cache}` | адаптеры, вызывающие коллекторы; `OutgoingHttp/OutgoingRequestLabels` — общие метки host/path для http-client и Guzzle (ассемблеры + `PathSanitizer`, с 2.2 там же); `Cache/` — декораторы, `CountingCallbackWrapper` + `ComputationCounter`; `Messenger/MessengerQueueDepthReader` | `Application` |
 | `Framework/Monolog` | `HandlerDecorator` | `Application` |
-| `Presentation` | listener'ы kernel/console/Messenger, `GetMetricsController`, команды — только через порты | `Application` |
-| `DependencyInjection` | pass'ы (`CompilerPass/`), `DefinitionFilter`, `ElasticaClientDefinitions`, `RuntimeIntegrations` (подписчик MongoDB и транспорты Elastica 7 при `boot()`) | `Application`, `Infrastructure`, `Framework` |
+| `Presentation` | listener'ы kernel/console/Messenger (`CacheMetricsFlushListener`, `MessengerQueueDepthListener` — 2.2), `GetMetricsController`, команды — только через порты | `Application` |
+| `DependencyInjection` | pass'ы (`CompilerPass/`), `DefinitionFilter`, `ElasticaClientDefinitions`, `RuntimeIntegrations` (подписчик MongoDB и транспорты Elastica 7 при `boot()`) | `Application`, `Infrastructure`, `Presentation` (2.2, канонное правило: `RegisterMessengerQueueDepthPass`), `Framework` |
 | `MetricsBundle` | конфиг-дерево, параметры, pass'ы, `boot()` → `RuntimeIntegrations::register()` | `Application`, `DependencyInjection` |
 
 Prometheus импортируют только классы `Infrastructure/` (и регистрация в `services.php`). Лог-канал —
@@ -23,19 +23,24 @@ Infrastructure. `AbstractCollector` удалён в 2.0: свой коллект
 1. `MetricsBundle` (`AbstractBundle`, алиас `msstc4symfony_metrics`):
    - `configure()` — дерево `storage.{dsn, reconnect_backoff_seconds}`, `application_name`,
      `component_name`, `errors.short_exception_class_name`, `http_client.sanitize_path`,
-     `metric_enums` (каждый класс обязан реализовать `MetricDefinitionInterface`). Значения по
+     `cache.pools` (2.2; `metrics.cache` и `cache.messenger.restart_workers_signal` отвергаются),
+     `messenger.queue_depth.{enabled, transports, period}` (2.2, `canBeEnabled()`: любой ключ секции включает её,
+     `period` — ISO 8601 больше нуля), `metric_enums` (каждый класс обязан реализовать `MetricDefinitionInterface`). Значения по
      умолчанию dsn/application/component — env-плейсхолдеры с параметрами
      `msstc4symfony_metrics.default_dsn` / `msstc4symfony_metrics.unknown`;
    - `loadExtension()` — пишет параметры `msstc4symfony_metrics.<путь опции>`
      (`storage.dsn`, `storage.reconnect_backoff_seconds`, `application_name`, `component_name`,
      `errors.short_exception_class_name`, `http_client.sanitize_path`, `metric_enums` =
-     `[BuiltInMetric::class, ...metric_enums]`) и импортирует `Resources/config/services.php`;
+     `[BuiltInMetric::class, ...metric_enums]`, `cache.pools`, `messenger.queue_depth.{enabled,transports,period}` —
+     списки без дублей) и импортирует `Resources/config/services.php`;
    - `getPath()` — `src/` (ради `@MetricsBundle/Presentation/Controller/`).
    Контракт для мостов: `msstc4symfony_metrics.metric_enums` (компилер-пассы дописывают в конец),
    `msstc4symfony_metrics.application_name`, `msstc4symfony_metrics.component_name`.
 2. `services.php` — resource-скан `src/` без всего, что требует опциональной библиотеки
-   (`Infrastructure/{Doctrine,Elastica,Monolog}/`, `Infrastructure/HttpClient/*.php`,
-   `MessengerEventListener`), а также DI, `Resources` и корня; `HttpClient/URLAssembler/` сканируется:
+   (`Infrastructure/{Doctrine,Elastica,Monolog,Guzzle}/`, `Infrastructure/HttpClient/*.php`,
+   `MessengerEventListener`, `MessengerQueueDepthListener`), декораторы `Infrastructure/Cache/` (их ставит только пасс), `Infrastructure/Messenger/`, статический `OutgoingHttp/PathSanitizer` (не сервис; `ServiceScanTest`),
+   а также DI, `Resources` и корня; `MetricsGuzzleMiddleware` регистрируется с гардом
+   `interface_exists(GuzzleHttp\ClientInterface)` — до оптимизации, чтобы автовайринг дал ему зависимости; `HttpClient/URLAssembler/` сканируется:
    `#[AutoconfigureTag]` на `AssemblerInterface` тегирует ассемблеры приложения, только пока интерфейс в
    скане. bind `$applicationName`/`$componentName`. С гардом регистрируются
    `MessengerEventListener` (`class_exists(WorkerMessageReceivedEvent)`) и `TimingSubscriber`
@@ -57,6 +62,27 @@ Infrastructure. `AbstractCollector` удалён в 2.0: свой коллект
      правильным host. Повторы `retry_failed` — отдельные запросы. Клиенты, созданные
      приложением в обход FrameworkBundle, не мониторятся. URL-ассемблеры — по тегу
      `AssemblerInterface::TAG` (`metrics.http_client.url_assembler`);
+   - `AddGuzzleMonitorPass` (`TYPE_BEFORE_REMOVING`, после разрешения именованных аргументов) — у каждого
+     сервиса `GuzzleHttp\ClientInterface`: литеральный массив конфига `GuzzleHttp\Client` → `handler` = фабрика
+     `MetricsGuzzleMiddleware::decorateHandler(<handler|null>)` (не-`HandlerStack` handler — пропуск с
+     `container->log`); фабрика/свой конструктор/конфиг-параметр/ключи `max_host_connections`,
+     `max_total_connections`, `transport_sharing`, `multiplex` без `handler` → конфигуратор `addHandler()` (свой
+     конфигуратор сохраняется через `ChainedClientConfigurator`); без `getConfig()` (Guzzle 8) → только лог.
+     Middleware ставится `before('allow_redirects')` (нет его — `unshift`), предварительно `remove()` своего имени;
+   - `DecorateCachePoolsPass` (BEFORE_OPTIMIZATION, priority 16 — после `CachePoolPass` 32, который выводит namespace
+     пула из id) — каждый пул из `cache.pools` (алиас раскрывается, метка `pool` — имя как в конфиге) декорируется
+     `CountingCacheAdapter` или `CountingTagAwareCacheAdapter` (класс по цепочке `ChildDefinition`; достаточно
+     `AdapterInterface` — `cache.system` объявлен так фабрикой). Тегу `cache.pool` пасс дописывает `name` = id (иначе
+     после переезда тега на декоратор `cache:pool:prune` и профайлер показали бы id декоратора), фабрику
+     `setCallbackWrapper` early-expiration переводит на `<декоратор>.inner` (как `CacheCollectorPass`);
+   - `RegisterMessengerQueueDepthPass` (BEFORE_OPTIMIZATION, priority -10 — после `_instanceof`; теги listener'а
+     явные) — при `queue_depth.enabled`: имена транспортов как у `messenger:stats` (последний `alias` тега
+     `messenger.receiver`, иначе id), `MessengerQueueDepthReader` (адаптер порта `Application\Port\QueueDepthReaderInterface`,
+     @internal) с локатором выбранных receivers; неизвестное имя или перечисленный receiver известного класса без
+     `MessageCountAwareInterface` — `InvalidArgumentException`, нет `messenger.receiver_locator` — `LogicException`,
+     ни одного транспорта — `container->log()` и ничего;
+   - `KeepCachePoolsReversiblePass` (BEFORE_REMOVING) — возвращает `container.reversible` внутренним пулам
+     (`<декоратор>.inner`) из параметра, который пишет `DecorateCachePoolsPass` и который пасс удаляет;
    - `ElasticaClientDefinitions` (`@internal`): `find()` — общий отбор для двух пассов ниже: не
      абстрактные и не декораторы (`DefinitionFilter::isDecoratable`), класс (по цепочке родителей
      `ChildDefinition` — `lineage()`, после разрешения параметров, через `getReflectionClass`) —
@@ -79,8 +105,8 @@ Infrastructure. `AbstractCollector` удалён в 2.0: свой коллект
 
 ## Опциональные библиотеки
 
-Все интеграции, кроме Redis-хранилища, опциональны: http-client, DBAL,
-MongoDB, Elastica, Messenger, APCu. Точка проводки молча выключается без своей библиотеки:
+Все интеграции, кроме Redis-хранилища, опциональны: http-client, Guzzle, DBAL,
+MongoDB, Elastica, Messenger, APCu. Метрики кешей и глубины очередей — opt-in в конфиге. Точка проводки молча выключается без своей библиотеки:
 либо явным гардом (`interface_exists` для интерфейсов, `class_exists` для
 классов — http-client, MongoDB, Elastica в `boot()`), либо потому, что без
 библиотеки в контейнере нет подходящих определений (DBAL, список клиентов Elastica). Job `minimal` в CI доказывает, что гарды держат.

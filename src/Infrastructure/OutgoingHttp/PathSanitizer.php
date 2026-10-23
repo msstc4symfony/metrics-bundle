@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient;
+namespace Msstc4Symfony\MetricsBundle\Infrastructure\OutgoingHttp;
 
 /**
  * @internal

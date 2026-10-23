@@ -39,8 +39,8 @@
 (`HttpExceptionInterface`), и в деструкторе непрочитанного ответа; ошибки транспорта
 статуса не дают. `toStream()` отдаёт буферизованный и перематываемый поток внутреннего
 ответа (Psr18Client/HttplugClient делают `seek`), а длительность фиксирует read-фильтр
-`CompletionStreamFilter` на EOF; закрытие недочитанного потока тоже его вызывает, так
-что длительность у такого ответа будет частичной. Деструктор не пробрасывает ошибки
+`CompletionStreamFilter` только на EOF: `fclose()` недочитанного потока фильтр с `$closing` не вызывает, длительность
+не пишется (исправленный в 2.2 комментарий утверждал обратное; `testClosingAPartiallyReadStreamRecordsNoDuration`). Деструктор не пробрасывает ошибки
 хранилища метрик. Явный вызов внутреннего `__destruct()` (как в `TraceableResponse`)
 у Native/Amp дважды уменьшает счётчик активных ответов — только чуть раньше чистится
 DNS-кеш, корректность не страдает. Тег ассемблеров
@@ -141,7 +141,7 @@ instanceof-тег `metrics.http_client.url_assembler`, только если и�
 - `ElasticaPathSanitizer::sanitize()` (`@internal`, `Infrastructure/Elastica/`) — общая для 7 и 8:
   сегмент после `_doc|_create|_update|_source|_explain|_termvectors` (если до него есть непустой
   сегмент-индекс и после — непустой id) становится `:id`, затем весь путь проходит
-  `HttpClient\PathSanitizer` (UUID → `:uuid`, цифры → `:id`, 24+ hex → `:hash`). `''` остаётся `''`
+  `OutgoingHttp\PathSanitizer` (с 2.2; раньше `HttpClient\`) (UUID → `:uuid`, цифры → `:id`, 24+ hex → `:hash`). `''` остаётся `''`
   (у `PathSanitizer` `''` → `/`), ведущий `/` сохраняется как был (на 7 путь с `/`, на 8 без).
   Индекс целиком из цифр/UUID/длинного hex тоже заменится — сознательно, правила общие.
 - Флаг `msstc4symfony_metrics.elastica.sanitize_path` (`DecorateElasticaClientsPass::SANITIZE_PATH_PARAMETER`,
@@ -207,6 +207,12 @@ Symfony 8 DBAL 3 не ставится (конфликт с `symfony/http-founda
 ## BC check
 
 Roave BC check (дефолт `bundle-standard`) блокирующий и сравнивает с последним стабильным тегом.
+Добавленный кейс enum Roave считает BC break (`[BC] ADDED: Case … was added`, детектор `EnumCasesChanged`; кейс с
+`@internal` в докблоке не считается). Новые метрики — кейсы `BuiltInMetric`, поэтому с 2.2 есть
+`.roave-backward-compatibility-check.xml` с baseline-регэкспом только на добавленные кейсы `BuiltInMetric`, а README
+«Public API» обещает их добавление в минорах. Локально CI-шаг проверяется в клоне с закоммиченным working tree:
+`COMPOSER=composer-ci.json vendor/bin/roave-backward-compatibility-check --from=v2.1.0 --install-development-dependencies`
+(Roave сравнивает HEAD, не рабочее дерево; с `composer.json` вместо CI-манифеста — 28 SKIPPED по Doctrine).
 
 ## Профилирование вынесено в мост (2026-10-01 UTC)
 
@@ -568,7 +574,7 @@ cache, lock и `collect()` promphp спотыкались на `+OK`.
 `partitioned`. Квотированные идентификаторы (`FROM "users"`) не матчились `\w+`, и поиск уходил к
 следующему `FROM` — в том числе в комментарий.
 
-Алгоритм (в `QueryLabeller`, см. «Фикс-проход по ревью разбора SQL» ниже):
+Алгоритм (с 2.1.0 — в пакете msstc4symfony/sql-labeller, `SqlLabeller`; раньше `QueryLabeller`, см. «Фикс-проход по ревью разбора SQL» ниже):
 1. режет SQL до 16 KiB, заменяет комментарии (`--`, `/* */`) пробелом, строковые литералы — `''`
    (экранирование `''` и `\'`);
 2. сворачивает скобочные группы (рекурсивная PCRE `\((?:[^()]++|(?R))*+\)`) в плейсхолдеры `(#n)`;
@@ -676,3 +682,119 @@ vendor/bin/phpunit --filter testUnreachableRedisNeverTurnsRequestsInto500` в lo
   `metrics_bundle` из декорирования (`AddMonologDecoratorCompilerPass::EXCLUDE_CHANNELS`); `NoRecursionTest` (env
   `failing_storage` тестового ядра) проверяет это, убрать канал из списка — тест падает.
 
+
+## PHPStan не анализирует Elastica 7 и 8/9 против одной установки (2026-10-22 UTC)
+
+`TimingTransport` наследует `Elastica\Transport\AbstractTransport` (только Elastica 7), а `TimingHttpClient` и ветка
+8/9 в `RuntimeIntegrations` работают с Elastica 8/9. Против Elastica 9 PHPStan падает с internal error на
+`TimingTransport` и даёт около 30 `class.notFound`/`method.notFound` по ветке 7 и `TimingTransportTest`. `composer-ci.lock` (в git) держит 7.3.2, кэш `vendor` в CI привязан к хэшу `composer-ci.json`. Поэтому шаг
+bundle-standard 3.2 `run-phpstan-per-symfony` (свежая установка, Elastica 9) выключен в `checks.yml`. Если кэш `vendor`
+пересоберётся с Elastica 9, упадёт и job `PHPStan`: тогда нужен условный `excludePaths` (PHP-конфиг, подключённый
+из `phpstan-baseline.neon`) или `ruflin/elastica: ^7.3` в `composer-ci.json`.
+
+## Разбор SQL вынесен в msstc4symfony/sql-labeller (2.1.0, 2026-10-22 UTC)
+
+`QueryLabeller`/`QueryLabelling`/`QueryLabels` (@internal) удалены: тот же парсер с тестами живёт в
+`msstc4symfony/sql-labeller` (`Domain\Helper\SqlLabeller`), его использует и profiling-bundle 2.2 для имён SQL-span'ов.
+`QueryMeter` принимает `SqlLabelling` и переводит `StatementType` в публичный `DoctrineQueryType` через `tryFrom()`
+с откатом в `other`: новый тип минорной версии sql-labeller не должен ронять успешный запрос у потребителя;
+`testEveryStatementTypeOfTheLabellerIsAMetricType` покажет его в CI (ячейки highest). Пакет не на Packagist, а
+`repositories` зависимостей Composer не читает — потребитель регистрирует vcs sql-labeller сам (README, CHANGELOG). Тесты
+разбора (`typeProvider`, `tableNameProvider`) остались здесь как проверка меток метрик.
+
+## Guzzle-метрики (2.2.0, 2026-10-23 UTC)
+
+- Middleware `MetricsGuzzleMiddleware` стоит прямо снаружи `allow_redirects` (внутри `http_errors`): одна запись на
+  вызов с финальным статусом после редиректов, 4xx/5xx — ответом, до превращения в исключение. В Guzzle 8 в стеке есть
+  ещё `auth` — тесты порядка проверяют соседей, а не весь список; `HandlerStack::__toString()` в 8 нет, имена читаются
+  рефлексией приватного `$stack` (`[callable, name]`, индекс 0 — самый внешний).
+- Guzzle 8 `Client::__construct()` строит дефолтный handler из `max_host_connections`, `max_total_connections`,
+  `transport_sharing`, `multiplex` и бросает, если они заданы вместе с `handler`. Поэтому без явного `handler` и с
+  любым из этих ключей пасс идёт через конфигуратор (`getConfig('handler')`), а не пишет `handler`. У
+  tracing/profiling `GuzzlePass` этой проверки нет — тот же риск.
+- Guzzle 8: `RequestException` без ответа (конструктор `(message, request, code…)`), ответ — у `ResponseException`
+  (`BadResponseException`/`ServerException`/`TooManyRedirectsException`); в 7 — nullable `getResponse()` у
+  `RequestException`. Отсюда `method_exists($reason, 'getResponse')`. В тестах — `ServerException`.
+- `roave/security-advisories` блокирует Guzzle 7.8.x–7.15.1: `--prefer-lowest` фактически ставит 7.15.2
+  (+ psr7 2.13, promises 2.5). Тесты Guzzle проверены на 7.15.2 и 8.3.0; `conflict: <7.8` оставлен по дизайну.
+- `handler` неизвестного на компиляции класса (ссылка на сервис-фабрику без `class`, недоступный сервис, класс
+  отсутствующего пакета) — путь конфигуратора (`addHandler()` проверяет `HandlerStack` в runtime); лог «not
+  measured» — только если класс известен и это не стек (ревью 2.2).
+- Callback'и промиса никогда не бросают (сбой коллектора/ассемблера глотается); сбой ассемблера в начале запроса —
+  запрос уходит без метрик.
+
+## Метрики кеш-пулов (2.2.0, 2026-10-23 UTC)
+
+- `tags: true`: публичный id пула — `TagAwareAdapter` над `.<pool>.inner`; FrameworkExtension регистрирует
+  autowiring-алиасы `CacheInterface`/`CacheItemPoolInterface`/`NamespacedPoolInterface $pool` на **внутренний**
+  `.<pool>.inner`, а `TagAwareCacheInterface $pool` — на внешний. Декорируется только внешний (иначе внутренние
+  чтения версий тегов считались бы), так что `CacheInterface $pool` такого пула не считается — описано в README.
+- Обычный пул: `TagAwareCacheInterface $pool` — это `.<pool>.taggable` (`TagAwareAdapter` над пулом) → ходит через
+  декоратор. Ключи версий тегов (`<tag>` . `TagAwareAdapter::TAGS_PREFIX`, суффикс `"\1tags\1"`) и метаданных тегов до 6.1
+  (префикс `"\0tags\0"`) не считаются; инвалидированный тегом элемент там засчитывается как hit (внутренний элемент на месте).
+  `knownTagVersions` (TTL 0,15 с) у `TagAwareAdapter` часто вообще пропускает чтение версий — тест на фильтр ключей
+  поэтому прямой (`getItem('users' . TAGS_PREFIX)`).
+- Early expiration (ревью 2.2, CR-001): первая версия оборачивала callback приложения замыканием — dispatcher не
+  может развернуть анонимное замыкание (`ReverseContainer::getId()` → null) и считал «online»; плюс декорация
+  уносила тег `container.reversible` на декоратор, а `EarlyExpirationMessage` называет пул, который ContractsTrait
+  передал dispatcher'у, — внутренний. Сейчас: пулы с собственным callback wrapper (`AbstractAdapter`,
+  `AbstractTagAwareAdapter`, `TagAwareAdapter`, `ChainAdapter`) получают `CountingCallbackWrapper` (внутрь
+  `EarlyExpirationDispatcher` третьим аргументом, иначе отдельным `setCallbackWrapper`, предыдущий берётся
+  `setCallbackWrapper(null)`); счётчик `ComputationCounter` — общий сервис декоратора и wrapper'а. Внутреннему пулу
+  ставится `container.do_not_inline` (behavior-тег, остаётся на декорируемом), а `KeepCachePoolsReversiblePass`
+  (BEFORE_REMOVING) возвращает ему `container.reversible`. `ProxyAdapter`/`PhpArrayAdapter` отдают `get()` внутреннему
+  пулу мимо своего wrapper'а, `ArrayAdapter` wrapper'а не имеет — для них остаётся обёртка callback'а.
+  `EarlyExpirationMetricsTest` ловит оба регресса (без любого из фиксов значение пересчитывается online).
+- `--prefer-lowest` без явного `symfony/cache` ставил 6.4.40 + `cache-contracts` 2.5 (FrameworkBundle 7.4 разрешает
+  `^6.4|^7.0`): нет `NamespacedPoolInterface` → 33 ошибки. С 2.2 `symfony/cache: ^7.4|^8.0` в `require` обоих
+  манифестов (шаг пина CI переписывает и его на `7.4.*`); `composer-ci.lock` — только новый content-hash
+  (`composer update --lock`). Lowest-копия: 607 тестов зелёные, cache 7.4.12, Guzzle 7.15.2.
+- Hit/miss — дельта `ComputationCounter` пула за время `get()`; счётчик один на пул, поэтому чередующиеся в Fibers
+  `get()` одного пула могут превратить hit в miss (в README).
+- `ChainAdapter` — в списке пулов со своим wrapper'ом: последний адаптер он считает через свой `doGet()`/wrapper,
+  промежуточные зовут `$wrap` как callback. Проверено юнит-тестом и пулом `app.chain` (`[array, filesystem]`) в
+  `CachePoolsKernel` на Symfony 8.1 и на `--prefer-lowest` (7.4).
+- Отказ `metrics.cache` в `MessengerQueueDepthListener` троттлит процесс на полный период: иначе воркер при
+  недоступном Redis писал бы warning со стеком на каждой итерации цикла.
+- Отказ от непроверяемых пулов сравнивает и цели алиасов: если `metrics.cache` — алиас `cache.app`, `cache.app` в
+  `cache.pools` отвергается (иначе чтения троттлинга бандла попадали бы в `cache_request`).
+- Декоратор, как `TraceableAdapter`, объявляет `get()`/`withSubNamespace()` всегда и бросает
+  `BadMethodCallException`, если внутренний пул их не поддерживает (в README).
+- Profiler: `CacheCollectorPass` оборачивает декоратор в `TraceableAdapter` под именем пула; пул `tags: true` Symfony
+  профилирует через внутренний пул (там тег `cache.pool`) — его бандл не трогает.
+- `getItems()` декоратора зовёт пул сразу и возвращает генератор подсчёта (как `TraceableAdapter`): ленивый вызов
+  терял бы `InvalidArgumentException` за ключ и `commit()` отложенных элементов, а `TagAwareAdapter` ловит это
+  исключение вокруг своего вызова.
+- Алиас на `metrics.cache`/`cache.messenger.restart_workers_signal` конфиг пропускает — отвергает пасс после
+  раскрытия алиаса (`DecorateCachePoolsPass::UNMEASURABLE_POOLS`).
+- `MetricBatchRecorderInterface` — отдельный алиас на `PrometheusMetricRecorder`: приложение, подменившее
+  `MetricRecorderInterface`, должно подменить и его, иначе `cache_request` уйдёт в Prometheus-рекордер.
+- `cache.system` объявлен `AdapterInterface` с фабрикой `createSystemCache` — проверка класса в пассе требует только
+  `AdapterInterface`; `get()`/`withSubNamespace()` декоратора бросают `BadMethodCallException`, если пул не
+  `CacheInterface`/`NamespacedPoolInterface` (как `TraceableAdapter`).
+- `DecoratorServicePass` переносит теги (кроме behavior-describing) на внешний декоратор, а `CachePoolPass` к этому
+  моменту уже стёр атрибут `name` у `cache.pool` → пасс дописывает `name` = id пула, иначе `cache:pool:prune` и
+  профайлер показали бы `msstc4symfony_metrics.cache.<pool>`.
+- `early_expiration_message_bus`: `CachePoolPass` добавляет `setCallbackWrapper` с фабрикой `[ref(<pool>),
+  'setCallbackWrapper']`; после декорации `<pool>` — декоратор без этого метода, поэтому ссылка переводится на
+  `<декоратор>.inner` (так же делает `CacheCollectorPass`).
+- `CacheItem::expiresAfter()` считает срок по `microtime()`, а `ArrayAdapter(clock:)` сравнивает с часами: `MockClock`
+  в тестах троттлинга стартует с реального «сейчас».
+
+## Глубина очередей Messenger (2.2.0, 2026-10-23 UTC)
+
+- `queue_depth` — `canBeEnabled()`: `queue_depth: {transports: [...]}` и даже `queue_depth: {}` включают сэмплинг;
+  выключить при заданной секции — `enabled: false`.
+- `RegisterMessengerQueueDepthPass` — priority -10, после `ResolveInstanceofConditionalsPass` (100): видит и теги
+  `messenger.receiver` от `_instanceof` (интеграционное ядро ставит тег так). Атрибуты автоконфигурации к такому
+  определению уже не применяются — теги `kernel.event_listener` и логгер `monolog.logger.metrics_bundle` (канал есть:
+  `#[WithMonologChannel]` у рекордера) пасс пишет сам. Первая версия стояла на 110 ради атрибутов и не видела `_instanceof`.
+- Класс framework-транспорта на компиляции не известен (фабрика, класс `TransportInterface`): только runtime-проверка
+  `MessageCountAwareInterface` в `MessengerQueueDepthReader`; перечисленный некоунтабельный — warning раз на процесс.
+  Известный конкретный класс без интерфейса: в `transports` — ошибка компиляции, иначе пропуск; пусто — лог и ничего.
+- Троттлинг: в `metrics.cache` лежит конец периода (float, unix), процесс держит его в `QueueDepthSamplingState`
+  (listener readonly) и до этого момента пул не спрашивает: простаивающий воркер иначе делал бы GET раз в секунду.
+- Порядок имён транспортов — порядок тегированных сервисов (`countable` из `services` раньше `async` из
+  `framework.messenger.transports` в тестовом ядре).
+- `in-memory://` не реализует `MessageCountAwareInterface` → для тестов `tests/Support/Messenger/CountableReceiver`
+  (`null` — `getMessageCount()` бросает, как недоступный брокер).

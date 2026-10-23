@@ -11,6 +11,7 @@ use Msstc4Symfony\MetricsBundle\Application\Metric\Metric;
 use Msstc4Symfony\MetricsBundle\Application\Metric\MetricDefinitionInterface;
 use Msstc4Symfony\MetricsBundle\Application\Metric\MetricRepositoryInterface;
 use Msstc4Symfony\MetricsBundle\Application\Metric\MetricType;
+use Msstc4Symfony\MetricsBundle\Application\Port\MetricBatchRecorderInterface;
 use Msstc4Symfony\MetricsBundle\Application\Port\MetricRecorderInterface;
 use Override;
 use Prometheus\RegistryInterface;
@@ -21,7 +22,7 @@ use Throwable;
  * @internal
  */
 #[WithMonologChannel(LogChannel::NAME)]
-final readonly class PrometheusMetricRecorder implements MetricRecorderInterface
+final readonly class PrometheusMetricRecorder implements MetricRecorderInterface, MetricBatchRecorderInterface
 {
     private const NAMESPACE = 'symfony';
 
@@ -45,6 +46,19 @@ final readonly class PrometheusMetricRecorder implements MetricRecorderInterface
         $this->guarded($definition, fn () => $this->registry
             ->getOrRegisterCounter(self::NAMESPACE, ...$this->identity($definition))
             ->inc($this->labelValues($labels)));
+    }
+
+    #[Override]
+    public function incrementBy(MetricDefinitionInterface $metric, int $amount, array $labels = []): void
+    {
+        $definition = $this->definition($metric, 'incrementBy', [MetricType::COUNTER]);
+        if ($amount < 1) {
+            throw new InvalidArgumentException(\sprintf('incrementBy() needs a positive amount, got %d', $amount));
+        }
+
+        $this->guarded($definition, fn () => $this->registry
+            ->getOrRegisterCounter(self::NAMESPACE, ...$this->identity($definition))
+            ->incBy($amount, $this->labelValues($labels)));
     }
 
     #[Override]

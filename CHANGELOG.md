@@ -4,6 +4,47 @@ All notable changes to this bundle are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions follow
 [Semantic Versioning](https://semver.org/); dates are UTC.
 
+## [2.2.0] - 2026-10-23
+
+### Added
+
+- Guzzle metrics: with `guzzlehttp/guzzle` 7.8+ or 8 installed, every `GuzzleHttp\ClientInterface` service writes the
+  `http_connection_*` series of `symfony/http-client` (same labels, URL assemblers and `http_client.sanitize_path`),
+  one record per call with the final status after redirects. Clients are reached through their `handler` config or a
+  service configurator; unreachable ones are named in the container compiler log (README "Guzzle metrics"). With the
+  `stream` request option the duration ends with the response headers, not the body. URL assemblers get the URL
+  without credentials.
+- Opt-in cache pool metrics: `msstc4symfony_metrics.cache.pools` lists the pools whose lookups are counted in the new
+  `cache_request` counter (`pool`, `result` = `hit`|`miss`), aggregated in memory and written once per series at the
+  end of each request, command or message, every 1000 lookups and when the container is destroyed (README "Cache pool
+  metrics"). Callbacks reach the pool unchanged, so `early_expiration_message_bus` keeps recomputing asynchronously.
+  `metrics.cache` and `cache.messenger.restart_workers_signal` are rejected, also through an alias, and so is the pool
+  they alias.
+- Opt-in Messenger queue depth: `msstc4symfony_metrics.messenger.queue_depth` (`enabled`, `transports`, `period`
+  = `PT1M`) samples the new `messenger_queue_depth` and `messenger_queue_depth_sampled_at` gauges (`transport`) of the
+  transports that can count their messages, at most once per period (each process skips the shared throttle until the
+  period ends; after a failure of that pool, for a full period), on `kernel.terminate` and in workers (README
+  "Messenger queue depth"). Receivers tagged through
+  `_instanceof` are seen; a listed receiver that cannot count fails the compilation when its class is known.
+- `Application\Port\MetricBatchRecorderInterface::incrementBy()`, implemented by the Prometheus recorder, for counts
+  aggregated before they are written.
+
+### Changed
+
+- `symfony/cache` `^7.4|^8.0` and `symfony/cache-contracts` `^3.6` are direct requirements: the cache decorators
+  implement their 7.4 interfaces (`NamespacedPoolInterface` of `symfony/cache-contracts` 3.6), and FrameworkBundle 7.4 still accepts `symfony/cache` 6.4.
+- `BuiltInMetric` has the cases `CACHE_REQUEST`, `MESSENGER_QUEUE_DEPTH` and `MESSENGER_QUEUE_DEPTH_SAMPLED_AT`; minor
+  releases add cases, so a `match` over them needs a `default` arm (README "Public API"). The Roave BC check ignores
+  added `BuiltInMetric` cases (`.roave-backward-compatibility-check.xml`).
+- The internal `HttpClientDecorator` takes the host/path labels from the new internal `OutgoingRequestLabels`, shared
+  with the Guzzle middleware; the labels are unchanged. The internal `PathSanitizer` moved from
+  `Infrastructure\HttpClient` to `Infrastructure\OutgoingHttp`.
+
+### Fixed
+
+- The comment of the internal `CompletionStreamFilter` claimed it also fires on `fclose()`: it fires on EOF only, so
+  closing a partially read `toStream()` records no duration (now pinned by a test).
+
 ## [2.1.0] - 2026-10-22
 
 ### Changed
@@ -174,6 +215,7 @@ First release of `msstc4symfony/metrics-bundle` (namespace `Msstc4Symfony\Metric
 - Optional: Doctrine DBAL / DoctrineBundle, `mongodb/mongodb`, `ruflin/elastica` ^7.3|^8.0, Symfony
   HttpClient, Messenger, APCu.
 
+[2.2.0]: https://github.com/msstc4symfony/metrics-bundle/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/msstc4symfony/metrics-bundle/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/msstc4symfony/metrics-bundle/compare/v2.0.0-rc.1...v2.0.0
 [2.0.0-rc.1]: https://github.com/msstc4symfony/metrics-bundle/compare/v1.4.0...v2.0.0-rc.1

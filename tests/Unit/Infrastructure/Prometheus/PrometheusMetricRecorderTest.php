@@ -15,6 +15,7 @@ use Msstc4Symfony\MetricsBundle\Test\Support\CollectingLogger;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use Override;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
@@ -53,6 +54,51 @@ final class PrometheusMetricRecorderTest extends TestCase
         $this->recorder()->increment(BuiltInMetric::HTTP_RESPONSE, ['GET', 'order_show', 404]);
 
         self::assertSame([['app', 'cmp', 'GET', 'order_show', '404']], RegistrySamples::labels($this->registry, BuiltInMetric::HTTP_RESPONSE));
+    }
+
+    public function testIncrementsACounterByAnAmount(): void
+    {
+        $this->recorder()->incrementBy(BuiltInMetric::HTTP_REQUEST, 3, ['GET', 'order_show']);
+        $this->recorder()->incrementBy(BuiltInMetric::HTTP_REQUEST, 1, ['GET', 'order_show']);
+
+        self::assertSame([[['app', 'cmp', 'GET', 'order_show'], '4']], RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_REQUEST));
+    }
+
+    /**
+     * @return iterable<string, array{int}>
+     */
+    public static function nonPositiveAmountProvider(): iterable
+    {
+        yield 'zero' => [0];
+        yield 'negative' => [-1];
+    }
+
+    #[DataProvider('nonPositiveAmountProvider')]
+    public function testIncrementByRejectsANonPositiveAmount(int $amount): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('incrementBy() needs a positive amount, got ' . $amount);
+
+        $this->recorder()->incrementBy(BuiltInMetric::HTTP_REQUEST, $amount, ['GET', 'x']);
+    }
+
+    public function testIncrementByRejectsAMetricOfAnotherType(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('incrementBy() needs a counter, "' . BuiltInMetric::REQUEST_DURATION_HISTOGRAM_SECONDS->value . '" is a histogram');
+
+        $this->recorder()->incrementBy(BuiltInMetric::REQUEST_DURATION_HISTOGRAM_SECONDS, 1, ['GET', 'x']);
+    }
+
+    public function testIncrementByLogsAStorageFailureInsteadOfThrowing(): void
+    {
+        $logger = new CollectingLogger();
+        $registry = self::createStub(RegistryInterface::class);
+        $registry->method('getOrRegisterCounter')->willThrowException(new StorageException('down'));
+
+        $this->recorder($registry, $logger)->incrementBy(BuiltInMetric::HTTP_REQUEST, 2, ['GET', 'x']);
+
+        self::assertSame(['error: Cannot save metric "' . BuiltInMetric::HTTP_REQUEST->value . '": down'], $logger->records);
     }
 
     public function testSetsAGauge(): void

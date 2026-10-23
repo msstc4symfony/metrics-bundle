@@ -44,7 +44,7 @@ final class CompletionStreamFilter extends php_user_filter
             stream_bucket_append($out, $bucket);
         }
 
-        // Fires on EOF and on fclose(); recordCompletion() is idempotent.
+        // Fires on EOF only: fclose() of a partially read stream records no duration, which needs the whole body.
         if ($closing && $this->params instanceof Closure) {
             ($this->params)();
         }

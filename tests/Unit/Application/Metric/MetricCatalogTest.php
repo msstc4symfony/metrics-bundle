@@ -59,6 +59,9 @@ final class MetricCatalogTest extends TestCase
         yield 'MESSENGER_MESSAGE_SENT' => [BuiltInMetric::MESSENGER_MESSAGE_SENT, 'counter', ['transport:string', 'message:string'], []];
         yield 'MESSENGER_MESSAGE_HANDLED' => [BuiltInMetric::MESSENGER_MESSAGE_HANDLED, 'counter', ['transport:string', 'message:string', 'status:enum=handled|failed|retried'], []];
         yield 'MESSENGER_MESSAGE_HANDLING_DURATION_HISTOGRAM_SECONDS' => [BuiltInMetric::MESSENGER_MESSAGE_HANDLING_DURATION_HISTOGRAM_SECONDS, 'histogram', ['transport:string', 'message:string', 'status:enum=handled|failed|retried'], [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 180]];
+        yield 'MESSENGER_QUEUE_DEPTH' => [BuiltInMetric::MESSENGER_QUEUE_DEPTH, 'gauge', ['transport:string'], []];
+        yield 'MESSENGER_QUEUE_DEPTH_SAMPLED_AT' => [BuiltInMetric::MESSENGER_QUEUE_DEPTH_SAMPLED_AT, 'gauge', ['transport:string'], []];
+        yield 'CACHE_REQUEST' => [BuiltInMetric::CACHE_REQUEST, 'counter', ['pool:string', 'result:enum=hit|miss'], []];
     }
 
     /**

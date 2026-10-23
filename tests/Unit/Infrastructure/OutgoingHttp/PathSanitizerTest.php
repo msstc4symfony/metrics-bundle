@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\HttpClient;
+namespace Msstc4Symfony\MetricsBundle\Test\Unit\Infrastructure\OutgoingHttp;
 
-use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\PathSanitizer;
+use Msstc4Symfony\MetricsBundle\Infrastructure\OutgoingHttp\PathSanitizer;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
-final class HttpClientDecoratorSanitizeTest extends TestCase
+final class PathSanitizerTest extends TestCase
 {
     /**
      * @return iterable<string, array{string, string}>

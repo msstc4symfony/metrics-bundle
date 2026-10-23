@@ -5,14 +5,21 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\Test\Integration\DependencyInjection;
 
 use MongoDB\Driver\Monitoring\CommandSubscriber;
+use Msstc4Symfony\MetricsBundle\Application\Collector\CacheCollector;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Cache\CountingCacheAdapter;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Doctrine\ODM\Metrics\TimingSubscriber;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Guzzle\ChainedClientConfigurator;
 use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\CompletionStreamFilter;
 use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\HttpClientDecorator;
 use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\MonitoredResponse;
-use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\PathSanitizer;
 use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\URLAssembler\AssemblerInterface;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Messenger\MessengerQueueDepthReader;
+use Msstc4Symfony\MetricsBundle\Infrastructure\OutgoingHttp\PathSanitizer;
 use Msstc4Symfony\MetricsBundle\MetricsBundle;
+use Msstc4Symfony\MetricsBundle\Presentation\EventListener\CacheMetricsFlushListener;
 use Msstc4Symfony\MetricsBundle\Presentation\EventListener\MessengerEventListener;
+use Msstc4Symfony\MetricsBundle\Presentation\EventListener\MessengerQueueDepthListener;
+use Msstc4Symfony\MetricsBundle\Presentation\EventListener\QueueDepthSamplingState;
 use Msstc4Symfony\MetricsBundle\Test\Integration\DependencyInjection\Fixture\StaticUrlAssembler;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -36,7 +43,32 @@ final class ServiceScanTest extends TestCase
         yield 'MonitoredResponse' => [MonitoredResponse::class];
         yield 'HttpClientDecorator' => [HttpClientDecorator::class];
         yield 'CompletionStreamFilter' => [CompletionStreamFilter::class];
+    }
+
+    /**
+     * Not scanned: they need an optional library or an option (registered guarded or by a pass), or are plain helpers.
+     *
+     * @return iterable<string, array{class-string}>
+     */
+    public static function optionalClassProvider(): iterable
+    {
+        yield 'ChainedClientConfigurator' => [ChainedClientConfigurator::class];
+        yield 'MessengerQueueDepthListener' => [MessengerQueueDepthListener::class];
+        yield 'MessengerQueueDepthReader' => [MessengerQueueDepthReader::class];
+        yield 'QueueDepthSamplingState' => [QueueDepthSamplingState::class];
+        yield 'CountingCacheAdapter' => [CountingCacheAdapter::class];
+        yield 'CacheCollector' => [CacheCollector::class];
+        yield 'CacheMetricsFlushListener' => [CacheMetricsFlushListener::class];
         yield 'PathSanitizer' => [PathSanitizer::class];
+    }
+
+    /**
+     * @param class-string $class
+     */
+    #[DataProvider('optionalClassProvider')]
+    public function testOptionalClassesAreNotScanned(string $class): void
+    {
+        self::assertFalse($this->isRegistered($this->loadedContainer(), $class));
     }
 
     /**

@@ -11,12 +11,14 @@ Out of the box the following are measured:
 - incoming HTTP requests (count, duration, response status)
 - console command executions (count, duration)
 - uncaught exceptions and Monolog error/warning records
-- outgoing requests via `symfony/http-client`
+- outgoing requests via `symfony/http-client` and Guzzle 7/8 client services — see [Guzzle metrics](#guzzle-metrics)
 - Doctrine DBAL queries (count, duration, type, table)
 - MongoDB driver commands
 - Symfony Messenger messages sent to transports and consumed by workers (count by outcome, handling duration)
 - `ruflin/elastica` 7.x, 8.x and 9.x requests, for `Elastica\Client` and its subclasses (FOSElasticaBundle clients included) — see [Elastica metrics](#elastica-metrics)
 - system info (CPU load, memory, OPcache, FPM, filesystem)
+- opt-in: cache pool hits and misses — see [Cache pool metrics](#cache-pool-metrics)
+- opt-in: Messenger queue depth — see [Messenger queue depth](#messenger-queue-depth)
 
 The exact list of metrics with labels and histogram buckets is shown by `bin/console metrics:list`.
 
@@ -30,7 +32,7 @@ Span durations from `msstc4symfony/profiling-bundle` are exported by
 
 | Bundle  | PHP   | Symfony           |
 | ------- | ----- | ----------------- |
-| 2.0     | 8.2+  | 7.4, 8.x          |
+| 2.x     | 8.2+  | 7.4, 8.x          |
 | 1.4     | 8.2+  | 7.4, 8.x          |
 | 1.0–1.3 | 8.4+  | 7.4, 8.x          |
 
@@ -151,6 +153,17 @@ msstc4symfony_metrics:
         # Replace document ids (products/_doc/sku-1 -> products/_doc/:id) and id/uuid/hash segments
         # in the "path" label of the elastica_request_* metrics. false keeps the raw request path.
         sanitize_path: true
+    cache:
+        # Cache pool service ids whose lookups are counted in cache_request (see "Cache pool metrics").
+        pools: []
+    messenger:
+        # Samples messenger_queue_depth (see "Messenger queue depth"). Configuring the section enables it.
+        queue_depth:
+            enabled: false
+            # Transport names; empty samples every transport.
+            transports: []
+            # ISO 8601 interval: at most one sample per period across the processes sharing metrics.cache.
+            period: PT1M
     # Extra metric catalogs (see "Adding a custom metric"), appended after the bundle's BuiltInMetric.
     metric_enums: []
 ```
@@ -207,6 +220,113 @@ Messenger is installed; without Messenger they are never recorded and `/_/metric
 
 Cardinality: the histogram writes 16 series (14 buckets, `_sum`, `_count`) per
 transport × message × status combination — with many message classes, watch the storage size.
+
+### Messenger queue depth
+
+Opt-in (`msstc4symfony_metrics.messenger.queue_depth`, see [Configuration](#configuration)):
+
+```yaml
+msstc4symfony_metrics:
+    messenger:
+        queue_depth:
+            transports: [async, failed]  # optional; configuring the section enables it
+            period: PT1M
+```
+
+| Metric | Type | Labels | Recorded on |
+| ------ | ---- | ------ | ----------- |
+| `symfony_messenger_queue_depth` | gauge | `transport` | Messages waiting in the transport (`MessageCountAwareInterface::getMessageCount()`, approximate on some brokers). |
+| `symfony_messenger_queue_depth_sampled_at` | gauge | `transport` | Unix time (seconds) of the last successful sample of that transport: alert on `time() - … > N` to catch a stale depth. |
+
+The transports are sampled at most once per `period` across every process sharing the `metrics.cache` pool (the
+throttle of the system info gauges), on `kernel.terminate` and on `WorkerRunningEvent` (so worker pods sample too).
+The shared entry holds the end of the current period: a process asks the pool again only after that time, not on
+every request or worker loop.
+
+- Transport names are those of `messenger:stats` (the failure transport included; receivers tagged through
+  `_instanceof` too). An unknown name in `transports` fails the container compilation.
+- Transports that cannot count their messages (`in-memory://`, `sync://`) are skipped. Listing one whose class is
+  known at compile time (a receiver service of your own) fails the compilation; a framework transport (built by a
+  factory) that turns out not to count is logged once per process on the `metrics_bundle` channel. Without any
+  countable transport nothing is registered and the container compiler log says so.
+- A transport that fails to count (broker down) is logged on the `metrics_bundle` channel and skipped: its depth and
+  `sampled_at` keep their last values. Each sample calls the broker once per transport.
+- If the `metrics.cache` pool itself fails (Redis down), the process logs one warning and does not try again for a
+  full `period`.
+
+## Guzzle metrics
+
+With `guzzlehttp/guzzle` 7.8+ or 8 installed, every container service implementing `GuzzleHttp\ClientInterface` writes
+the same series as `symfony/http-client` (no configuration): `http_connection_request`, `http_connection_response` and
+`http_connection_duration_histogram_seconds`, with the same `method`, `host` and `path` labels — URL assemblers
+(`metrics.http_client.url_assembler`) and `msstc4symfony_metrics.http_client.sanitize_path` apply to both. Dashboards
+see one outbound HTTP family whatever the client.
+
+- The middleware sits in the client's `HandlerStack` right outside Guzzle's `allow_redirects` (inside `http_errors`):
+  one call is one record with the final status after redirects, labelled with the requested URL, as the curl transport
+  of `symfony/http-client` does. `4xx`/`5xx` are recorded with their status before `http_errors` turns them into
+  exceptions.
+- The request counter is written when the request starts; the response counter and the duration (from that moment to
+  the settlement of the promise, so asynchronous requests and pools are measured too) when it completes. A rejection
+  carrying a response (`RequestException`/`ResponseException` with `getResponse()`) is recorded with that status; a
+  connection failure only counts the request. With the `stream` option the duration ends with the response headers.
+  URL assemblers get the request URL without its user info (credentials).
+- Retries: a retry middleware the application `push()`es runs inside the metrics middleware, so retries are one record;
+  one it `unshift()`s runs outside and every attempt is recorded.
+- Reached clients: a `GuzzleHttp\Client` service with a literal config array gets the middleware in its `handler`
+  (Guzzle's default stack when none is set; a `handler` whose class is known and is not a `HandlerStack` is left alone
+  and reported in the container compiler log; one whose class is unknown at compile time goes the configurator way). Clients built by a factory, by their own constructor, with a parameter as config, or with
+  `max_host_connections`/`max_total_connections`/`transport_sharing`/`multiplex` (Guzzle 8 builds its default handler
+  from those) get it through a service configurator via `getConfig('handler')`, chained after their own configurator.
+  A Guzzle 8 client without `getConfig()` cannot be reached: the compiler log names it — configure it as a
+  `GuzzleHttp\Client` with a literal config array or a `HandlerStack` handler. Clients created with `new`
+  outside the container are not measured.
+- Elastica 8/9 configured with a Guzzle-based PSR-18 client, or anything else sending through a measured Guzzle
+  service, is counted in both families — as with `psr18.http_client` today.
+
+## Cache pool metrics
+
+Opt-in: list the pools under `msstc4symfony_metrics.cache.pools` (service ids, such as `cache.app` or the names under
+`framework.cache.pools`):
+
+```yaml
+msstc4symfony_metrics:
+    cache:
+        pools: [cache.app, app.cache.products]
+```
+
+| Metric | Type | Labels | Recorded on |
+| ------ | ---- | ------ | ----------- |
+| `symfony_cache_request` | counter | `pool`, `result` (`hit`, `miss`) | Every item lookup of a listed pool: `getItem()`, each item of `getItems()`, and `get()` with a callback (`miss` when the pool computes the value now — also for a synchronous probabilistic early recomputation — `hit` otherwise, including a stale value served while `early_expiration_message_bus` recomputes it asynchronously). A failing backend counts nothing; a failing computation counts a miss. `hasItem()`, writes and deletes are not counted. |
+
+Lookups are counted in memory and written with one increment per pool and result at the end of the unit of work
+(`kernel.terminate`, `console.terminate`, a handled or failed Messenger message, `kernel.reset`), so a hot pool costs
+one storage write per series and request instead of one per lookup. Long commands and workers also write every 1000
+lookups, and the pending counts are written when the container is destroyed.
+
+- `get()` callbacks reach the pool unchanged: pools that compute through a callback wrapper (filesystem, Redis,
+  PDO, APCu, chain and tag-aware adapters) count the computation in a wrapper the bundle adds to that pool, inside
+  Symfony's early-expiration dispatcher, so `early_expiration_message_bus` keeps sending recomputations to the bus.
+  Other pools (`cache.adapter.array`, proxies) count by wrapping the callback, as they have no early expiration.
+- Hit or miss of a `get()` is whether the pool's computation count moved while the call ran; the count is per pool.
+  Two `get()` calls of the same pool interleaved in Fibers can therefore turn a hit into a miss.
+- Like Symfony's `TraceableAdapter`, the decorator exposes `get()` and `withSubNamespace()` for every pool and throws
+  `BadMethodCallException` when the decorated pool does not implement `CacheInterface` or `NamespacedPoolInterface`.
+
+- The decorator keeps the pool's interfaces (`CacheInterface`, `NamespacedPoolInterface`, `PruneableInterface`,
+  `ResettableInterface`, and the tag-aware ones for tag-aware pools); `cache:pool:clear`/`prune` and the profiler keep
+  the pool name. A sub-namespace (`withSubNamespace()`) is counted under the same pool.
+- `tags: true` pools: the public `TagAwareAdapter` service is decorated, so the tag version lookups it makes in its
+  inner pool are not counted. Symfony autowires `CacheInterface $pool` of such a pool to that inner, untagged pool:
+  those lookups are not counted — inject `TagAwareCacheInterface $pool`. For other pools, `TagAwareCacheInterface $pool`
+  (Symfony's `.<pool>.taggable` adapter) is counted, without its tag version lookups; an item invalidated by a tag is
+  still counted as a hit there.
+- A listed id that is not a service, or not a `Symfony\Component\Cache\Adapter\AdapterInterface`, fails the container
+  compilation. `metrics.cache` (the bundle's own throttle pool) and `cache.messenger.restart_workers_signal` (read on
+  every worker loop) are rejected, also through an alias, and so is the pool they are an alias of (with
+  `metrics.cache` aliased to `cache.app`, `cache.app` cannot be listed).
+- Without a `metrics.cache` pool (see [doc/cache.yaml](doc/cache.yaml)) the bundle's throttle falls back to `cache.app`:
+  listing `cache.app` then also counts those throttle lookups (one per request or worker loop).
 
 ## Elastica metrics
 
@@ -358,10 +478,12 @@ release.
 | `Application\Metric` | `MetricDefinitionInterface`, `BuiltInMetric`, `MetricType`, `LabelType`, `Metric`, `Label`, `MessengerMessageStatus`, `MetricRepositoryInterface`, `MetricRepository` |
 | `Application\Collector` | `DoctrineConnectionCollector`, `DoctrineQueryType` (wiring DBAL metrics without DoctrineBundle) |
 | `Infrastructure\Doctrine\DBAL\Metrics` | `NamedConnectionMiddleware` |
-| `Application\Port` | `MetricRecorderInterface`, `MetricStorageInterface`, `MetricExport`, `MetricStorageException` |
+| `Application\Port` | `MetricRecorderInterface`, `MetricBatchRecorderInterface` (`incrementBy()` for counts aggregated in memory; an application replacing the recorder aliases both), `MetricStorageInterface`, `MetricExport`, `MetricStorageException` |
 | `Application` | `LogChannel` (`metrics_bundle`) |
 | `Infrastructure\HttpClient\URLAssembler` | `AssemblerInterface` |
 | (root) | `MetricsBundle` |
+
+Minor releases add cases to `BuiltInMetric` (new metrics): a `match` over its cases needs a `default` arm.
 
 The configuration keys under `msstc4symfony_metrics` (including `metric_enums`), the container parameters
 `msstc4symfony_metrics.metric_enums`, `.application_name`, `.component_name`, the route `/_/metrics` and the commands
@@ -372,7 +494,7 @@ the metric repository throws a `LogicException` naming both cases.
 
 ## How it works
 
-Collectors measure at well-known integration points (Symfony kernel events, console events, Monolog handler decorator, Doctrine DBAL middleware, MongoDB driver subscriber, Elastica transport adapter on 7 / PSR-18 client decorator on 8 and 9, `symfony/http-client` decorator). They record through `MetricRecorderInterface`, whose Prometheus adapter writes to a `RegistryInterface` backed by the configured storage adapter (Redis by default). Prometheus periodically scrapes the `/_/metrics` controller, which exports the storage through `MetricStorageInterface` as text/plain.
+Collectors measure at well-known integration points (Symfony kernel events, console events, Monolog handler decorator, Doctrine DBAL middleware, MongoDB driver subscriber, Elastica transport adapter on 7 / PSR-18 client decorator on 8 and 9, `symfony/http-client` decorator, Guzzle handler-stack middleware, cache pool decorators, Messenger receivers). They record through `MetricRecorderInterface`, whose Prometheus adapter writes to a `RegistryInterface` backed by the configured storage adapter (Redis by default). Prometheus periodically scrapes the `/_/metrics` controller, which exports the storage through `MetricStorageInterface` as text/plain.
 
 Metric state lives in Redis indefinitely (or until `metrics:clear` is run / the app is redeployed and the keys are flushed). Each scrape returns the full current state — Prometheus overwrites its own series on every scrape, so a stale Redis simply produces stale values, not duplicates.
 

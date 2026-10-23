@@ -88,3 +88,20 @@ Elastica разделены по версии: `SaveElasticaClientsListPassTest`
   адаптеров/listener'ов оборачивают реальный registry в `PrometheusMetricRecorder` и проверяют сэмплы через
   `RegistrySamples`.
 
+## Ядра и фикстуры 2.2
+
+- `Kernel/Cache/CachePoolsKernel` (+ `CachePoolsConsumer` с `#[Target]`): пулы `app.plain`, `app.tagged` (`tags:
+  true`), `app.files` (filesystem — для `cache:pool:prune`), `app.unlisted`; серии пишутся на `kernel->terminate()`.
+- `Kernel/Messenger/QueueDepthKernel(?array)`: `null` — без секции `queue_depth`; транспорт `in-memory://` и
+  `CountableReceiver`, тег `messenger.receiver` (alias `countable`) — через `_instanceof`.
+- `Kernel/Cache/EarlyExpirationKernel` + `EarlyComputer` (invokable, `container.reversible`): filesystem-пул с
+  `early_expiration_message_bus`, сообщения — в `in-memory://` транспорт `early`; `CachePoolsKernel(profiler: true)` —
+  `TraceableAdapter` и имена пулов в `data_collector.cache`.
+- Guzzle 7 в CI-локе нет (8.3.0): формы 7 — двойники `tests/Support/Guzzle/{Guzzle7Client,Guzzle7RequestException}` и
+  стек в порядке 7.x `HandlerStack::create()`; настоящий 7.15.2 ставит ячейка `--prefer-lowest`.
+- `TestKernel` с Guzzle: `test.guzzle.configured` (конфиг-массив с `handler` = `GuzzleClientFactory::stack()`) и
+  `test.guzzle.factory_built` (фабрика → путь конфигуратора), оба на `MockHandler`.
+- Юнит-тесты Guzzle/Messenger — `#[RequiresMethod(<класс>, <метод>)]` (без библиотеки — skip). Провайдеры данных не
+  создают объекты опциональных библиотек: они вызываются до проверки требований.
+- Двойники пулов — интерфейсы `tests/Support/Cache/{ContractsPool,PruneableContractsPool}`: intersection-моки
+  PHPUnit для PHPStan теряют интерфейсы. `CollectingLogger::$contexts` — контекст записей (проверка `exception`).

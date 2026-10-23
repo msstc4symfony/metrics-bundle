@@ -36,3 +36,16 @@
   (`opcache_get_status()` и т. п.) сужается `is_array()`/`is_int()`/`is_float()` в маленьком хелпере
   (`InfoEventListener::number()`), а не кастами.
 - Комментарии — только «почему», на английском.
+- Встроенные функции из набора `@compiler_optimized` (`\sprintf`, `\is_array`, `\in_array`, `\count`…) — с ведущим `\`
+  в новом коде (так в большинстве `src/`; CS-Fixer этого не требует, правило применялось разово к файлам 2.2).
+- Декоратор пула/клиента реализует все необязательные интерфейсы декорируемого (как `TraceableAdapter`) и
+  проксирует их по `instanceof`; общий код вариантов — trait (`CountsCacheLookups`), классы остаются `final readonly`.
+- Счётчики горячих путей (кеш) агрегируются в памяти и пишутся через `MetricBatchRecorderInterface::incrementBy()`
+  один раз на серию в конце единицы работы; новый метод порта — новый интерфейс, не метод существующего (Roave BC).
+- Опциональный listener/коллектор, нужный только при опции конфига, исключается из скана и регистрируется пассом
+  с явными тегами (`kernel.event_listener`, `kernel.reset`) — пасс идёт после автоконфигурации, атрибуты к его
+  определениям не применяются (`RegisterMessengerQueueDepthPass`, `DecorateCachePoolsPass`).
+- Декоратор пула не оборачивает callback приложения, если у пула есть собственный callback wrapper: считать там
+  (`CountingCallbackWrapper`), иначе ломается развёртывание callback'а early expiration.
+- Метрики разных клиентов одного рода (http-client, Guzzle) пишут одни серии; общие метки — в одном `@internal`
+  классе (`OutgoingRequestLabels`).

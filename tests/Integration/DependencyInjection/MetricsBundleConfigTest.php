@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Test\Integration\DependencyInjection;
 
+use LogicException;
 use Msstc4Symfony\MetricsBundle\Application\Collector\ErrorCollector;
 use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
 use Msstc4Symfony\MetricsBundle\Application\Metric\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Infrastructure\Cache\CountingCacheAdapter;
 use Msstc4Symfony\MetricsBundle\Presentation\EventListener\MessengerEventListener;
 use Msstc4Symfony\MetricsBundle\Test\Integration\DependencyInjection\Fixture\ExtraMetricEnum;
 use Msstc4Symfony\MetricsBundle\Test\Integration\DependencyInjection\Fixture\IntBackedMetricEnum;
@@ -14,6 +16,7 @@ use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\BundleConfigKernel;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\TestKernel;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use Override;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Prometheus\RegistryInterface;
 use RuntimeException;
@@ -64,6 +67,10 @@ final class MetricsBundleConfigTest extends TestCase
         self::assertTrue($container->getParameter('msstc4symfony_metrics.http_client.sanitize_path'));
         self::assertTrue($container->getParameter('msstc4symfony_metrics.elastica.sanitize_path'));
         self::assertSame([BuiltInMetric::class], $container->getParameter('msstc4symfony_metrics.metric_enums'));
+        self::assertSame([], $container->getParameter('msstc4symfony_metrics.cache.pools'));
+        self::assertFalse($container->getParameter('msstc4symfony_metrics.messenger.queue_depth.enabled'));
+        self::assertSame([], $container->getParameter('msstc4symfony_metrics.messenger.queue_depth.transports'));
+        self::assertSame('PT1M', $container->getParameter('msstc4symfony_metrics.messenger.queue_depth.period'));
     }
 
     public function testEnvironmentVariablesFeedTheDefaults(): void
@@ -89,6 +96,8 @@ final class MetricsBundleConfigTest extends TestCase
             'http_client' => ['sanitize_path' => false],
             'elastica' => ['sanitize_path' => false],
             'metric_enums' => [ExtraMetricEnum::class],
+            'cache' => ['pools' => ['cache.app', 'cache.system', 'cache.app']],
+            'messenger' => ['queue_depth' => ['enabled' => false, 'transports' => ['async', 'failed'], 'period' => 'PT30S']],
         ])->getContainer();
 
         self::assertSame('inmemory://', $container->getParameter('msstc4symfony_metrics.storage.dsn'));
@@ -102,6 +111,60 @@ final class MetricsBundleConfigTest extends TestCase
             [BuiltInMetric::class, ExtraMetricEnum::class],
             $container->getParameter('msstc4symfony_metrics.metric_enums'),
         );
+        self::assertSame(['cache.app', 'cache.system'], $container->getParameter('msstc4symfony_metrics.cache.pools'));
+        self::assertFalse($container->getParameter('msstc4symfony_metrics.messenger.queue_depth.enabled'));
+        self::assertSame(['async', 'failed'], $container->getParameter('msstc4symfony_metrics.messenger.queue_depth.transports'));
+        self::assertSame('PT30S', $container->getParameter('msstc4symfony_metrics.messenger.queue_depth.period'));
+        self::assertInstanceOf(CountingCacheAdapter::class, $container->get('cache.app'));
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function unmeasurablePoolProvider(): iterable
+    {
+        yield 'the bundle throttle pool' => ['metrics.cache', 'The "metrics.cache" pool cannot be listed in msstc4symfony_metrics.cache.pools: the bundle reads it on every request and worker loop to throttle its own sampling.'];
+        yield 'the worker restart signal' => ['cache.messenger.restart_workers_signal', 'The "cache.messenger.restart_workers_signal" pool cannot be listed in msstc4symfony_metrics.cache.pools: every Messenger worker reads it on each loop.'];
+    }
+
+    #[DataProvider('unmeasurablePoolProvider')]
+    public function testRejectsPoolsReadOnEveryLoop(string $pool, string $message): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage($message);
+
+        $this->bootKernel(['cache' => ['pools' => [$pool]]]);
+    }
+
+    public function testRejectsAnEmptyPoolName(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+
+        $this->bootKernel(['cache' => ['pools' => ['']]]);
+    }
+
+    public function testRejectsAQueueDepthPeriodThatIsNoInterval(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('"1 minute" is not an ISO 8601 interval');
+
+        $this->bootKernel(['messenger' => ['queue_depth' => ['period' => '1 minute']]]);
+    }
+
+    public function testRejectsAZeroQueueDepthPeriod(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('"PT0S" is not an ISO 8601 interval');
+
+        $this->bootKernel(['messenger' => ['queue_depth' => ['period' => 'PT0S']]]);
+    }
+
+    public function testQueueDepthNeedsMessenger(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('msstc4symfony_metrics.messenger.queue_depth needs Symfony Messenger (framework.messenger).');
+
+        $this->bootKernel(['messenger' => ['queue_depth' => true]]);
     }
 
     public function testExtraEnumsReachTheMetricRepository(): void

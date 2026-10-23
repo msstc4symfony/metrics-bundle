@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\Test\Support;
 
 use Msstc4Symfony\MetricsBundle\Application\Metric\MetricDefinitionInterface;
+use Msstc4Symfony\MetricsBundle\Application\Port\MetricBatchRecorderInterface;
 use Msstc4Symfony\MetricsBundle\Application\Port\MetricRecorderInterface;
 use Override;
 
-final class RecordingMetricRecorder implements MetricRecorderInterface
+final class RecordingMetricRecorder implements MetricRecorderInterface, MetricBatchRecorderInterface
 {
     /** @var list<array{string, MetricDefinitionInterface, float|int|null, list<scalar>}> */
     public array $calls = [];
@@ -17,6 +18,12 @@ final class RecordingMetricRecorder implements MetricRecorderInterface
     public function increment(MetricDefinitionInterface $metric, array $labels = []): void
     {
         $this->calls[] = ['increment', $metric, null, $labels];
+    }
+
+    #[Override]
+    public function incrementBy(MetricDefinitionInterface $metric, int $amount, array $labels = []): void
+    {
+        $this->calls[] = ['incrementBy', $metric, $amount, $labels];
     }
 
     #[Override]

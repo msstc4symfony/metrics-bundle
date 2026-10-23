@@ -46,12 +46,17 @@ enum BuiltInMetric: string implements MetricDefinitionInterface
     case MESSENGER_MESSAGE_SENT = 'messenger_message_sent';
     case MESSENGER_MESSAGE_HANDLED = 'messenger_message_handled';
     case MESSENGER_MESSAGE_HANDLING_DURATION_HISTOGRAM_SECONDS = 'messenger_message_handling_duration_histogram_seconds';
+    case MESSENGER_QUEUE_DEPTH = 'messenger_queue_depth';
+    case MESSENGER_QUEUE_DEPTH_SAMPLED_AT = 'messenger_queue_depth_sampled_at';
+    case CACHE_REQUEST = 'cache_request';
 
     private const HTTP_METHODS = ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'HEAD'];
 
     private const HTTP_METHODS_EXTENDED = ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'HEAD', 'OPTIONS'];
 
     private const DOCTRINE_QUERY_TYPES = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'OTHER'];
+
+    private const CACHE_RESULTS = ['hit', 'miss'];
 
     private const ERROR_LEVEL_NAMES = [
         'EMERGENCY',
@@ -90,7 +95,9 @@ enum BuiltInMetric: string implements MetricDefinitionInterface
             self::INFO_FPM_MAX_LISTEN_QUEUE,
             self::INFO_FPM_LISTEN_QUEUE_SIZE,
             self::INFO_CACHE_WARMUP_TIME,
-            self::INFO_FPM_LISTEN_QUEUE => MetricType::GAUGE,
+            self::INFO_FPM_LISTEN_QUEUE,
+            self::MESSENGER_QUEUE_DEPTH,
+            self::MESSENGER_QUEUE_DEPTH_SAMPLED_AT => MetricType::GAUGE,
 
             default => MetricType::COUNTER,
         };
@@ -146,6 +153,10 @@ enum BuiltInMetric: string implements MetricDefinitionInterface
             self::MESSENGER_MESSAGE_SENT => 'Messenger messages sent to a transport count',
             self::MESSENGER_MESSAGE_HANDLED => 'Messenger messages consumed by workers count, by outcome',
             self::MESSENGER_MESSAGE_HANDLING_DURATION_HISTOGRAM_SECONDS => 'Messenger message handling duration in workers in seconds',
+            self::MESSENGER_QUEUE_DEPTH => 'Messenger messages waiting in a transport, as last sampled',
+            self::MESSENGER_QUEUE_DEPTH_SAMPLED_AT => 'Unix time in seconds of the last successful queue depth sample of a transport',
+
+            self::CACHE_REQUEST => 'Cache pool item lookups count, by result',
         };
     }
 
@@ -226,6 +237,16 @@ enum BuiltInMetric: string implements MetricDefinitionInterface
                     'Handling outcome',
                     array_map(static fn (MessengerMessageStatus $status): string => $status->value, MessengerMessageStatus::cases()),
                 ),
+            ],
+
+            self::MESSENGER_QUEUE_DEPTH,
+            self::MESSENGER_QUEUE_DEPTH_SAMPLED_AT => [
+                new Label('transport', LabelType::STRING, 'Transport (receiver) name'),
+            ],
+
+            self::CACHE_REQUEST => [
+                new Label('pool', LabelType::STRING, 'Cache pool name'),
+                new Label('result', LabelType::ENUM, 'Lookup result', self::CACHE_RESULTS),
             ],
 
             default => [],

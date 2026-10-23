@@ -9,6 +9,7 @@ use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
 use Msstc4Symfony\MetricsBundle\Application\Metric\MetricRepository;
 use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\HttpClientDecorator;
 use Msstc4Symfony\MetricsBundle\Infrastructure\HttpClient\URLAssembler\AssemblerInterface;
+use Msstc4Symfony\MetricsBundle\Infrastructure\OutgoingHttp\OutgoingRequestLabels;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Prometheus\PrometheusMetricRecorder;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Infrastructure\HttpClient\Fixture\ResettableClient;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
@@ -89,7 +90,7 @@ final class HttpClientDecoratorTest extends TestCase
 
     public function testKeepsRawPathWhenSanitizeDisabled(): void
     {
-        $decorator = new HttpClientDecorator(new MockHttpClient(new MockResponse('')), $this->collector, [], sanitizePath: false);
+        $decorator = new HttpClientDecorator(new MockHttpClient(new MockResponse('')), $this->collector, new OutgoingRequestLabels([], false));
 
         $decorator->request('GET', 'https://api.example.com/users/42')->getContent();
 
@@ -109,7 +110,7 @@ final class HttpClientDecoratorTest extends TestCase
             }
         };
 
-        $decorator = new HttpClientDecorator(new MockHttpClient(new MockResponse('')), $this->collector, [$assembler], true);
+        $decorator = new HttpClientDecorator(new MockHttpClient(new MockResponse('')), $this->collector, new OutgoingRequestLabels([$assembler], true));
         $decorator->request('GET', 'https://api.example.com/whatever')->getContent();
 
         self::assertSame(
@@ -239,6 +240,19 @@ final class HttpClientDecoratorTest extends TestCase
         self::assertSame('1', $this->durationCount());
     }
 
+    public function testClosingAPartiallyReadStreamRecordsNoDuration(): void
+    {
+        $response = $this->decorator(new MockHttpClient(new MockResponse(['a', 'b'])))->request('GET', 'https://api.example.com/a');
+        self::assertInstanceOf(StreamableInterface::class, $response);
+        $stream = $response->toStream();
+
+        self::assertSame('a', fread($stream, 1));
+        fclose($stream);
+
+        self::assertCount(1, RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_CONNECTION_RESPONSE));
+        self::assertNull($this->durationCount());
+    }
+
     public function testEachResponseIsRecordedOnceAcrossReadsAndDestruction(): void
     {
         $response = $this->decorator(new MockHttpClient(new MockResponse('ok')))->request('GET', 'https://api.example.com/a');
@@ -311,6 +325,6 @@ final class HttpClientDecoratorTest extends TestCase
 
     private function decorator(HttpClientInterface $inner): HttpClientDecorator
     {
-        return new HttpClientDecorator($inner, $this->collector, [], true);
+        return new HttpClientDecorator($inner, $this->collector, new OutgoingRequestLabels([], true));
     }
 }
