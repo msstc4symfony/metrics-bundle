@@ -71,6 +71,7 @@ final class RegisterMessengerQueueDepthPass implements CompilerPassInterface
         $container->register(MessengerQueueDepthListener::class, MessengerQueueDepthListener::class)
             ->setAutowired(true)
             ->setArgument('$reader', new Reference(MessengerQueueDepthReader::class))
+            ->setArgument('$metricsCache', new Reference(AliasThrottleCachePass::THROTTLE_CACHE))
             ->setArgument('$transports', $transports)
             ->setArgument('$listed', $listed !== [])
             ->setArgument('$period', '%' . self::PERIOD_PARAMETER . '%')

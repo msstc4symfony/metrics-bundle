@@ -36,6 +36,7 @@ final class QueueDepthKernel extends Kernel
      */
     public function __construct(
         private readonly ?array $queueDepth,
+        private readonly bool $metricsPool = true,
     ) {
         parent::__construct('test', true);
     }
@@ -49,7 +50,7 @@ final class QueueDepthKernel extends Kernel
     #[Override]
     public function getCacheDir(): string
     {
-        return TestKernel::cacheRoot() . '/queue-depth/' . md5(serialize($this->queueDepth));
+        return TestKernel::cacheRoot() . '/queue-depth/' . md5(serialize([$this->queueDepth, $this->metricsPool]));
     }
 
     #[Override]
@@ -67,6 +68,8 @@ final class QueueDepthKernel extends Kernel
             'router' => ['utf8' => true],
             'php_errors' => ['log' => false],
             'messenger' => ['transports' => [self::IN_MEMORY_TRANSPORT => 'in-memory://']],
+            // As doc/cache.yaml advises: the pool also gets the named autowiring alias CacheInterface $metricsCache.
+            'cache' => ['pools' => $this->metricsPool ? ['metrics.cache' => ['adapter' => 'cache.adapter.array']] : []],
         ]);
         $container->extension('monolog', ['handlers' => ['main' => ['type' => 'null']]]);
         $container->extension('msstc4symfony_metrics', ['storage' => ['dsn' => 'inmemory://']] + ($this->queueDepth === null ? [] : ['messenger' => ['queue_depth' => $this->queueDepth]]));

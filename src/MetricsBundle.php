@@ -15,6 +15,7 @@ use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\AddDoctrineDBAL
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\AddGuzzleMonitorPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\AddHttpClientMonitorPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\AddMonologDecoratorCompilerPass;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\AliasThrottleCachePass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\DecorateCachePoolsPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\DecorateElasticaClientsPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\KeepCachePoolsReversiblePass;
@@ -203,6 +204,7 @@ final class MetricsBundle extends AbstractBundle
     {
         parent::build($container);
 
+        $container->addCompilerPass(new AliasThrottleCachePass());
         $container->addCompilerPass(new AddMonologDecoratorCompilerPass());
         $container->addCompilerPass(new AddHttpClientMonitorPass(), priority: -256);
         $container->addCompilerPass(new AddGuzzleMonitorPass(), PassConfig::TYPE_BEFORE_REMOVING);

@@ -798,3 +798,12 @@ bundle-standard 3.2 `run-phpstan-per-symfony` (свежая установка, 
   `framework.messenger.transports` в тестовом ядре).
 - `in-memory://` не реализует `MessageCountAwareInterface` → для тестов `tests/Support/Messenger/CountableReceiver`
   (`null` — `getMessageCount()` бросает, как недоступный брокер).
+
+## Именованный автовайринг `$metricsCache` (2.2.1, 2026-10-23 UTC)
+
+Symfony DI 8.1 объявил deprecated сопоставление именованного алиаса только по имени параметра. Пул `metrics.cache`
+(doc/cache.yaml) даёт алиас `CacheInterface $metricsCache`, и `InfoEventListener` / `MessengerQueueDepthListener`
+получали его именно так. Теперь `AliasThrottleCachePass` заводит `msstc4symfony_metrics.throttle_cache`
+(`metrics.cache`, иначе алиас `CacheInterface`, как раньше при автовайринге по типу) и передаёт его обоим явно. Тестовые ядра без пула `metrics.cache` этого не
+ловят: алиаса нет — нет и deprecation; `QueueDepthKernel` объявляет пул специально. PHPUnit не падает на нём сам:
+`trigger_deprecation` подавлен `@`, а источник — vendor (`MetricsCacheAutowiringTest` ловит его своим handler'ом).

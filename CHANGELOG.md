@@ -4,6 +4,15 @@ All notable changes to this bundle are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions follow
 [Semantic Versioning](https://semver.org/); dates are UTC.
 
+## [2.2.1] - 2026-10-23
+
+### Fixed
+
+- No `symfony/dependency-injection` 8.1 deprecation "Relying solely on the name of parameter \"$metricsCache\"" when the
+  application defines the `metrics.cache` pool: the system info and queue depth listeners get the throttle pool
+  explicitly (`metrics.cache`, or the `CacheInterface` alias — `cache.app` — without it, as before). A `$metricsCache`
+  argument the application set on the info listener is kept.
+
 ## [2.2.0] - 2026-10-23
 
 ### Added

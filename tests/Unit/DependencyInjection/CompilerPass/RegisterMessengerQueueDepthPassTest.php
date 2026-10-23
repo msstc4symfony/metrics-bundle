@@ -6,6 +6,7 @@ namespace Msstc4Symfony\MetricsBundle\Test\Unit\DependencyInjection\CompilerPass
 
 use InvalidArgumentException;
 use LogicException;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\AliasThrottleCachePass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\RegisterMessengerQueueDepthPass;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Messenger\MessengerQueueDepthReader;
 use Msstc4Symfony\MetricsBundle\Presentation\EventListener\MessengerQueueDepthListener;
@@ -44,6 +45,7 @@ final class RegisterMessengerQueueDepthPassTest extends TestCase
         self::assertFalse($listener->getArgument('$listed'));
         self::assertSame('%' . RegisterMessengerQueueDepthPass::PERIOD_PARAMETER . '%', $listener->getArgument('$period'));
         self::assertEquals(new Reference(MessengerQueueDepthReader::class), $listener->getArgument('$reader'));
+        self::assertEquals(new Reference(AliasThrottleCachePass::THROTTLE_CACHE), $listener->getArgument('$metricsCache'));
         self::assertEquals(new Reference('monolog.logger.metrics_bundle'), $listener->getArgument('$logger'));
         self::assertSame(
             [
