@@ -1,7 +1,6 @@
 # Metrics Symfony bundle
 
 ![Build Status](https://github.com/msstc4symfony/metrics-bundle/actions/workflows/checks.yml/badge.svg?branch=main)
-[![codecov](https://codecov.io/github/msstc4symfony/metrics-bundle/graph/badge.svg?token=EoGwEpONxh)](https://codecov.io/github/msstc4symfony/metrics-bundle)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Automatic collection of application runtime metrics and Prometheus-format export over HTTP. Drops into a Symfony app, observes the request, console, exception, log, DB and outbound HTTP layers without code changes, stores aggregated values in Redis (or any Prometheus storage adapter), and exposes them at `GET /_/metrics` for Prometheus to scrape.

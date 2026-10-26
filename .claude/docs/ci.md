@@ -7,7 +7,6 @@ jobs:
   standard:
     uses: msstc4symfony/bundle-standard/.github/workflows/php-bundle.yml@v1.0.0
     with:
-      slug: msstc4symfony/metrics-bundle
       extensions: 'mbstring, xml, ctype, iconv, intl, redis, apcu, mongodb, pdo_sqlite'
       ini-values: 'apc.enable_cli=1'
       infection-min-msi: 69
@@ -31,5 +30,5 @@ jobs:
 - `PHPUnit without optional libraries` — job общего workflow: ставит только `composer.json`.
   Расширения — те же `extensions`, проверяется отсутствие *библиотек*, а не расширений.
 - Тег стандарта закреплён точным `vX.Y.Z`; обновление — явная правка строки.
-- Codecov выключен (`run-codecov: false` по умолчанию) — нет `CODECOV_TOKEN`.
+- Покрытие не загружается: Codecov убран из стандарта в v4.0.0.
 - Логику гейта менять в `bundle-standard`, не копированием сюда.

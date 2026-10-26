@@ -76,7 +76,7 @@ One `phpunit.xml.dist`, two suites:
 
 ## CI
 
-`.github/workflows/checks.yml` = the shared `bundle-standard` reusable workflow (pinned tag) with extensions `redis, apcu, mongodb` and `ini-values: apc.enable_cli=1`. The workflow's `PHPUnit without optional libraries` job installs `composer.json` only and proves the `class_exists`/`interface_exists` guards hold without optional libraries. Infection (`infection-min-msi`/`infection-min-covered-msi` = 69, measured 73 on 2026-10-02 UTC, 79 on 2026-10-14 UTC) is blocking; the Roave BC check is blocking (the standard's default); a `--prefer-lowest` PHPUnit cell (PHP 8.2, Symfony 7.4) tests the declared lower bounds. Codecov is disabled (`run-codecov` defaults to `false`). Details: `.claude/docs/ci.md`.
+`.github/workflows/checks.yml` = the shared `bundle-standard` reusable workflow (pinned tag) with extensions `redis, apcu, mongodb` and `ini-values: apc.enable_cli=1`. The workflow's `PHPUnit without optional libraries` job installs `composer.json` only and proves the `class_exists`/`interface_exists` guards hold without optional libraries. Infection (`infection-min-msi`/`infection-min-covered-msi` = 69, measured 73 on 2026-10-02 UTC, 79 on 2026-10-14 UTC) is blocking; the Roave BC check is blocking (the standard's default); a `--prefer-lowest` PHPUnit cell (PHP 8.2, Symfony 7.4) tests the declared lower bounds. Details: `.claude/docs/ci.md`.
 
 ## Deep references
 
