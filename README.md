@@ -395,6 +395,33 @@ Differences and limits on Elastica 8 and 9 ("8" below means both):
 | `bin/console metrics:list`  | Tabular list of every registered metric (name, type, labels, histogram buckets). |
 | `bin/console metrics:clear` | Wipes the storage adapter.                                   |
 
+## Shipping metrics over OTLP
+
+The bundle pushes nothing itself: a PHP-FPM process lives for one request, and an in-process OpenTelemetry meter would
+send each request's partial counts. The values are already aggregated in the storage, so let the collector scrape
+`/_/metrics` and forward them over OTLP — for example with Grafana Alloy:
+
+```alloy
+prometheus.scrape "app" {
+  targets    = [{"__address__" = "app:8080", "__metrics_path__" = "/_/metrics"}]
+  forward_to = [otelcol.receiver.prometheus.app.receiver]
+}
+
+otelcol.receiver.prometheus "app" {
+  output {
+    metrics = [otelcol.exporter.otlphttp.backend.input]
+  }
+}
+
+otelcol.exporter.otlphttp "backend" {
+  client {
+    endpoint = "https://otlp.example.com"
+  }
+}
+```
+
+The OpenTelemetry Collector does the same with its `prometheus` receiver and `otlphttp` exporter.
+
 ## Adding a custom metric
 
 1. Implement a string-backed enum on `Msstc4Symfony\MetricsBundle\Application\Metric\MetricDefinitionInterface` describing your metrics:
