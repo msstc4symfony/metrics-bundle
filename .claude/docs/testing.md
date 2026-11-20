@@ -105,3 +105,14 @@ Elastica разделены по версии: `SaveElasticaClientsListPassTest`
   создают объекты опциональных библиотек: они вызываются до проверки требований.
 - Двойники пулов — интерфейсы `tests/Support/Cache/{ContractsPool,PruneableContractsPool}`: intersection-моки
   PHPUnit для PHPStan теряют интерфейсы. `CollectingLogger::$contexts` — контекст записей (проверка `exception`).
+
+## Ядра и фикстуры 2.3
+
+- `TestKernel` env: `http_ignored_routes` (`test_throw` в `http.ignored_routes`), `http_observer` (автоконфигурируемые
+  `ThrowingHttpMeasurementObserver` + `RecordingHttpMeasurementObserver`, канал `metrics_bundle` в
+  `monolog.handler.metrics`), `messenger_observer` (то же для Messenger), `http_cache` (`framework.http_cache: true`).
+- Контроллер маршрутов `test_ok` / `test_throw` / `test_fragment` — `Kernel/Http/HttpTestController`.
+- `tests/Support/ThrowingMetricRecorder` — рекордер, нарушающий контракт порта (каждая запись бросает): проверка
+  fail-open listener'ов.
+- Пустой `route` в `HttpMeasurement` тест передаёт через `ReflectionClass::newInstance()`: прямой вызов с `''` PHPStan
+  отвергает из-за `non-empty-string|null`.

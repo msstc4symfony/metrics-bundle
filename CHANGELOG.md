@@ -18,13 +18,29 @@ All notable changes to this bundle are documented here. The format follows
   Default `metrics-get`, `healthcheck-ping`, `healthcheck-readiness`, `healthcheck-liveliness`; setting it replaces the
   default list.
 
+### Changed
+
+- The `method` label of `http_request`, `http_response`, `request_duration_histogram_seconds` and
+  `request_duration_summary_seconds` is one of `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD` or the new `OTHER`:
+  any other method token (WebDAV, scanners) is recorded as `OTHER` instead of opening a series per token. `OPTIONS`
+  requests are still not recorded.
+- Request and Messenger handling durations are measured with the monotonic `hrtime()` clock instead of `microtime()`.
+
 ### Fixed
 
 - Responses rendered for uncaught exceptions, router 404s and pages with fragment sub-requests were not recorded in
   `http_response` and the request duration metrics; they are now. The request listener kept one start time that every
   `kernel.request`, including Symfony's error sub-request, reset. After upgrading, 5xx and 404 responses that were
-  invisible before appear in `http_response` — this is the fix, not a regression.
-- Requests stopped before routing are counted in `http_request` with `route="unknown"`.
+  invisible before appear in `http_response` — this is the fix, not a regression. For the same reason the duration
+  percentiles now include fast 404s and error responses and may shift.
+- Requests stopped before routing are counted in `http_request` with `route="unknown"`. Any main request answered
+  before the `kernel.request` listeners of priority 0 (e.g. a firewall 401 or a login redirect 302) is now counted in
+  `http_request` with its real route; it was not counted before.
+- With `framework.http_cache` enabled, cache misses and revalidations are recorded: the kernel handles a clone of the
+  main request while `kernel.terminate` gets the original one. Cache hits stay unrecorded, as behind a real proxy.
+- A metric recorder that throws (a replacement of `MetricRecorderInterface` breaking its contract) no longer escapes
+  `kernel.request`, `kernel.terminate` or the Messenger events and no longer skips the observers: the failure is
+  logged on the `metrics_bundle` channel.
 - The request listener resets between requests in long-running runtimes.
 
 ## [2.2.1] - 2026-10-23

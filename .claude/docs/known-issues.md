@@ -820,3 +820,29 @@ Listener реализует `ResetInterface` (long-running рантаймы). П
 
 `http.ignored_routes` ЗАМЕНЯЕТ список по умолчанию (`metrics-get`, `healthcheck-ping`, `healthcheck-readiness`,
 `healthcheck-liveliness`), а не дополняет его; параметр `msstc4symfony_metrics.http.ignored_routes`.
+
+## framework.http_cache и kernel.terminate (2.3)
+
+С `framework.http_cache: true` `Kernel::handle()` отдаёт главный запрос в `HttpCache`, который на промахе/ревалидации
+форвардит в ядро **клон** (`HttpCache::fetch()/validate()` — `clone $request`, тип MAIN_REQUEST). `Kernel::terminate()`
+же зовёт `http_kernel->terminate()` с **оригиналом** (минуя `HttpCache::terminate()` и его `backendRequest`, который
+есть только в http-kernel ≥ 7.4.13 / 8.0.11 и работает лишь при ручной обёртке `new HttpCache($kernel)`). Поиск по
+идентичности в `WeakMap` промахивается → без fallback не писались `http_response`/длительность/наблюдатели. Поэтому
+`RequestEventListener::$pendingMain`: первый главный запрос после terminate/reset (`??=` — ESI-фрагменты HttpCache
+тоже приходят как MAIN_REQUEST и не должны его вытеснить); в `onTerminate` сначала identity, иначе pending при
+совпадении `getPathInfo()`. Метод/маршрут берутся с клона (HEAD форвардится как GET → метка `GET`). Попадания в кеш
+(`fresh`) ядро не видит — не пишутся, как за настоящим прокси. Регрессия ловится `HttpErrorPathKernelTest::
+testHttpCacheMissIsRecordedOnce` (env `http_cache`) на текущем 8.1.
+
+## Метка `method` HTTP-метрик (2.3)
+
+`RequestEventListener::method()` пропускает только GET/POST/PUT/PATCH/DELETE/HEAD, остальное → `OTHER` (в enum метки
+`BuiltInMetric::HTTP_METHODS`): после 2.3 пишутся и не-смаршрутизированные запросы, и сканеры с произвольным
+токеном метода плодили бы серии. `OPTIONS` отсекается раньше, в `onRequestFirst`. Enum метки информационный
+(`metrics:list`), рекордер его не валидирует.
+
+## Rector и проверки при узком `@param` (2.3)
+
+Rector (dead-code) удаляет проверку `$x === ''`, если `@param` конструктора уже `non-empty-string`. В `HttpMeasurement`
+проверка `route` вынесена в приватный `assertRoute(?string)` — там тип широкий, Rector её не трогает (проверено
+`rector -n`). `method`/`status` по той же причине документированы обычными типами.

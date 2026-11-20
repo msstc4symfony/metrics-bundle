@@ -127,9 +127,6 @@ MongoDB, Elastica, Messenger, APCu. Метрики кешей и глубины 
 недоступном хранилище отвечает 503. После сетевой ошибки действует circuit breaker:
 `msstc4symfony_metrics.storage.reconnect_backoff_seconds` (5 с) без попыток переподключения. Подробности — `known-issues.md`, разделы о переподключении Redis, регрессии с 500 и circuit breaker.
 
-## Не-final классы
-
-
 ## Наблюдатели измерений (2.3)
 
 - Порты `HttpMeasurementObserverInterface` (TAG `msstc4symfony_metrics.http_measurement_observer`, `onHttpMeasured`) и
@@ -138,8 +135,16 @@ MongoDB, Elastica, Messenger, APCu. Метрики кешей и глубины 
   Порт Messenger не зависит от `symfony/messenger`: `MessengerMeasurement` несёт transport, messageClass,
   `MessengerMessageStatus`, `?durationSeconds`, `?exception`.
 - Fail-open порядок: сначала listener пишет базовые метрики, потом зовёт наблюдателей с тем же значением длительности.
-  Каждый наблюдатель обёрнут отдельно: исключение логируется в канал `metrics_bundle` и не мешает ни ответу/воркеру,
-  ни остальным наблюдателям. HTTP — один вызов на записанный главный запрос в `kernel.terminate`; Messenger — один на
-  исход воркера (handled/retried/failed).
-- `RequestEventListener` хранит состояние запроса в `WeakMap` (старт, «уже посчитан», исключение) и реализует
-  `ResetInterface`; см. known-issues «Сброс состояния подзапросами».
+  Запись базовых метрик тоже в try/catch (лог `Cannot record HTTP request metrics` / `Cannot record Messenger metrics`
+  в `metrics_bundle`): бросающий рекордер не пропускает наблюдателей и очистку состояния. Каждый наблюдатель обёрнут
+  отдельно: исключение логируется в канал `metrics_bundle` и не мешает ни ответу/воркеру, ни остальным наблюдателям.
+  HTTP — один вызов на записанный главный запрос в `kernel.terminate`; Messenger — один на исход воркера
+  (handled/retried/failed).
+- Игнорируемые маршруты (`http.ignored_routes`) и `OPTIONS` не пишутся в метрики и не доходят до наблюдателей.
+- `HttpMeasurement::$method` = значение метки `method` (GET/POST/PUT/PATCH/DELETE/HEAD, иначе `OTHER`); `$route` —
+  `non-empty-string|null`, null там, где метрика пишет `unknown`. Новые поля обоих measurement — только опциональные
+  параметры в конце конструктора.
+- Длительности в обоих listener'ах — `hrtime(true)` (монотонные, без clamp).
+- `RequestEventListener` хранит состояние запроса в `WeakMap` (старт, «уже посчитан», исключение) плюс `?Request
+  $pendingMain` (первый главный запрос после terminate/reset — fallback для `framework.http_cache`) и реализует
+  `ResetInterface`; см. known-issues «Сброс состояния подзапросами» и «framework.http_cache».

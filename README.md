@@ -506,22 +506,32 @@ autoconfigured: implementing services are tagged (`msstc4symfony_metrics.http_me
 `msstc4symfony_metrics.messenger_measurement_observer`) with no configuration.
 
 ```php
+use Msstc4Symfony\MetricsBundle\Application\Port\HttpMeasurement;
+use Msstc4Symfony\MetricsBundle\Application\Port\HttpMeasurementObserverInterface;
+
 final class SlowRouteObserver implements HttpMeasurementObserverInterface
 {
     public function onHttpMeasured(HttpMeasurement $measurement): void
     {
-        // $measurement->method, ->route (null when unrouted), ->status, ->durationSeconds, ->exception
+        // $measurement->method, ->route, ->status, ->durationSeconds, ->exception
     }
 }
 ```
 
 - `HttpMeasurement` is delivered once per recorded main request at `kernel.terminate`, with the same duration that was
-  written to the duration metrics; `exception` is the uncaught exception of the request, if any.
+  written to the duration metrics. `method` is the value of the `method` label (`GET`, `POST`, `PUT`, `PATCH`,
+  `DELETE`, `HEAD` or `OTHER`). `route` is null where the metrics write `route="unknown"` (the request was not routed).
+  `exception` is the throwable that reached `kernel.exception` for the main request; a later listener may have turned
+  it into a 3xx/401/403 response, so classify by `status`.
+- Requests to the ignored routes (`http.ignored_routes`) and `OPTIONS` requests are neither recorded nor observed.
 - `MessengerMeasurement` (`transport`, `messageClass`, `status`, `durationSeconds`, `exception`) is delivered once per
-  worker outcome: handled, retried or failed. `durationSeconds` is null when no start was seen. The port has no
-  dependency on `symfony/messenger`.
-- Observers run after the bundle wrote its own metrics. A failing observer is logged on the `metrics_bundle` channel
-  and never affects the response, the worker or the other observers.
+  worker outcome: handled, retried or failed. `durationSeconds` is null when no start was seen. `transport` is the
+  receiver name, so a message replayed with `messenger:failed:retry` reports the failure transport. `exception` is the
+  raw throwable of `WorkerMessageFailedEvent` — usually a `HandlerFailedException` wrapping the handler's exceptions.
+  The port has no dependency on `symfony/messenger`.
+- Observers run after the bundle wrote its own metrics, and also when writing them failed. A failing observer is
+  logged on the `metrics_bundle` channel and never affects the response, the worker or the other observers.
+- Both measurements only grow: new fields are added as optional trailing constructor parameters.
 
 ## Public API
 
