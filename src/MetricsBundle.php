@@ -24,7 +24,6 @@ use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\KeepCachePoolsR
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\RegisterMessengerQueueDepthPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\SaveElasticaClientsListPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\RuntimeIntegrations;
-use Msstc4Symfony\MetricsBundle\Presentation\Controller\GetMetricsController;
 use Override;
 use ReflectionEnum;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
@@ -42,8 +41,9 @@ final class MetricsBundle extends AbstractBundle
 
     private const UNKNOWN = 'unknown';
 
+    // Literal: deptrac forbids BundleRoot -> Presentation; MetricsBundleConfigTest pins it to GetMetricsController::ROUTE_NAME.
     private const DEFAULT_IGNORED_ROUTES = [
-        GetMetricsController::ROUTE_NAME,
+        'metrics-get',
         'healthcheck-ping',
         'healthcheck-readiness',
         'healthcheck-liveliness',

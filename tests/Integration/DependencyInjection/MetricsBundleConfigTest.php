@@ -9,6 +9,7 @@ use Msstc4Symfony\MetricsBundle\Application\Collector\ErrorCollector;
 use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
 use Msstc4Symfony\MetricsBundle\Application\Metric\MetricRepository;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Cache\CountingCacheAdapter;
+use Msstc4Symfony\MetricsBundle\Presentation\Controller\GetMetricsController;
 use Msstc4Symfony\MetricsBundle\Presentation\EventListener\MessengerEventListener;
 use Msstc4Symfony\MetricsBundle\Test\Integration\DependencyInjection\Fixture\ExtraMetricEnum;
 use Msstc4Symfony\MetricsBundle\Test\Integration\DependencyInjection\Fixture\IntBackedMetricEnum;
@@ -71,6 +72,10 @@ final class MetricsBundleConfigTest extends TestCase
         self::assertFalse($container->getParameter('msstc4symfony_metrics.messenger.queue_depth.enabled'));
         self::assertSame([], $container->getParameter('msstc4symfony_metrics.messenger.queue_depth.transports'));
         self::assertSame('PT1M', $container->getParameter('msstc4symfony_metrics.messenger.queue_depth.period'));
+        self::assertSame(
+            [GetMetricsController::ROUTE_NAME, 'healthcheck-ping', 'healthcheck-readiness', 'healthcheck-liveliness'],
+            $container->getParameter('msstc4symfony_metrics.http.ignored_routes'),
+        );
     }
 
     public function testEnvironmentVariablesFeedTheDefaults(): void
