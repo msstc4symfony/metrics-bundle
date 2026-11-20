@@ -53,7 +53,8 @@ final readonly class HttpMeasurement
     private function assertMethod(string $method): void
     {
         if (!\in_array($method, BuiltInMetric::HTTP_METHODS, true)) {
-            throw new InvalidArgumentException(\sprintf('HTTP method must be one of %s, "%s" given.', implode(', ', BuiltInMetric::HTTP_METHODS), $method));
+            $list = implode(', ', BuiltInMetric::HTTP_METHODS);
+            throw new InvalidArgumentException(\sprintf('HTTP method must be one of %s, "%s" given.', $list, $method));
         }
     }
 
