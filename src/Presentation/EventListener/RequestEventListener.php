@@ -123,8 +123,9 @@ final class RequestEventListener implements ResetInterface
             return;
         }
 
-        // The client's request: HttpCache forwards a HEAD miss to the kernel as GET.
-        $method = $this->method($terminated);
+        // HttpCache forwards a HEAD miss as GET; depending on the http-kernel version terminate gets the client's request
+        // or the forwarded one.
+        $method = $this->method($this->httpCacheContext->clientRequest($terminated));
         $status = $event->getResponse()->getStatusCode();
 
         try {

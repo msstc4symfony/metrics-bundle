@@ -596,6 +596,29 @@ final class RequestEventListenerTest extends TestCase
         );
     }
 
+    public function testHttpCacheTerminatingTheForwardedHeadKeepsTheClientMethod(): void
+    {
+        $observer = new RecordingHttpMeasurementObserver();
+        $original = Request::create('/orders/42', Request::METHOD_HEAD);
+        $listener = $this->listenerBehindHttpCache($original, [$observer]);
+
+        // http-kernel 7.4.13+/8.0.11+: Kernel::terminate() goes through HttpCache::terminate(), which passes the
+        // forwarded request (a HEAD miss as GET) instead of the client's.
+        $forwarded = clone $original;
+        $forwarded->setMethod(Request::METHOD_GET);
+        $forwarded->attributes->set('_route', 'order_show');
+
+        $listener->onRequestFirst($this->requestEvent($forwarded));
+        $listener->onRequest($this->requestEvent($forwarded));
+        $listener->onTerminate(new TerminateEvent($this->kernel, $forwarded, new Response('')));
+
+        self::assertSame(
+            [[['app', 'cmp', 'HEAD', 'order_show', '200'], '1']],
+            RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_RESPONSE),
+        );
+        self::assertSame('HEAD', $observer->measurements[0]->method ?? null);
+    }
+
     public function testHttpCacheThatHandledNoRequestIsIgnored(): void
     {
         $listener = $this->listenerBehindHttpCache(null);
