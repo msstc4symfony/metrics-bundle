@@ -14,6 +14,7 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Guzzle\MetricsGuzzleMiddleware;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Prometheus\PrometheusMetricRecorder;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Prometheus\PrometheusMetricStorage;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Prometheus\Storage\FactoryInterface;
+use Msstc4Symfony\MetricsBundle\Presentation\EventListener\HttpCacheContext;
 use Msstc4Symfony\MetricsBundle\Presentation\EventListener\MessengerEventListener;
 use Msstc4Symfony\MetricsBundle\Presentation\EventListener\RequestEventListener;
 use Prometheus\CollectorRegistry;
@@ -47,6 +48,7 @@ return static function (ContainerConfigurator $container): void {
             '../../Infrastructure/Messenger/',
             // Plain helpers, never services.
             '../../Presentation/EventListener/QueueDepthSamplingState.php',
+            // Registered below: InjectHttpCachePass sets its argument.
             '../../Presentation/EventListener/HttpCacheContext.php',
             '../../Infrastructure/OutgoingHttp/PathSanitizer.php',
             // DecorateCachePoolsPass registers these only for listed pools.
@@ -76,6 +78,8 @@ return static function (ContainerConfigurator $container): void {
     if (interface_exists(CommandSubscriber::class)) {
         $services->set(TimingSubscriber::class);
     }
+
+    $services->set(HttpCacheContext::class);
 
     $services->set(RequestEventListener::class)
         ->arg('$ignoredRoutes', param('msstc4symfony_metrics.http.ignored_routes'))

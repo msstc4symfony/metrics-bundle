@@ -57,7 +57,6 @@ final class ServiceScanTest extends TestCase
         yield 'MessengerQueueDepthListener' => [MessengerQueueDepthListener::class];
         yield 'MessengerQueueDepthReader' => [MessengerQueueDepthReader::class];
         yield 'QueueDepthSamplingState' => [QueueDepthSamplingState::class];
-        yield 'HttpCacheContext' => [HttpCacheContext::class];
         yield 'CountingCacheAdapter' => [CountingCacheAdapter::class];
         yield 'CacheCollector' => [CacheCollector::class];
         yield 'CacheMetricsFlushListener' => [CacheMetricsFlushListener::class];
@@ -80,6 +79,11 @@ final class ServiceScanTest extends TestCase
     public function testHttpClientClassesAreNotScanned(string $class): void
     {
         self::assertFalse($this->isRegistered($this->loadedContainer(), $class));
+    }
+
+    public function testHttpCacheContextIsRegisteredForTheCompilerPass(): void
+    {
+        self::assertTrue($this->isRegistered($this->loadedContainer(), HttpCacheContext::class));
     }
 
     public function testMongoDbSubscriberIsRegisteredOnlyWithTheDriver(): void

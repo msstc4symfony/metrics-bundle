@@ -13,6 +13,7 @@ use Msstc4Symfony\MetricsBundle\MetricsBundle;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Guzzle\GuzzleClientFactory;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Http\EsiTestController;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Http\HttpTestController;
+use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Http\PassThroughKernel;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Messenger\TestMessage;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Messenger\TestMessageHandler;
 use Msstc4Symfony\MetricsBundle\Test\Support\RecordingHttpMeasurementObserver;
@@ -69,6 +70,9 @@ final class TestKernel extends Kernel
 
     // framework.http_cache is enabled: HttpCache forwards a clone of the main request to the kernel.
     public const ENV_HTTP_CACHE = 'http_cache';
+
+    // framework.http_cache is enabled and a kernel wrapper that is not an HttpCache decorates it.
+    public const ENV_HTTP_CACHE_DECORATED = 'http_cache_decorated';
 
     // framework.http_cache and framework.esi: HttpCache forwards ESI fragments to the kernel as main requests.
     public const ENV_HTTP_CACHE_ESI = 'http_cache_esi';
@@ -144,6 +148,11 @@ final class TestKernel extends Kernel
 
         if ($this->environment === self::ENV_HTTP_CACHE) {
             $framework['http_cache'] = true;
+        }
+
+        if ($this->environment === self::ENV_HTTP_CACHE_DECORATED) {
+            $framework['http_cache'] = true;
+            $container->services()->set(PassThroughKernel::class)->decorate('http_cache')->autowire();
         }
 
         if ($this->environment === self::ENV_HTTP_CACHE_ESI) {

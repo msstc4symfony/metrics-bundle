@@ -77,6 +77,23 @@ final class HttpErrorPathKernelTest extends KernelTestCase
         );
     }
 
+    public function testHttpCacheDecoratedByAnotherKernelStillMeasuresRequests(): void
+    {
+        $kernel = self::bootKernel(['environment' => TestKernel::ENV_HTTP_CACHE_DECORATED]);
+
+        $response = $this->serve($kernel, '/_test/ok');
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame(
+            [[['unknown', 'unknown', 'GET', 'test_ok'], '1']],
+            RegistrySamples::samples($this->registry(), BuiltInMetric::HTTP_REQUEST),
+        );
+        self::assertSame(
+            [[['unknown', 'unknown', 'GET', 'test_ok', '200'], '1']],
+            RegistrySamples::samples($this->registry(), BuiltInMetric::HTTP_RESPONSE),
+        );
+    }
+
     public function testHttpCacheEsiFragmentIsNotRecordedAsARequest(): void
     {
         $kernel = self::bootKernel(['environment' => TestKernel::ENV_HTTP_CACHE_ESI]);

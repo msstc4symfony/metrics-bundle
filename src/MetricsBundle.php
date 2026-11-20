@@ -241,8 +241,8 @@ final class MetricsBundle extends AbstractBundle
 
         $container->addCompilerPass(new AliasThrottleCachePass());
         $container->addCompilerPass(new AddMonologDecoratorCompilerPass());
-        // Default type and priority: after the extensions loaded, so FrameworkExtension has set http_cache's visibility.
-        $container->addCompilerPass(new InjectHttpCachePass());
+        // After the extensions loaded (http_cache's visibility) and the decorators applied (what stands under that id).
+        $container->addCompilerPass(new InjectHttpCachePass(), PassConfig::TYPE_BEFORE_REMOVING);
         $container->addCompilerPass(new AddHttpClientMonitorPass(), priority: -256);
         $container->addCompilerPass(new AddGuzzleMonitorPass(), PassConfig::TYPE_BEFORE_REMOVING);
         $container->addCompilerPass(new DecorateCachePoolsPass(), priority: DecorateCachePoolsPass::PRIORITY);

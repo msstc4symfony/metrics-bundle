@@ -10,6 +10,7 @@ use Msstc4Symfony\MetricsBundle\Application\Metric\MetricRepository;
 use Msstc4Symfony\MetricsBundle\Application\Port\HttpMeasurement;
 use Msstc4Symfony\MetricsBundle\Application\Port\HttpMeasurementObserverInterface;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Prometheus\PrometheusMetricRecorder;
+use Msstc4Symfony\MetricsBundle\Presentation\EventListener\HttpCacheContext;
 use Msstc4Symfony\MetricsBundle\Presentation\EventListener\RequestEventListener;
 use Msstc4Symfony\MetricsBundle\Test\Support\CollectingLogger;
 use Msstc4Symfony\MetricsBundle\Test\Support\RecordingHttpMeasurementObserver;
@@ -189,7 +190,7 @@ final class RequestEventListenerTest extends TestCase
 
     public function testIgnoredRoutesComeFromConstructor(): void
     {
-        $listener = new RequestEventListener($this->collector, [], $this->logger, ['custom-ignored'], null);
+        $listener = new RequestEventListener($this->collector, [], $this->logger, ['custom-ignored'], new HttpCacheContext(null));
 
         $request = Request::create('/custom', Request::METHOD_GET);
         $request->attributes->set('_route', 'custom-ignored');
@@ -602,8 +603,8 @@ final class RequestEventListenerTest extends TestCase
         $original = Request::create('/orders/42', Request::METHOD_HEAD);
         $listener = $this->listenerBehindHttpCache($original, [$observer]);
 
-        // http-kernel 7.4.13+/8.0.11+: Kernel::terminate() goes through HttpCache::terminate(), which passes the
-        // forwarded request (a HEAD miss as GET) instead of the client's.
+        // Observed on http-kernel 8.1.11 (not on 8.1.8): Kernel::terminate() passes the forwarded request (a HEAD
+        // miss as GET) instead of the client's.
         $forwarded = clone $original;
         $forwarded->setMethod(Request::METHOD_GET);
         $forwarded->attributes->set('_route', 'order_show');
@@ -619,7 +620,7 @@ final class RequestEventListenerTest extends TestCase
         self::assertSame('HEAD', $observer->measurements[0]->method ?? null);
     }
 
-    public function testHttpCacheThatHandledNoRequestIsIgnored(): void
+    public function testHttpCacheThatHandledNoRequestDoesNotHideTheRequest(): void
     {
         $listener = $this->listenerBehindHttpCache(null);
 
@@ -657,7 +658,7 @@ final class RequestEventListenerTest extends TestCase
     public function testThrowingRecorderStillNotifiesObserversAndForgetsTheRequest(): void
     {
         $observer = new RecordingHttpMeasurementObserver();
-        $listener = new RequestEventListener(new RequestCollector(new ThrowingMetricRecorder()), [$observer], $this->logger, [], null);
+        $listener = new RequestEventListener(new RequestCollector(new ThrowingMetricRecorder()), [$observer], $this->logger, [], new HttpCacheContext(null));
 
         $request = Request::create('/orders/42', Request::METHOD_GET);
         $request->attributes->set('_route', 'order_show');
@@ -687,7 +688,7 @@ final class RequestEventListenerTest extends TestCase
             'healthcheck-ping',
             'healthcheck-readiness',
             'healthcheck-liveliness',
-        ], null);
+        ], new HttpCacheContext(null));
     }
 
     /**
@@ -703,7 +704,7 @@ final class RequestEventListenerTest extends TestCase
             $httpCache->handle($clientRequest);
         }
 
-        return new RequestEventListener($this->collector, $observers, $this->logger, [], $httpCache);
+        return new RequestEventListener($this->collector, $observers, $this->logger, [], new HttpCacheContext($httpCache));
     }
 
     private function retainedStates(RequestEventListener $listener): int

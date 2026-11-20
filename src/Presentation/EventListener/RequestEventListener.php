@@ -18,7 +18,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\Event\TerminateEvent;
-use Symfony\Component\HttpKernel\HttpCache\HttpCache;
 use Symfony\Contracts\Service\ResetInterface;
 use Throwable;
 use WeakMap;
@@ -44,11 +43,10 @@ final class RequestEventListener implements ResetInterface
 
     /**
      * The main request being measured until its terminate or a reset. With framework.http_cache the kernel handles a
-     * clone of the client request, but Kernel::terminate() passes the original one, so the identity lookup misses.
+     * clone of the client request, while terminate may receive the client original (observed on http-kernel 8.1.8) or
+     * the forwarded clone (observed on 8.1.11): the original misses the identity lookup.
      */
     private ?Request $pendingMain = null;
-
-    private readonly HttpCacheContext $httpCacheContext;
 
     /**
      * @param iterable<int, HttpMeasurementObserverInterface> $observers
@@ -60,16 +58,19 @@ final class RequestEventListener implements ResetInterface
         private readonly iterable $observers,
         private readonly LoggerInterface $logger,
         private readonly array $ignoredRoutes,
-        ?HttpCache $httpCache,
+        private readonly HttpCacheContext $httpCacheContext,
     ) {
         $this->states = new WeakMap();
-        $this->httpCacheContext = new HttpCacheContext($httpCache);
     }
 
     public function onRequestFirst(RequestEvent $event): void
     {
         $request = $event->getRequest();
-        if (!$event->isMainRequest() || $request->isMethod('OPTIONS') || $this->httpCacheContext->isForwardedFragment($request)) {
+        if (
+            !$event->isMainRequest()
+            || $request->isMethod('OPTIONS')
+            || $this->httpCacheContext->isForwardedFragment($request)
+        ) {
             return;
         }
 
@@ -92,7 +93,8 @@ final class RequestEventListener implements ResetInterface
         }
 
         try {
-            $this->collector->incRequestTotal($this->method($this->httpCacheContext->clientRequest($request)), $requestRoute);
+            $method = $this->method($this->httpCacheContext->clientRequest($request));
+            $this->collector->incRequestTotal($method, $requestRoute);
             $this->states[$request]->markCounted();
         } catch (Throwable $e) {
             $this->logger->error('Cannot record HTTP request metrics', ['exception' => $e]);
@@ -123,8 +125,7 @@ final class RequestEventListener implements ResetInterface
             return;
         }
 
-        // HttpCache forwards a HEAD miss as GET; depending on the http-kernel version terminate gets the client's request
-        // or the forwarded one.
+        // HttpCache forwards a HEAD miss as GET, and terminate gets either the client's request or the forwarded one.
         $method = $this->method($this->httpCacheContext->clientRequest($terminated));
         $status = $event->getResponse()->getStatusCode();
 
@@ -158,15 +159,13 @@ final class RequestEventListener implements ResetInterface
     {
         $pending = $this->pendingMain;
         $this->pendingMain = null;
-        if (!$pending instanceof Request || $pending->getRequestUri() !== $terminated->getRequestUri()) {
-            return isset($this->states[$terminated]) ? $terminated : null;
-        }
-
         if (isset($this->states[$terminated])) {
             return $terminated;
         }
 
-        return isset($this->states[$pending]) ? $pending : null;
+        $isSameRequest = $pending instanceof Request && $pending->getRequestUri() === $terminated->getRequestUri();
+
+        return $isSameRequest && isset($this->states[$pending]) ? $pending : null;
     }
 
     /**
@@ -176,7 +175,10 @@ final class RequestEventListener implements ResetInterface
     private function notify(string $method, ?string $route, int $status, float $duration, ?Throwable $exception): void
     {
         if (!HttpMeasurement::isRecordableStatus($status)) {
-            $this->logger->error('Cannot build HTTP measurement: status {status} is outside 100..599', ['status' => $status]);
+            $this->logger->error(
+                'Cannot build HTTP measurement: status {status} is outside 100..599',
+                ['status' => $status],
+            );
 
             return;
         }
@@ -193,7 +195,10 @@ final class RequestEventListener implements ResetInterface
             try {
                 $observer->onHttpMeasured($measurement);
             } catch (Throwable $e) {
-                $this->logger->error('Cannot notify HTTP measurement observer "{class}"', ['class' => $observer::class, 'exception' => $e]);
+                $this->logger->error(
+                    'Cannot notify HTTP measurement observer "{class}"',
+                    ['class' => $observer::class, 'exception' => $e],
+                );
             }
         }
     }

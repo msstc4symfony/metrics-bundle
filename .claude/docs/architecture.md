@@ -50,8 +50,9 @@ Infrastructure. `AbstractCollector` удалён в 2.0: свой коллект
    `Storage\Factory`, `MetricRepositoryFactory`).
 3. Компилер-пассы (`MetricsBundle::build()`):
    - `AddMonologDecoratorCompilerPass` — декорирует `monolog.logger.*`;
-   - `InjectHttpCachePass` (BEFORE_OPTIMIZATION, priority 0 — после `MergeExtensionConfigurationPass`) — аргумент
-     `$httpCache` `RequestEventListener` = `http_cache`, если его определение публичное (`framework.http_cache`), иначе `null`;
+   - `InjectHttpCachePass` (`TYPE_BEFORE_REMOVING` — после расширений и декораторов) — аргумент `$httpCache`
+     `HttpCacheContext` = `http_cache`, если определение публичное (`framework.http_cache`) и его класс — `HttpCache`
+     или наследник, иначе `null`;
    - `AddDoctrineDBALMonitorPass` (priority 1, раньше `MiddlewaresPass` DoctrineBundle) — при
      параметре `doctrine.connections` регистрирует на каждое соединение
      `msstc4symfony_metrics.doctrine.middleware.<name>` = `NamedConnectionMiddleware` с
@@ -150,6 +151,6 @@ MongoDB, Elastica, Messenger, APCu. Метрики кешей и глубины 
 - Длительности в обоих listener'ах — `hrtime(true)` (монотонные, без clamp).
 - `RequestEventListener` хранит состояние запроса в одном `WeakMap<Request, RequestMeasurementState>` (`@internal`:
   старт, «уже посчитан», исключение) плюс `?Request $pendingMain` (измеряемый главный запрос до terminate/reset —
-  fallback для `framework.http_cache`), получает `?HttpCache` (`InjectHttpCachePass`; осведомлённость о HttpCache — в
-  `@internal` `HttpCacheContext`) и реализует `ResetInterface` (тег `kernel.reset`); ESI-фрагменты под HttpCache не измеряются. См. known-issues «Сброс состояния
+  fallback для `framework.http_cache`), получает `@internal` сервис `HttpCacheContext` (`?HttpCache` ставит
+  `InjectHttpCachePass`; вся осведомлённость о HttpCache — в нём) и реализует `ResetInterface` (тег `kernel.reset`); ESI-фрагменты под HttpCache не измеряются. См. known-issues «Сброс состояния
   подзапросами», «framework.http_cache» и «ESI-фрагменты под framework.http_cache».
