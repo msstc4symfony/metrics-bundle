@@ -150,18 +150,14 @@ final class RequestEventListener implements ResetInterface
     }
 
     /**
-     * HttpCache forwards every ESI fragment miss to the kernel as a main request: after the page was forwarded (it is
-     * still pending), or alone when the page itself is a cache hit (its path differs from the client request).
+     * HttpCache forwards every ESI fragment miss to the kernel as a main request, whether the page is a miss forwarded
+     * just before or a cache hit. Its clones of the client request keep REQUEST_URI; a fragment request has its own.
      */
     private function isForwardedFragment(Request $request): bool
     {
-        if ($this->pendingMain instanceof Request && $this->pendingMain !== $request) {
-            return true;
-        }
-
         $client = $this->httpCacheClientRequest();
 
-        return $client instanceof Request && $client->getPathInfo() !== $request->getPathInfo();
+        return $client instanceof Request && $client->getRequestUri() !== $request->getRequestUri();
     }
 
     /**
@@ -194,11 +190,11 @@ final class RequestEventListener implements ResetInterface
     private function resolveTerminatedRequest(Request $terminated): ?Request
     {
         $pending = $this->pendingMain;
-        if (!$pending instanceof Request || $pending->getPathInfo() !== $terminated->getPathInfo()) {
+        $this->pendingMain = null;
+        if (!$pending instanceof Request || $pending->getRequestUri() !== $terminated->getRequestUri()) {
             return isset($this->states[$terminated]) ? $terminated : null;
         }
 
-        $this->pendingMain = null;
         if (isset($this->states[$terminated])) {
             return $terminated;
         }

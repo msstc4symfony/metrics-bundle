@@ -442,7 +442,7 @@ final class RequestEventListenerTest extends TestCase
         self::assertCount(1, $observer->measurements);
     }
 
-    public function testTerminateOfAnotherPathDoesNotConsumeThePendingMainRequest(): void
+    public function testTerminateOfAnotherUriDoesNotRecordThePendingMainRequest(): void
     {
         $observer = new RecordingHttpMeasurementObserver();
         $listener = $this->listener([$observer]);
@@ -455,6 +455,19 @@ final class RequestEventListenerTest extends TestCase
 
         $listener->onTerminate(new TerminateEvent($this->kernel, $request, new Response('')));
         self::assertCount(1, $observer->measurements);
+    }
+
+    public function testTerminateOfAnotherUriDropsThePendingMainRequestFallback(): void
+    {
+        $observer = new RecordingHttpMeasurementObserver();
+        $listener = $this->listener([$observer]);
+
+        $original = Request::create('/orders/42', Request::METHOD_GET);
+        $listener->onRequestFirst($this->requestEvent(clone $original));
+        $listener->onTerminate(new TerminateEvent($this->kernel, Request::create('/other'), new Response('')));
+        $listener->onTerminate(new TerminateEvent($this->kernel, $original, new Response('')));
+
+        self::assertSame([], $observer->measurements);
     }
 
     public function testResetDropsThePendingMainRequestFallback(): void
@@ -470,40 +483,28 @@ final class RequestEventListenerTest extends TestCase
         self::assertSame([], $observer->measurements);
     }
 
-    public function testMainRequestArrivingWhileThePageIsPendingIsNotMeasured(): void
+    public function testMainRequestAfterAnUnterminatedOneIsMeasured(): void
     {
         $observer = new RecordingHttpMeasurementObserver();
         $listener = $this->listener([$observer]);
 
-        // framework.http_cache + ESI: a fragment cache miss is forwarded as a main request before the page terminates.
-        $original = Request::create('/page', Request::METHOD_GET);
-        $page = clone $original;
-        $page->attributes->set('_route', 'page');
+        // A runtime that neither terminates nor resets between requests must not lose every later request.
+        $abandoned = Request::create('/abandoned', Request::METHOD_GET);
+        $listener->onRequestFirst($this->requestEvent($abandoned));
+        $listener->onRequest($this->requestEvent($abandoned));
 
-        $fragment = Request::create('/fragment', Request::METHOD_GET);
-        $fragment->attributes->set('_route', 'fragment');
-
-        $listener->onRequestFirst($this->requestEvent($page));
-        $listener->onRequest($this->requestEvent($page));
-        $listener->onRequestFirst($this->requestEvent($fragment));
-        $listener->onRequest($this->requestEvent($fragment));
-        $listener->onException(new ExceptionEvent($this->kernel, $fragment, HttpKernelInterface::MAIN_REQUEST, new RuntimeException('fragment')));
-        self::assertSame(1, $this->retainedStates($listener));
-
-        $listener->onTerminate(new TerminateEvent($this->kernel, $original, new Response('ok')));
+        $request = Request::create('/orders/42', Request::METHOD_POST);
+        $request->attributes->set('_route', 'order_update');
+        $listener->onRequestFirst($this->requestEvent($request));
+        $listener->onRequest($this->requestEvent($request));
+        $listener->onTerminate(new TerminateEvent($this->kernel, $request, new Response('')));
 
         self::assertSame(
-            [[['app', 'cmp', 'GET', 'page'], '1']],
-            RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_REQUEST),
-        );
-        self::assertSame(
-            [[['app', 'cmp', 'GET', 'page', '200'], '1']],
+            [[['app', 'cmp', 'POST', 'order_update', '200'], '1']],
             RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_RESPONSE),
         );
         self::assertCount(1, $observer->measurements);
-        self::assertSame('page', $observer->measurements[0]->route);
-        self::assertNull($observer->measurements[0]->exception);
-        self::assertSame(0, $this->retainedStates($listener));
+        self::assertSame('order_update', $observer->measurements[0]->route);
     }
 
     public function testHeadForwardedAsGetIsLabelledWithTheTerminatedRequestMethod(): void
@@ -547,6 +548,34 @@ final class RequestEventListenerTest extends TestCase
         self::assertSame(0, $this->retainedStates($listener));
         self::assertFalse(RegistrySamples::exists($this->registry, BuiltInMetric::HTTP_REQUEST));
         self::assertSame([], $observer->measurements);
+    }
+
+    /**
+     * @return iterable<string, array{non-empty-string, non-empty-string}>
+     */
+    public static function fragmentsSharingThePagePath(): iterable
+    {
+        yield 'same path, own query' => ['/products', '/products?partial=1'];
+        yield 'controller reference' => ['/page', '/_fragment?_hash=abc&_path=_controller%3DApp%255CFragment'];
+    }
+
+    /**
+     * @param non-empty-string $page
+     * @param non-empty-string $fragmentUri
+     */
+    #[DataProvider('fragmentsSharingThePagePath')]
+    public function testHttpCacheFragmentWithThePagePathIsNotMeasured(string $page, string $fragmentUri): void
+    {
+        $listener = $this->listenerBehindHttpCache(Request::create($page));
+
+        $fragment = Request::create($fragmentUri);
+        $fragment->attributes->set('_route', 'fragment');
+
+        $listener->onRequestFirst($this->requestEvent($fragment));
+        $listener->onRequest($this->requestEvent($fragment));
+
+        self::assertSame(0, $this->retainedStates($listener));
+        self::assertFalse(RegistrySamples::exists($this->registry, BuiltInMetric::HTTP_REQUEST));
     }
 
     public function testHttpCacheForwardedHeadIsCountedWithTheClientMethod(): void
