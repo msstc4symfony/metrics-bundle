@@ -11,6 +11,7 @@ use InvalidArgumentException;
 use LogicException;
 use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
 use Msstc4Symfony\MetricsBundle\Application\Metric\MetricDefinitionInterface;
+use Msstc4Symfony\MetricsBundle\Application\Port\HttpMeasurementObserverInterface;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\AddDoctrineDBALMonitorPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\AddGuzzleMonitorPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\AddHttpClientMonitorPass;
@@ -219,6 +220,10 @@ final class MetricsBundle extends AbstractBundle
             ->set(RegisterMessengerQueueDepthPass::ENABLED_PARAMETER, $queueDepth['enabled'] ?? null)
             ->set(RegisterMessengerQueueDepthPass::TRANSPORTS_PARAMETER, $this->uniqueStrings($this->section($queueDepth, 'transports')))
             ->set(RegisterMessengerQueueDepthPass::PERIOD_PARAMETER, $queueDepth['period'] ?? null)
+        ;
+
+        $builder->registerForAutoconfiguration(HttpMeasurementObserverInterface::class)
+            ->addTag(HttpMeasurementObserverInterface::TAG)
         ;
 
         $container->import(__DIR__ . '/Resources/config/services.php');

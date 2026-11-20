@@ -14,6 +14,7 @@ use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Guzzle\GuzzleClientFacto
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Http\ThrowingController;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Messenger\TestMessage;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Messenger\TestMessageHandler;
+use Msstc4Symfony\MetricsBundle\Test\Support\RecordingHttpMeasurementObserver;
 use Override;
 use Prometheus\Storage\Adapter;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
@@ -57,6 +58,9 @@ final class TestKernel extends Kernel
 
     // msstc4symfony_metrics.http.ignored_routes lists the throwing test route.
     public const ENV_HTTP_IGNORED_ROUTES = 'http_ignored_routes';
+
+    // A public autoconfigured HttpMeasurementObserverInterface service is registered.
+    public const ENV_HTTP_OBSERVER = 'http_observer';
 
     // The test connection is sqlite in memory.
     public static function hasDoctrine(): bool
@@ -128,6 +132,10 @@ final class TestKernel extends Kernel
 
         if (!$this->isRoutingControllersEnvironment()) {
             $container->services()->set(ThrowingController::class)->autowire()->autoconfigure();
+        }
+
+        if ($this->environment === self::ENV_HTTP_OBSERVER) {
+            $container->services()->set(RecordingHttpMeasurementObserver::class)->autoconfigure()->public();
         }
 
         if ($this->environment === self::ENV_HTTP_IGNORED_ROUTES) {

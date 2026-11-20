@@ -7,18 +7,26 @@ namespace Msstc4Symfony\MetricsBundle\Test\Integration\Presentation\EventListene
 use Msstc4Symfony\MetricsBundle\Application\Collector\RequestCollector;
 use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
 use Msstc4Symfony\MetricsBundle\Application\Metric\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Application\Port\HttpMeasurement;
+use Msstc4Symfony\MetricsBundle\Application\Port\HttpMeasurementObserverInterface;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Prometheus\PrometheusMetricRecorder;
 use Msstc4Symfony\MetricsBundle\Presentation\EventListener\RequestEventListener;
+use Msstc4Symfony\MetricsBundle\Test\Support\CollectingLogger;
+use Msstc4Symfony\MetricsBundle\Test\Support\RecordingHttpMeasurementObserver;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
 use Prometheus\Storage\InMemory;
+use ReflectionProperty;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\Event\TerminateEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
+use WeakMap;
 
 final class RequestEventListenerTest extends TestCase
 {
@@ -27,6 +35,8 @@ final class RequestEventListenerTest extends TestCase
     private RequestCollector $collector;
 
     private HttpKernelInterface $kernel;
+
+    private CollectingLogger $logger;
 
     #[Override]
     protected function setUp(): void
@@ -38,6 +48,7 @@ final class RequestEventListenerTest extends TestCase
         $this->registry = new CollectorRegistry(new InMemory());
         $this->collector = new RequestCollector(new PrometheusMetricRecorder($this->registry, new MetricRepository([]), 'app', 'cmp'));
         $this->kernel = self::createStub(HttpKernelInterface::class);
+        $this->logger = new CollectingLogger();
     }
 
     public function testMainRequestFlowRecordsAllMetrics(): void
@@ -173,7 +184,7 @@ final class RequestEventListenerTest extends TestCase
 
     public function testIgnoredRoutesComeFromConstructor(): void
     {
-        $listener = new RequestEventListener($this->collector, ['custom-ignored']);
+        $listener = new RequestEventListener($this->collector, [], $this->logger, ['custom-ignored']);
 
         $request = Request::create('/custom', Request::METHOD_GET);
         $request->attributes->set('_route', 'custom-ignored');
@@ -186,14 +197,154 @@ final class RequestEventListenerTest extends TestCase
         self::assertFalse(RegistrySamples::exists($this->registry, BuiltInMetric::HTTP_RESPONSE));
     }
 
-    private function listener(): RequestEventListener
+    public function testObserverReceivesMeasurementAfterMetricsAreWritten(): void
     {
-        return new RequestEventListener($this->collector, [
+        $observer = new class($this->registry) implements HttpMeasurementObserverInterface {
+            /** @var list<HttpMeasurement> */
+            public array $measurements = [];
+
+            public bool $responseSampleExisted = false;
+
+            public function __construct(private readonly CollectorRegistry $registry)
+            {
+            }
+
+            #[Override]
+            public function onHttpMeasured(HttpMeasurement $measurement): void
+            {
+                $this->measurements[] = $measurement;
+                $this->responseSampleExisted = RegistrySamples::exists($this->registry, BuiltInMetric::HTTP_RESPONSE);
+            }
+        };
+        $listener = $this->listener([$observer]);
+
+        $request = Request::create('/orders/42', Request::METHOD_GET);
+        $request->attributes->set('_route', 'order_show');
+
+        $listener->onRequestFirst($this->requestEvent($request));
+        $listener->onRequest($this->requestEvent($request));
+        usleep(1000);
+        $listener->onTerminate(new TerminateEvent($this->kernel, $request, new Response('ok', Response::HTTP_CREATED)));
+
+        self::assertCount(1, $observer->measurements);
+        self::assertTrue($observer->responseSampleExisted);
+        $measurement = $observer->measurements[0];
+        self::assertSame('GET', $measurement->method);
+        self::assertSame('order_show', $measurement->route);
+        self::assertSame(201, $measurement->status);
+        self::assertGreaterThan(0.0, $measurement->durationSeconds);
+        self::assertNull($measurement->exception);
+    }
+
+    public function testObserverReceivesUncaughtException(): void
+    {
+        $observer = new RecordingHttpMeasurementObserver();
+        $listener = $this->listener([$observer]);
+
+        $request = Request::create('/orders/42', Request::METHOD_GET);
+        $request->attributes->set('_route', 'order_show');
+
+        $exception = new RuntimeException('boom');
+
+        $listener->onRequestFirst($this->requestEvent($request));
+        $listener->onRequest($this->requestEvent($request));
+        $listener->onException(new ExceptionEvent($this->kernel, $request, HttpKernelInterface::MAIN_REQUEST, $exception));
+        $listener->onTerminate(new TerminateEvent($this->kernel, $request, new Response('', Response::HTTP_INTERNAL_SERVER_ERROR)));
+
+        self::assertCount(1, $observer->measurements);
+        self::assertSame($exception, $observer->measurements[0]->exception);
+        self::assertSame(500, $observer->measurements[0]->status);
+        self::assertSame(0, $this->retainedExceptions($listener));
+    }
+
+    public function testSubRequestExceptionIsNotReportedToObserver(): void
+    {
+        $observer = new RecordingHttpMeasurementObserver();
+        $listener = $this->listener([$observer]);
+
+        $request = Request::create('/orders/42', Request::METHOD_GET);
+        $subRequest = Request::create('/_error/500', Request::METHOD_GET);
+
+        $listener->onRequestFirst($this->requestEvent($request));
+        $listener->onException(new ExceptionEvent($this->kernel, $subRequest, HttpKernelInterface::SUB_REQUEST, new RuntimeException('sub')));
+        $listener->onTerminate(new TerminateEvent($this->kernel, $request, new Response('')));
+
+        self::assertCount(1, $observer->measurements);
+        self::assertNull($observer->measurements[0]->exception);
+        self::assertSame(0, $this->retainedExceptions($listener));
+    }
+
+    public function testExceptionOfUntrackedRequestIsNotRetained(): void
+    {
+        $listener = $this->listener();
+
+        $request = Request::create('/orders/42', Request::METHOD_OPTIONS);
+        $listener->onRequestFirst($this->requestEvent($request));
+        $listener->onException(new ExceptionEvent($this->kernel, $request, HttpKernelInterface::MAIN_REQUEST, new RuntimeException('boom')));
+
+        self::assertSame(0, $this->retainedExceptions($listener));
+    }
+
+    public function testThrowingObserverDoesNotStopOthersAndIsLogged(): void
+    {
+        $throwing = new class implements HttpMeasurementObserverInterface {
+            #[Override]
+            public function onHttpMeasured(HttpMeasurement $measurement): void
+            {
+                throw new RuntimeException('observer failed');
+            }
+        };
+        $recording = new RecordingHttpMeasurementObserver();
+        $listener = $this->listener([$throwing, $recording]);
+
+        $request = Request::create('/orders/42', Request::METHOD_GET);
+        $request->attributes->set('_route', 'order_show');
+
+        $listener->onRequestFirst($this->requestEvent($request));
+        $listener->onRequest($this->requestEvent($request));
+        $listener->onTerminate(new TerminateEvent($this->kernel, $request, new Response('ok')));
+
+        self::assertCount(1, $recording->measurements);
+        self::assertCount(1, $this->logger->records);
+        self::assertStringStartsWith('error: Cannot notify HTTP measurement observer', $this->logger->records[0]);
+        self::assertInstanceOf(RuntimeException::class, $this->logger->contexts[0]['exception'] ?? null);
+        self::assertSame($throwing::class, $this->logger->contexts[0]['class'] ?? null);
+    }
+
+    public function testIgnoredRouteIsNotObserved(): void
+    {
+        $observer = new RecordingHttpMeasurementObserver();
+        $listener = $this->listener([$observer]);
+
+        $request = Request::create('/_/metrics', Request::METHOD_GET);
+        $request->attributes->set('_route', 'metrics-get');
+
+        $listener->onRequestFirst($this->requestEvent($request));
+        $listener->onRequest($this->requestEvent($request));
+        $listener->onTerminate(new TerminateEvent($this->kernel, $request, new Response('')));
+
+        self::assertSame([], $observer->measurements);
+    }
+
+    /**
+     * @param list<HttpMeasurementObserverInterface> $observers
+     */
+    private function listener(array $observers = []): RequestEventListener
+    {
+        return new RequestEventListener($this->collector, $observers, $this->logger, [
             'metrics-get',
             'healthcheck-ping',
             'healthcheck-readiness',
             'healthcheck-liveliness',
         ]);
+    }
+
+    private function retainedExceptions(RequestEventListener $listener): int
+    {
+        $map = (new ReflectionProperty($listener, 'exceptions'))->getValue($listener);
+        self::assertInstanceOf(WeakMap::class, $map);
+
+        return \count($map);
     }
 
     private function requestEvent(Request $request, bool $isMain = true): RequestEvent

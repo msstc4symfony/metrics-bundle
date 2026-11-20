@@ -4,8 +4,14 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Presentation\EventListener;
 
+use Monolog\Attribute\WithMonologChannel;
 use Msstc4Symfony\MetricsBundle\Application\Collector\RequestCollector;
+use Msstc4Symfony\MetricsBundle\Application\LogChannel;
+use Msstc4Symfony\MetricsBundle\Application\Port\HttpMeasurement;
+use Msstc4Symfony\MetricsBundle\Application\Port\HttpMeasurementObserverInterface;
 use Override;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
@@ -18,6 +24,7 @@ use WeakMap;
 /**
  * @internal
  */
+#[WithMonologChannel(LogChannel::NAME)]
 #[AsEventListener(event: 'kernel.request', method: 'onRequestFirst', priority: 4096)]
 #[AsEventListener(event: 'kernel.request', method: 'onRequest')]
 #[AsEventListener(event: 'kernel.exception', method: 'onException', priority: 4096)]
@@ -42,10 +49,14 @@ final class RequestEventListener implements ResetInterface
     private WeakMap $exceptions;
 
     /**
-     * @param list<string> $ignoredRoutes
+     * @param iterable<HttpMeasurementObserverInterface> $observers
+     * @param list<non-empty-string> $ignoredRoutes
      */
     public function __construct(
         private readonly RequestCollector $collector,
+        #[AutowireIterator(HttpMeasurementObserverInterface::TAG)]
+        private readonly iterable $observers,
+        private readonly LoggerInterface $logger,
         private readonly array $ignoredRoutes,
     ) {
         $this->startedAt = new WeakMap();
@@ -83,11 +94,12 @@ final class RequestEventListener implements ResetInterface
 
     public function onException(ExceptionEvent $event): void
     {
-        if (!$event->isMainRequest()) {
+        $request = $event->getRequest();
+        if (!$event->isMainRequest() || !isset($this->startedAt[$request])) {
             return;
         }
 
-        $this->exceptions[$event->getRequest()] = $event->getThrowable();
+        $this->exceptions[$request] = $event->getThrowable();
     }
 
     public function onTerminate(TerminateEvent $event): void
@@ -110,17 +122,17 @@ final class RequestEventListener implements ResetInterface
             $this->collector->incRequestTotal($request->getMethod(), $requestRoute);
         }
 
-        $this->collector->incResponseTotal(
-            $request->getMethod(),
-            $requestRoute,
-            $event->getResponse()->getStatusCode(),
-        );
+        $status = $event->getResponse()->getStatusCode();
+        $this->collector->incResponseTotal($request->getMethod(), $requestRoute, $status);
 
         $duration = microtime(true) - $startedAt;
         $this->collector->setRequestDuration($request->getMethod(), $requestRoute, $duration);
         $this->collector->setRequestDurationSummary($request->getMethod(), $requestRoute, $duration);
 
+        $exception = $this->exceptions[$request] ?? null;
         $this->forget($request);
+
+        $this->notify($request, $requestRoute, $status, $duration, $exception);
     }
 
     #[Override]
@@ -129,6 +141,25 @@ final class RequestEventListener implements ResetInterface
         $this->startedAt = new WeakMap();
         $this->counted = new WeakMap();
         $this->exceptions = new WeakMap();
+    }
+
+    private function notify(Request $request, ?string $route, int $status, float $duration, ?Throwable $exception): void
+    {
+        try {
+            $measurement = new HttpMeasurement($request->getMethod(), $route, $status, max(0.0, $duration), $exception);
+        } catch (Throwable $e) {
+            $this->logger->error('Cannot build HTTP measurement', ['exception' => $e]);
+
+            return;
+        }
+
+        foreach ($this->observers as $observer) {
+            try {
+                $observer->onHttpMeasured($measurement);
+            } catch (Throwable $e) {
+                $this->logger->error('Cannot notify HTTP measurement observer "{class}"', ['class' => $observer::class, 'exception' => $e]);
+            }
+        }
     }
 
     private function route(Request $request): ?string
