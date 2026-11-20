@@ -6,6 +6,9 @@ namespace Msstc4Symfony\MetricsBundle\Application\Metric;
 
 use Override;
 
+/**
+ * @phpstan-type HttpMethod 'GET'|'POST'|'PUT'|'PATCH'|'DELETE'|'HEAD'|'OTHER'
+ */
 enum BuiltInMetric: string implements MetricDefinitionInterface
 {
     case CONSOLE_COMMAND_START = 'console_command_start';
@@ -52,6 +55,9 @@ enum BuiltInMetric: string implements MetricDefinitionInterface
 
     /**
      * Values of the method label of the HTTP request metrics; any other request method is recorded as OTHER.
+     * The list may grow in a minor release: do not treat it as exhaustive.
+     *
+     * @var non-empty-list<HttpMethod>
      */
     public const HTTP_METHODS = ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'HEAD', 'OTHER'];
 

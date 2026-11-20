@@ -55,6 +55,23 @@ final class HttpMeasurementTest extends TestCase
         yield 'above 599' => [600];
     }
 
+    #[DataProvider('statusBounds')]
+    public function testRecordableStatusIsTheHttpRange(int $status, bool $recordable): void
+    {
+        self::assertSame($recordable, HttpMeasurement::isRecordableStatus($status));
+    }
+
+    /**
+     * @return iterable<string, array{int, bool}>
+     */
+    public static function statusBounds(): iterable
+    {
+        yield 'below 100' => [99, false];
+        yield '100' => [100, true];
+        yield '599' => [599, true];
+        yield 'above 599' => [600, false];
+    }
+
     public function testNegativeDurationIsRejected(): void
     {
         $this->expectException(InvalidArgumentException::class);

@@ -26,7 +26,7 @@ use Throwable;
 use WeakMap;
 
 /**
- * @phpstan-import-type HttpMethod from HttpMeasurement
+ * @phpstan-import-type HttpMethod from BuiltInMetric
  *
  * @internal
  */
@@ -208,8 +208,7 @@ final class RequestEventListener implements ResetInterface
      */
     private function notify(string $method, ?string $route, int $status, float $duration, ?Throwable $exception): void
     {
-        // Unreachable through Response::setStatusCode(), which rejects such codes; a Response subclass can still return one.
-        if ($status < 100 || $status > 599) {
+        if (!HttpMeasurement::isRecordableStatus($status)) {
             $this->logger->error('Cannot build HTTP measurement: status {status} is outside 100..599', ['status' => $status]);
 
             return;

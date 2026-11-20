@@ -11,7 +11,7 @@ use Throwable;
 /**
  * New fields are added only as optional trailing constructor parameters.
  *
- * @phpstan-type HttpMethod 'GET'|'POST'|'PUT'|'PATCH'|'DELETE'|'HEAD'|'OTHER'
+ * @phpstan-import-type HttpMethod from BuiltInMetric
  */
 final readonly class HttpMeasurement
 {
@@ -39,6 +39,14 @@ final readonly class HttpMeasurement
         }
     }
 
+    /**
+     * @phpstan-assert-if-true int<100, 599> $status
+     */
+    public static function isRecordableStatus(int $status): bool
+    {
+        return $status >= 100 && $status <= 599;
+    }
+
     // The checks below are kept apart from the constructor: its narrowed @param would let Rector drop them as dead code.
     private function assertMethod(string $method): void
     {
@@ -56,7 +64,7 @@ final readonly class HttpMeasurement
 
     private function assertStatus(int $status): void
     {
-        if ($status < 100 || $status > 599) {
+        if (!self::isRecordableStatus($status)) {
             throw new InvalidArgumentException(\sprintf('HTTP status must be in 100..599, %d given.', $status));
         }
     }
