@@ -831,8 +831,16 @@ Listener реализует `ResetInterface` (long-running рантаймы). П
 `RequestEventListener::$pendingMain` — измеряемый главный запрос до terminate/reset; `resolveTerminatedRequest()`
 сначала ищет по идентичности, иначе берёт pending при совпадении `getPathInfo()`. Маршрут — с клона (оригинал не
 маршрутизировался), а метка `method` и `HttpMeasurement::$method` — с запроса клиента: HttpCache форвардит HEAD-промах
-как GET, но в `kernel.terminate` приходит исходный HEAD, а в `onRequest` метод берётся из `HttpCache::getRequest()`
-(клон запроса клиента) — `http_request` и `http_response` пишутся с `HEAD`. Попадания в кеш (`fresh`) ядро не видит —
+как GET; и в `onRequest`, и в `onTerminate` метод берётся из `HttpCacheContext::clientRequest()` =
+`HttpCache::getRequest()` (клон запроса клиента) — `http_request` и `http_response` пишутся с `HEAD`.
+
+**Версии http-kernel расходятся** (найдено в acc2, 2026-11-20 UTC): в 8.1.8 (CI-лок) `Kernel::terminate()` зовёт
+`http_kernel->terminate()` с оригиналом; в 8.1.11 (свежая установка `composer.json`, job «without optional
+libraries») `Kernel::terminate()` идёт через `HttpCache::terminate()`, который передаёт `backendRequest` —
+форварднутый клон (HEAD-промах → GET), а на `fresh`-попадании listener'ы не зовёт вовсе. Брать метод из
+`$terminated` поэтому нельзя (на 8.1.11 `testHttpCacheHeadMissKeepsTheClientMethod` писал `GET` уже на eaac1ae).
+Регрессия на уровне listener'а — `RequestEventListenerTest::testHttpCacheTerminatingTheForwardedHeadKeepsTheClientMethod`.
+Проверять обе ветки: CI-лок + копия с `composer install` по `composer.json`. Попадания в кеш (`fresh`) ядро не видит —
 не пишутся, как за настоящим прокси. Регрессии: `HttpErrorPathKernelTest::testHttpCacheMissIsRecordedOnce`,
 `testHttpCacheHeadMissKeepsTheClientMethod` (env `http_cache`).
 
