@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\Test\Integration\Presentation\EventListener;
 
 use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
+use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Http\EsiTestController;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\TestKernel;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use Override;
@@ -13,6 +14,7 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Bundle\MonologBundle\MonologBundle;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\KernelInterface;
 use Symfony\Component\HttpKernel\TerminableInterface;
 
@@ -75,6 +77,47 @@ final class HttpErrorPathKernelTest extends KernelTestCase
         );
     }
 
+    public function testHttpCacheEsiFragmentIsNotRecordedAsARequest(): void
+    {
+        $kernel = self::bootKernel(['environment' => TestKernel::ENV_HTTP_CACHE_ESI]);
+
+        $miss = $this->serve($kernel, EsiTestController::PAGE);
+        $pageHit = $this->serve($kernel, EsiTestController::PAGE);
+
+        self::assertSame('page:fragment', $miss->getContent());
+        self::assertSame('page:fragment', $pageHit->getContent());
+        self::assertStringContainsString('GET /_test/esi/page: fresh', (string) $pageHit->headers->get('X-Symfony-Cache'));
+        self::assertStringContainsString('GET /_test/esi/fragment: miss', (string) $pageHit->headers->get('X-Symfony-Cache'));
+        self::assertSame(
+            [[['unknown', 'unknown', 'GET', 'test_esi_page'], '1']],
+            RegistrySamples::samples($this->registry(), BuiltInMetric::HTTP_REQUEST),
+        );
+        self::assertSame(
+            [[['unknown', 'unknown', 'GET', 'test_esi_page', '200'], '1']],
+            RegistrySamples::samples($this->registry(), BuiltInMetric::HTTP_RESPONSE),
+        );
+        self::assertSame(
+            [[['unknown', 'unknown', 'GET', 'test_esi_page'], '1']],
+            RegistrySamples::samples($this->registry(), BuiltInMetric::REQUEST_DURATION_HISTOGRAM_SECONDS, '_count'),
+        );
+    }
+
+    public function testHttpCacheHeadMissKeepsTheClientMethod(): void
+    {
+        $kernel = self::bootKernel(['environment' => TestKernel::ENV_HTTP_CACHE]);
+
+        $this->serve($kernel, '/_test/ok', Request::METHOD_HEAD);
+
+        self::assertSame(
+            [[['unknown', 'unknown', 'HEAD', 'test_ok'], '1']],
+            RegistrySamples::samples($this->registry(), BuiltInMetric::HTTP_REQUEST),
+        );
+        self::assertSame(
+            [[['unknown', 'unknown', 'HEAD', 'test_ok', '200'], '1']],
+            RegistrySamples::samples($this->registry(), BuiltInMetric::HTTP_RESPONSE),
+        );
+    }
+
     public function testRouterNotFoundIsRecordedAsUnknown404(): void
     {
         $kernel = self::bootKernel();
@@ -119,12 +162,14 @@ final class HttpErrorPathKernelTest extends KernelTestCase
         return TestKernel::class;
     }
 
-    private function serve(KernelInterface $kernel, string $uri): void
+    private function serve(KernelInterface $kernel, string $uri, string $method = Request::METHOD_GET): Response
     {
-        $request = Request::create($uri);
+        $request = Request::create($uri, $method);
         self::assertInstanceOf(TerminableInterface::class, $kernel);
         $response = $kernel->handle($request);
         $kernel->terminate($request, $response);
+
+        return $response;
     }
 
     private function registry(): RegistryInterface

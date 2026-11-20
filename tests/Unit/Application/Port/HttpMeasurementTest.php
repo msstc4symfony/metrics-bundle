@@ -43,7 +43,7 @@ final class HttpMeasurementTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
 
-        new HttpMeasurement('GET', null, $status, 0.1, null);
+        $this->construct('GET', null, $status);
     }
 
     /**
@@ -62,25 +62,52 @@ final class HttpMeasurementTest extends TestCase
         new HttpMeasurement('GET', null, 200, -0.001, null);
     }
 
-    public function testEmptyMethodIsRejected(): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-
-        new HttpMeasurement('', null, 200, 0.1, null);
-    }
-
     public function testEmptyRouteIsRejected(): void
     {
         $this->expectException(InvalidArgumentException::class);
 
-        // Through reflection: PHPStan rejects '' for the non-empty-string parameter.
-        (new ReflectionClass(HttpMeasurement::class))->newInstance('GET', '', 200, 0.1, null);
+        $this->construct('GET', '', 200);
     }
 
-    public function testLowerCaseMethodIsRejected(): void
+    #[DataProvider('recordedMethods')]
+    public function testRecordedMethodIsAccepted(string $method): void
+    {
+        self::assertSame($method, $this->construct($method, null, 200)->method);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function recordedMethods(): iterable
+    {
+        foreach (['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OTHER'] as $method) {
+            yield $method => [$method];
+        }
+    }
+
+    #[DataProvider('unrecordedMethods')]
+    public function testMethodOutsideTheLabelValuesIsRejected(string $method): void
     {
         $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(\sprintf('HTTP method must be one of GET, POST, DELETE, PUT, PATCH, HEAD, OTHER, "%s" given.', $method));
 
-        new HttpMeasurement('get', null, 200, 0.1, null);
+        $this->construct($method, null, 200);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function unrecordedMethods(): iterable
+    {
+        yield 'empty' => [''];
+        yield 'lower case' => ['get'];
+        yield 'non-standard' => ['PROPFIND'];
+        yield 'not recorded' => ['OPTIONS'];
+    }
+
+    // Through reflection: PHPStan rejects values outside the narrowed parameter types.
+    private function construct(string $method, ?string $route, int $status): HttpMeasurement
+    {
+        return (new ReflectionClass(HttpMeasurement::class))->newInstance($method, $route, $status, 0.1, null);
     }
 }

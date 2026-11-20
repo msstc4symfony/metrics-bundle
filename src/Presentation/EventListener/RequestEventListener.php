@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Presentation\EventListener;
 
+use Error;
 use Monolog\Attribute\WithMonologChannel;
 use Msstc4Symfony\MetricsBundle\Application\Collector\RequestCollector;
 use Msstc4Symfony\MetricsBundle\Application\LogChannel;
+use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
 use Msstc4Symfony\MetricsBundle\Application\Port\HttpMeasurement;
 use Msstc4Symfony\MetricsBundle\Application\Port\HttpMeasurementObserverInterface;
 use Override;
@@ -17,11 +19,15 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\Event\TerminateEvent;
+use Symfony\Component\HttpKernel\HttpCache\HttpCache;
+use Symfony\Component\HttpKernel\KernelInterface;
 use Symfony\Contracts\Service\ResetInterface;
 use Throwable;
 use WeakMap;
 
 /**
+ * @phpstan-import-type HttpMethod from HttpMeasurement
+ *
  * @internal
  */
 #[WithMonologChannel(LogChannel::NAME)]
@@ -31,37 +37,21 @@ use WeakMap;
 #[AsEventListener(event: 'kernel.terminate', method: 'onTerminate')]
 final class RequestEventListener implements ResetInterface
 {
-    // Any other method token (scanners send arbitrary ones) would create a new series per token.
-    private const RECORDED_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'];
-
-    private const OTHER_METHOD = 'OTHER';
-
     /**
      * Keyed by the main request: the error sub-request issued by ErrorListener must not disturb it.
-     * Values are hrtime() nanoseconds.
      *
-     * @var WeakMap<Request, float|int>
+     * @var WeakMap<Request, RequestMeasurementState>
      */
-    private WeakMap $startedAt;
+    private WeakMap $states;
 
     /**
-     * @var WeakMap<Request, true>
-     */
-    private WeakMap $counted;
-
-    /**
-     * @var WeakMap<Request, Throwable>
-     */
-    private WeakMap $exceptions;
-
-    /**
-     * First main request since the last terminate or reset. With framework.http_cache the kernel handles a clone of
-     * the main request, but Kernel::terminate() passes the original one, so the identity lookup misses.
+     * The main request being measured until its terminate or a reset. With framework.http_cache the kernel handles a
+     * clone of the client request, but Kernel::terminate() passes the original one, so the identity lookup misses.
      */
     private ?Request $pendingMain = null;
 
     /**
-     * @param iterable<HttpMeasurementObserverInterface> $observers
+     * @param iterable<int, HttpMeasurementObserverInterface> $observers
      * @param list<non-empty-string> $ignoredRoutes
      */
     public function __construct(
@@ -70,41 +60,39 @@ final class RequestEventListener implements ResetInterface
         private readonly iterable $observers,
         private readonly LoggerInterface $logger,
         private readonly array $ignoredRoutes,
+        private readonly KernelInterface $kernel,
     ) {
-        $this->startedAt = new WeakMap();
-        $this->counted = new WeakMap();
-        $this->exceptions = new WeakMap();
+        $this->states = new WeakMap();
     }
 
     public function onRequestFirst(RequestEvent $event): void
     {
         $request = $event->getRequest();
-        if (!$event->isMainRequest() || $request->isMethod('OPTIONS')) {
+        if (!$event->isMainRequest() || $request->isMethod('OPTIONS') || $this->isForwardedFragment($request)) {
             return;
         }
 
-        $this->startedAt[$request] = hrtime(true);
-        // ESI fragments forwarded by HttpCache are main requests too; they must not replace the page.
-        $this->pendingMain ??= $request;
+        $this->states[$request] = new RequestMeasurementState(hrtime(true));
+        $this->pendingMain = $request;
     }
 
     public function onRequest(RequestEvent $event): void
     {
         $request = $event->getRequest();
-        if (!$event->isMainRequest() || !isset($this->startedAt[$request])) {
+        if (!$event->isMainRequest() || !isset($this->states[$request])) {
             return;
         }
 
         $requestRoute = $this->route($request);
         if ($this->isIgnored($requestRoute)) {
-            $this->forget($request);
+            unset($this->states[$request]);
 
             return;
         }
 
         try {
-            $this->collector->incRequestTotal($this->method($request), $requestRoute);
-            $this->counted[$request] = true;
+            $this->collector->incRequestTotal($this->method($this->httpCacheClientRequest() ?? $request), $requestRoute);
+            $this->states[$request]->markCounted();
         } catch (Throwable $e) {
             $this->logger->error('Cannot record HTTP request metrics', ['exception' => $e]);
         }
@@ -112,37 +100,35 @@ final class RequestEventListener implements ResetInterface
 
     public function onException(ExceptionEvent $event): void
     {
-        $request = $event->getRequest();
-        if (!$event->isMainRequest() || !isset($this->startedAt[$request])) {
-            return;
+        if ($event->isMainRequest()) {
+            ($this->states[$event->getRequest()] ?? null)?->recordException($event->getThrowable());
         }
-
-        $this->exceptions[$request] = $event->getThrowable();
     }
 
     public function onTerminate(TerminateEvent $event): void
     {
-        $request = $this->measuredRequest($event->getRequest());
+        $terminated = $event->getRequest();
+        $request = $this->resolveTerminatedRequest($terminated);
         if (!$request instanceof Request) {
             return;
         }
 
-        $duration = (hrtime(true) - $this->startedAt[$request]) / 1e9;
+        $state = $this->states[$request];
+        unset($this->states[$request]);
+        $duration = (hrtime(true) - $state->startedAt) / 1e9;
         $requestRoute = $this->route($request);
-        $isCounted = isset($this->counted[$request]);
-        $exception = $this->exceptions[$request] ?? null;
-        $this->forget($request);
 
         if ($this->isIgnored($requestRoute)) {
             return;
         }
 
-        $method = $this->method($request);
+        // The client's request: HttpCache forwards a HEAD miss to the kernel as GET.
+        $method = $this->method($terminated);
         $status = $event->getResponse()->getStatusCode();
 
         try {
             // The router can throw before onRequest runs (404), so the request is counted here instead.
-            if (!$isCounted) {
+            if (!$state->isCounted()) {
                 $this->collector->incRequestTotal($method, $requestRoute);
             }
 
@@ -153,38 +139,86 @@ final class RequestEventListener implements ResetInterface
             $this->logger->error('Cannot record HTTP request metrics', ['exception' => $e]);
         }
 
-        $this->notify($method, $requestRoute, $status, $duration, $exception);
+        $this->notify($method, $requestRoute, $status, $duration, $state->exception());
     }
 
     #[Override]
     public function reset(): void
     {
-        $this->startedAt = new WeakMap();
-        $this->counted = new WeakMap();
-        $this->exceptions = new WeakMap();
+        $this->states = new WeakMap();
         $this->pendingMain = null;
-    }
-
-    private function measuredRequest(Request $terminated): ?Request
-    {
-        $pending = $this->pendingMain;
-        if (!$pending instanceof Request || $pending->getPathInfo() !== $terminated->getPathInfo()) {
-            return isset($this->startedAt[$terminated]) ? $terminated : null;
-        }
-
-        $this->pendingMain = null;
-        if (isset($this->startedAt[$terminated])) {
-            return $terminated;
-        }
-
-        return isset($this->startedAt[$pending]) ? $pending : null;
     }
 
     /**
+     * HttpCache forwards every ESI fragment miss to the kernel as a main request: after the page was forwarded (it is
+     * still pending), or alone when the page itself is a cache hit (its path differs from the client request).
+     */
+    private function isForwardedFragment(Request $request): bool
+    {
+        if ($this->pendingMain instanceof Request && $this->pendingMain !== $request) {
+            return true;
+        }
+
+        $client = $this->httpCacheClientRequest();
+
+        return $client instanceof Request && $client->getPathInfo() !== $request->getPathInfo();
+    }
+
+    /**
+     * The client request HttpCache is serving, or null without framework.http_cache. Kernel::handle() makes the same
+     * has('http_cache') check; when disabled the service stays private and unused, so it is never instantiated here.
+     */
+    private function httpCacheClientRequest(): ?Request
+    {
+        $container = $this->kernel->getContainer();
+        if (!$container->has('http_cache')) {
+            return null;
+        }
+
+        $httpCache = $container->get('http_cache');
+        if (!$httpCache instanceof HttpCache) {
+            return null;
+        }
+
+        try {
+            return $httpCache->getRequest();
+        } catch (Error) {
+            // Uninitialised until HttpCache handles a main request: the kernel was called without it.
+            return null;
+        }
+    }
+
+    /**
+     * Falls back to the pending main request when the terminated one is the http_cache original of a forwarded clone.
+     */
+    private function resolveTerminatedRequest(Request $terminated): ?Request
+    {
+        $pending = $this->pendingMain;
+        if (!$pending instanceof Request || $pending->getPathInfo() !== $terminated->getPathInfo()) {
+            return isset($this->states[$terminated]) ? $terminated : null;
+        }
+
+        $this->pendingMain = null;
+        if (isset($this->states[$terminated])) {
+            return $terminated;
+        }
+
+        return isset($this->states[$pending]) ? $pending : null;
+    }
+
+    /**
+     * @param HttpMethod $method
      * @param non-empty-string|null $route
      */
     private function notify(string $method, ?string $route, int $status, float $duration, ?Throwable $exception): void
     {
+        // Unreachable through Response::setStatusCode(), which rejects such codes; a Response subclass can still return one.
+        if ($status < 100 || $status > 599) {
+            $this->logger->error('Cannot build HTTP measurement: status {status} is outside 100..599', ['status' => $status]);
+
+            return;
+        }
+
         try {
             $measurement = new HttpMeasurement($method, $route, $status, $duration, $exception);
         } catch (Throwable $e) {
@@ -202,11 +236,16 @@ final class RequestEventListener implements ResetInterface
         }
     }
 
+    /**
+     * Any other method token (scanners send arbitrary ones) would create a new series per token.
+     *
+     * @return HttpMethod
+     */
     private function method(Request $request): string
     {
         $method = $request->getMethod();
 
-        return \in_array($method, self::RECORDED_METHODS, true) ? $method : self::OTHER_METHOD;
+        return \in_array($method, BuiltInMetric::HTTP_METHODS, true) ? $method : 'OTHER';
     }
 
     /**
@@ -222,10 +261,5 @@ final class RequestEventListener implements ResetInterface
     private function isIgnored(?string $route): bool
     {
         return $route !== null && \in_array($route, $this->ignoredRoutes, true);
-    }
-
-    private function forget(Request $request): void
-    {
-        unset($this->startedAt[$request], $this->counted[$request], $this->exceptions[$request]);
     }
 }

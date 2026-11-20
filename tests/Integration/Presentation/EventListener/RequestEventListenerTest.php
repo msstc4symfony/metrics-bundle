@@ -22,12 +22,16 @@ use Prometheus\CollectorRegistry;
 use Prometheus\Storage\InMemory;
 use ReflectionProperty;
 use RuntimeException;
+use Symfony\Component\DependencyInjection\Container;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\Event\TerminateEvent;
+use Symfony\Component\HttpKernel\HttpCache\HttpCache;
+use Symfony\Component\HttpKernel\HttpCache\StoreInterface;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
+use Symfony\Component\HttpKernel\KernelInterface;
 use WeakMap;
 
 final class RequestEventListenerTest extends TestCase
@@ -36,7 +40,7 @@ final class RequestEventListenerTest extends TestCase
 
     private RequestCollector $collector;
 
-    private HttpKernelInterface $kernel;
+    private KernelInterface $kernel;
 
     private CollectingLogger $logger;
 
@@ -49,7 +53,7 @@ final class RequestEventListenerTest extends TestCase
 
         $this->registry = new CollectorRegistry(new InMemory());
         $this->collector = new RequestCollector(new PrometheusMetricRecorder($this->registry, new MetricRepository([]), 'app', 'cmp'));
-        $this->kernel = self::createStub(HttpKernelInterface::class);
+        $this->kernel = self::createStub(KernelInterface::class);
         $this->logger = new CollectingLogger();
     }
 
@@ -186,7 +190,7 @@ final class RequestEventListenerTest extends TestCase
 
     public function testIgnoredRoutesComeFromConstructor(): void
     {
-        $listener = new RequestEventListener($this->collector, [], $this->logger, ['custom-ignored']);
+        $listener = new RequestEventListener($this->collector, [], $this->logger, ['custom-ignored'], $this->kernel);
 
         $request = Request::create('/custom', Request::METHOD_GET);
         $request->attributes->set('_route', 'custom-ignored');
@@ -256,7 +260,7 @@ final class RequestEventListenerTest extends TestCase
         self::assertCount(1, $observer->measurements);
         self::assertSame($exception, $observer->measurements[0]->exception);
         self::assertSame(500, $observer->measurements[0]->status);
-        self::assertSame(0, $this->retainedExceptions($listener));
+        self::assertSame(0, $this->retainedStates($listener));
     }
 
     public function testSubRequestExceptionIsNotReportedToObserver(): void
@@ -273,7 +277,7 @@ final class RequestEventListenerTest extends TestCase
 
         self::assertCount(1, $observer->measurements);
         self::assertNull($observer->measurements[0]->exception);
-        self::assertSame(0, $this->retainedExceptions($listener));
+        self::assertSame(0, $this->retainedStates($listener));
     }
 
     public function testExceptionOfUntrackedRequestIsNotRetained(): void
@@ -284,7 +288,7 @@ final class RequestEventListenerTest extends TestCase
         $listener->onRequestFirst($this->requestEvent($request));
         $listener->onException(new ExceptionEvent($this->kernel, $request, HttpKernelInterface::MAIN_REQUEST, new RuntimeException('boom')));
 
-        self::assertSame(0, $this->retainedExceptions($listener));
+        self::assertSame(0, $this->retainedStates($listener));
     }
 
     public function testThrowingObserverDoesNotStopOthersAndIsLogged(): void
@@ -432,7 +436,7 @@ final class RequestEventListenerTest extends TestCase
         );
         self::assertCount(1, $observer->measurements);
         self::assertSame('order_show', $observer->measurements[0]->route);
-        self::assertSame(0, $this->retainedStarts($listener));
+        self::assertSame(0, $this->retainedStates($listener));
 
         $listener->onTerminate(new TerminateEvent($this->kernel, $original, new Response('ok')));
         self::assertCount(1, $observer->measurements);
@@ -466,10 +470,142 @@ final class RequestEventListenerTest extends TestCase
         self::assertSame([], $observer->measurements);
     }
 
+    public function testMainRequestArrivingWhileThePageIsPendingIsNotMeasured(): void
+    {
+        $observer = new RecordingHttpMeasurementObserver();
+        $listener = $this->listener([$observer]);
+
+        // framework.http_cache + ESI: a fragment cache miss is forwarded as a main request before the page terminates.
+        $original = Request::create('/page', Request::METHOD_GET);
+        $page = clone $original;
+        $page->attributes->set('_route', 'page');
+
+        $fragment = Request::create('/fragment', Request::METHOD_GET);
+        $fragment->attributes->set('_route', 'fragment');
+
+        $listener->onRequestFirst($this->requestEvent($page));
+        $listener->onRequest($this->requestEvent($page));
+        $listener->onRequestFirst($this->requestEvent($fragment));
+        $listener->onRequest($this->requestEvent($fragment));
+        $listener->onException(new ExceptionEvent($this->kernel, $fragment, HttpKernelInterface::MAIN_REQUEST, new RuntimeException('fragment')));
+        self::assertSame(1, $this->retainedStates($listener));
+
+        $listener->onTerminate(new TerminateEvent($this->kernel, $original, new Response('ok')));
+
+        self::assertSame(
+            [[['app', 'cmp', 'GET', 'page'], '1']],
+            RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_REQUEST),
+        );
+        self::assertSame(
+            [[['app', 'cmp', 'GET', 'page', '200'], '1']],
+            RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_RESPONSE),
+        );
+        self::assertCount(1, $observer->measurements);
+        self::assertSame('page', $observer->measurements[0]->route);
+        self::assertNull($observer->measurements[0]->exception);
+        self::assertSame(0, $this->retainedStates($listener));
+    }
+
+    public function testHeadForwardedAsGetIsLabelledWithTheTerminatedRequestMethod(): void
+    {
+        $observer = new RecordingHttpMeasurementObserver();
+        $listener = $this->listener([$observer]);
+
+        // HttpCache::fetch() forwards a HEAD miss as GET; Kernel::terminate() passes the client's HEAD request.
+        $original = Request::create('/orders/42', Request::METHOD_HEAD);
+        $forwarded = clone $original;
+        $forwarded->setMethod(Request::METHOD_GET);
+        $forwarded->attributes->set('_route', 'order_show');
+
+        $listener->onRequestFirst($this->requestEvent($forwarded));
+        $listener->onTerminate(new TerminateEvent($this->kernel, $original, new Response('')));
+
+        self::assertSame(
+            [[['app', 'cmp', 'HEAD', 'order_show'], '1']],
+            RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_REQUEST),
+        );
+        self::assertSame(
+            [[['app', 'cmp', 'HEAD', 'order_show', '200'], '1']],
+            RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_RESPONSE),
+        );
+        self::assertSame('HEAD', $observer->measurements[0]->method ?? null);
+    }
+
+    public function testHttpCacheFragmentOfACachedPageIsNotMeasured(): void
+    {
+        $observer = new RecordingHttpMeasurementObserver();
+        $listener = $this->listenerBehindHttpCache(Request::create('/page'), [$observer]);
+
+        // The page is a cache hit, so the fragment miss is the only request the kernel sees.
+        $fragment = Request::create('/fragment');
+        $fragment->attributes->set('_route', 'fragment');
+
+        $listener->onRequestFirst($this->requestEvent($fragment));
+        $listener->onRequest($this->requestEvent($fragment));
+        $listener->onTerminate(new TerminateEvent($this->kernel, Request::create('/page'), new Response('')));
+
+        self::assertSame(0, $this->retainedStates($listener));
+        self::assertFalse(RegistrySamples::exists($this->registry, BuiltInMetric::HTTP_REQUEST));
+        self::assertSame([], $observer->measurements);
+    }
+
+    public function testHttpCacheForwardedHeadIsCountedWithTheClientMethod(): void
+    {
+        $original = Request::create('/orders/42', Request::METHOD_HEAD);
+        $listener = $this->listenerBehindHttpCache($original);
+
+        $forwarded = clone $original;
+        $forwarded->setMethod(Request::METHOD_GET);
+        $forwarded->attributes->set('_route', 'order_show');
+
+        $listener->onRequestFirst($this->requestEvent($forwarded));
+        $listener->onRequest($this->requestEvent($forwarded));
+
+        self::assertSame(
+            [[['app', 'cmp', 'HEAD', 'order_show'], '1']],
+            RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_REQUEST),
+        );
+    }
+
+    public function testHttpCacheThatHandledNoRequestIsIgnored(): void
+    {
+        $listener = $this->listenerBehindHttpCache(null);
+
+        $request = Request::create('/orders/42', Request::METHOD_HEAD);
+        $listener->onRequestFirst($this->requestEvent($request));
+        $listener->onRequest($this->requestEvent($request));
+
+        self::assertSame(
+            [[['app', 'cmp', 'HEAD', 'unknown'], '1']],
+            RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_REQUEST),
+        );
+    }
+
+    public function testStatusOutsideHttpRangeIsLoggedInsteadOfObserved(): void
+    {
+        $observer = new RecordingHttpMeasurementObserver();
+        $listener = $this->listener([$observer]);
+
+        $request = Request::create('/orders/42', Request::METHOD_GET);
+        $listener->onRequestFirst($this->requestEvent($request));
+        $listener->onTerminate(new TerminateEvent($this->kernel, $request, new class extends Response {
+            // setStatusCode() rejects such a code; a subclass can still store one.
+            public function __construct()
+            {
+                parent::__construct('');
+                $this->statusCode = 600;
+            }
+        }));
+
+        self::assertSame([], $observer->measurements);
+        self::assertSame(['error: Cannot build HTTP measurement: status {status} is outside 100..599'], $this->logger->records);
+        self::assertSame(600, $this->logger->contexts[0]['status'] ?? null);
+    }
+
     public function testThrowingRecorderStillNotifiesObserversAndForgetsTheRequest(): void
     {
         $observer = new RecordingHttpMeasurementObserver();
-        $listener = new RequestEventListener(new RequestCollector(new ThrowingMetricRecorder()), [$observer], $this->logger, []);
+        $listener = new RequestEventListener(new RequestCollector(new ThrowingMetricRecorder()), [$observer], $this->logger, [], $this->kernel);
 
         $request = Request::create('/orders/42', Request::METHOD_GET);
         $request->attributes->set('_route', 'order_show');
@@ -481,8 +617,7 @@ final class RequestEventListenerTest extends TestCase
 
         self::assertCount(1, $observer->measurements);
         self::assertSame(500, $observer->measurements[0]->status);
-        self::assertSame(0, $this->retainedStarts($listener));
-        self::assertSame(0, $this->retainedExceptions($listener));
+        self::assertSame(0, $this->retainedStates($listener));
         self::assertSame(
             ['error: Cannot record HTTP request metrics', 'error: Cannot record HTTP request metrics'],
             $this->logger->records,
@@ -500,20 +635,32 @@ final class RequestEventListenerTest extends TestCase
             'healthcheck-ping',
             'healthcheck-readiness',
             'healthcheck-liveliness',
-        ]);
+        ], $this->kernel);
     }
 
-    private function retainedStarts(RequestEventListener $listener): int
+    /**
+     * @param Request|null $clientRequest The request HttpCache is serving; null when it has handled none yet
+     * @param list<HttpMeasurementObserverInterface> $observers
+     */
+    private function listenerBehindHttpCache(?Request $clientRequest, array $observers = []): RequestEventListener
     {
-        $map = (new ReflectionProperty($listener, 'startedAt'))->getValue($listener);
-        self::assertInstanceOf(WeakMap::class, $map);
+        $httpCache = new HttpCache(self::createStub(HttpKernelInterface::class), self::createStub(StoreInterface::class));
+        if ($clientRequest instanceof Request) {
+            (new ReflectionProperty(HttpCache::class, 'request'))->setValue($httpCache, $clientRequest);
+        }
 
-        return \count($map);
+        $container = new Container();
+        $container->set('http_cache', $httpCache);
+
+        $kernel = self::createStub(KernelInterface::class);
+        $kernel->method('getContainer')->willReturn($container);
+
+        return new RequestEventListener($this->collector, $observers, $this->logger, [], $kernel);
     }
 
-    private function retainedExceptions(RequestEventListener $listener): int
+    private function retainedStates(RequestEventListener $listener): int
     {
-        $map = (new ReflectionProperty($listener, 'exceptions'))->getValue($listener);
+        $map = (new ReflectionProperty($listener, 'states'))->getValue($listener);
         self::assertInstanceOf(WeakMap::class, $map);
 
         return \count($map);

@@ -50,7 +50,10 @@ enum BuiltInMetric: string implements MetricDefinitionInterface
     case MESSENGER_QUEUE_DEPTH_SAMPLED_AT = 'messenger_queue_depth_sampled_at';
     case CACHE_REQUEST = 'cache_request';
 
-    private const HTTP_METHODS = ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'HEAD', 'OTHER'];
+    /**
+     * Values of the method label of the HTTP request metrics; any other request method is recorded as OTHER.
+     */
+    public const HTTP_METHODS = ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'HEAD', 'OTHER'];
 
     private const HTTP_METHODS_EXTENDED = ['GET', 'POST', 'DELETE', 'PUT', 'PATCH', 'HEAD', 'OPTIONS'];
 

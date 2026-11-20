@@ -5,16 +5,20 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\Application\Port;
 
 use InvalidArgumentException;
+use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
 use Throwable;
 
 /**
  * New fields are added only as optional trailing constructor parameters.
+ *
+ * @phpstan-type HttpMethod 'GET'|'POST'|'PUT'|'PATCH'|'DELETE'|'HEAD'|'OTHER'
  */
 final readonly class HttpMeasurement
 {
     /**
-     * @param string $method Upper-case HTTP method as written to the metrics: GET, POST, PUT, PATCH, DELETE, HEAD or OTHER
+     * @param HttpMethod $method HTTP method as written to the metrics (BuiltInMetric::HTTP_METHODS); any other method is OTHER
      * @param non-empty-string|null $route Route name; null where the metrics write "unknown" (the request was not routed)
+     * @param int<100, 599> $status
      * @param float $durationSeconds Same value that was written to the duration metrics
      * @param Throwable|null $exception The throwable that reached kernel.exception for the main request. A later
      *                                  listener may have turned it into a 3xx/401/403 response: classify by $status.
@@ -26,26 +30,34 @@ final readonly class HttpMeasurement
         public float $durationSeconds,
         public ?Throwable $exception,
     ) {
-        if ($method === '' || $method !== strtoupper($method)) {
-            throw new InvalidArgumentException(\sprintf('HTTP method must be a non-empty upper-case string, "%s" given.', $method));
-        }
-
+        $this->assertMethod($method);
         $this->assertRoute($route);
-
-        if ($status < 100 || $status > 599) {
-            throw new InvalidArgumentException(\sprintf('HTTP status must be in 100..599, %d given.', $status));
-        }
+        $this->assertStatus($status);
 
         if ($durationSeconds < 0.0) {
             throw new InvalidArgumentException(\sprintf('Duration must not be negative, %F given.', $durationSeconds));
         }
     }
 
-    // Kept apart from the constructor: its narrowed @param would let Rector drop the check as dead code.
+    // The checks below are kept apart from the constructor: its narrowed @param would let Rector drop them as dead code.
+    private function assertMethod(string $method): void
+    {
+        if (!\in_array($method, BuiltInMetric::HTTP_METHODS, true)) {
+            throw new InvalidArgumentException(\sprintf('HTTP method must be one of %s, "%s" given.', implode(', ', BuiltInMetric::HTTP_METHODS), $method));
+        }
+    }
+
     private function assertRoute(?string $route): void
     {
         if ($route === '') {
             throw new InvalidArgumentException('HTTP route must not be empty; use null for an unrouted request.');
+        }
+    }
+
+    private function assertStatus(int $status): void
+    {
+        if ($status < 100 || $status > 599) {
+            throw new InvalidArgumentException(\sprintf('HTTP status must be in 100..599, %d given.', $status));
         }
     }
 }

@@ -11,6 +11,7 @@ use GuzzleHttp\HandlerStack;
 use Msstc4Symfony\MetricsBundle\Application\LogChannel;
 use Msstc4Symfony\MetricsBundle\MetricsBundle;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Guzzle\GuzzleClientFactory;
+use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Http\EsiTestController;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Http\HttpTestController;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Messenger\TestMessage;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Messenger\TestMessageHandler;
@@ -30,6 +31,7 @@ use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
 use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\inline_service;
+use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 
 final class TestKernel extends Kernel
 {
@@ -67,6 +69,9 @@ final class TestKernel extends Kernel
 
     // framework.http_cache is enabled: HttpCache forwards a clone of the main request to the kernel.
     public const ENV_HTTP_CACHE = 'http_cache';
+
+    // framework.http_cache and framework.esi: HttpCache forwards ESI fragments to the kernel as main requests.
+    public const ENV_HTTP_CACHE_ESI = 'http_cache_esi';
 
     // Public autoconfigured Messenger observers (one recording, one throwing) and the metrics_bundle channel in a TestHandler.
     public const ENV_MESSENGER_OBSERVER = 'messenger_observer';
@@ -139,6 +144,15 @@ final class TestKernel extends Kernel
 
         if ($this->environment === self::ENV_HTTP_CACHE) {
             $framework['http_cache'] = true;
+        }
+
+        if ($this->environment === self::ENV_HTTP_CACHE_ESI) {
+            $framework['http_cache'] = true;
+            $framework['esi'] = true;
+            $container->services()->set(EsiTestController::class)
+                ->arg('$fragments', service('fragment.handler'))
+                ->autoconfigure()
+            ;
         }
 
         $container->extension('framework', $framework);
@@ -217,6 +231,10 @@ final class TestKernel extends Kernel
             $routes->import('routing.controllers');
         } else {
             $routes->import(HttpTestController::class, 'attribute');
+        }
+
+        if ($this->environment === self::ENV_HTTP_CACHE_ESI) {
+            $routes->import(EsiTestController::class, 'attribute');
         }
 
         if ($this->environment !== self::ENV_ROUTING_CONTROLLERS_ONLY) {
