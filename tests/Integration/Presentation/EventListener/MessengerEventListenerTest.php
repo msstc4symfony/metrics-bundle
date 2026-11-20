@@ -15,6 +15,7 @@ use Msstc4Symfony\MetricsBundle\Test\Support\CollectingLogger;
 use Msstc4Symfony\MetricsBundle\Test\Support\RecordingMessengerMeasurementObserver;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use Msstc4Symfony\MetricsBundle\Test\Support\ThrowingMessengerMeasurementObserver;
+use Msstc4Symfony\MetricsBundle\Test\Support\ThrowingMetricRecorder;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
@@ -241,6 +242,35 @@ final class MessengerEventListenerTest extends TestCase
         self::assertStringStartsWith('error: Cannot notify Messenger measurement observer', $this->logger->records[0]);
         self::assertInstanceOf(RuntimeException::class, $this->logger->contexts[0]['exception'] ?? null);
         self::assertSame(ThrowingMessengerMeasurementObserver::class, $this->logger->contexts[0]['class'] ?? null);
+    }
+
+    public function testThrowingRecorderStillNotifiesObserversAndDropsTheStart(): void
+    {
+        $message = new stdClass();
+        $envelope = new Envelope($message);
+        $listener = new MessengerEventListener(new MessengerCollector(new ThrowingMetricRecorder()), [$this->observer], $this->logger);
+
+        $listener->onMessageReceived(new WorkerMessageReceivedEvent($envelope, 'async'));
+        $listener->onMessageFailed(new WorkerMessageFailedEvent($envelope, 'async', new RuntimeException('boom')));
+
+        self::assertCount(1, $this->observer->measurements);
+        self::assertSame(MessengerMessageStatus::FAILED, $this->observer->measurements[0]->status);
+        self::assertNotNull($this->observer->measurements[0]->durationSeconds);
+        self::assertSame(['error: Cannot record Messenger metrics'], $this->logger->records);
+        self::assertInstanceOf(RuntimeException::class, $this->logger->contexts[0]['exception'] ?? null);
+
+        $listener->onMessageHandled(new WorkerMessageHandledEvent($envelope, 'async'));
+        self::assertCount(2, $this->observer->measurements);
+        self::assertNull($this->observer->measurements[1]->durationSeconds);
+    }
+
+    public function testThrowingRecorderDoesNotBreakSending(): void
+    {
+        $listener = new MessengerEventListener(new MessengerCollector(new ThrowingMetricRecorder()), [], $this->logger);
+
+        $listener->onSendMessageToTransports(new SendMessageToTransportsEvent($this->envelope, ['async' => new InMemoryTransport()]));
+
+        self::assertSame(['error: Cannot record Messenger metrics'], $this->logger->records);
     }
 
     /**

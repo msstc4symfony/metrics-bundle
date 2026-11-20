@@ -40,7 +40,7 @@ use WeakMap;
 #[AsEventListener(event: WorkerMessageFailedEvent::class, method: 'onMessageFailed')]
 final class MessengerEventListener
 {
-    /** @var WeakMap<object, float> */
+    /** @var WeakMap<object, float|int> hrtime() nanoseconds */
     private WeakMap $startedAt;
 
     /**
@@ -58,8 +58,12 @@ final class MessengerEventListener
     public function onSendMessageToTransports(SendMessageToTransportsEvent $event): void
     {
         $messageClass = $event->getEnvelope()->getMessage()::class;
-        foreach (array_keys($event->getSenders()) as $transport) {
-            $this->collector->incMessageSent((string) $transport, $messageClass);
+        try {
+            foreach (array_keys($event->getSenders()) as $transport) {
+                $this->collector->incMessageSent((string) $transport, $messageClass);
+            }
+        } catch (Throwable $e) {
+            $this->logger->error('Cannot record Messenger metrics', ['exception' => $e]);
         }
     }
 
@@ -67,7 +71,7 @@ final class MessengerEventListener
     {
         $message = $event->getEnvelope()->getMessage();
         if ($event->shouldHandle()) {
-            $this->startedAt[$message] = microtime(true);
+            $this->startedAt[$message] = hrtime(true);
         } else {
             unset($this->startedAt[$message]);
         }
@@ -90,12 +94,16 @@ final class MessengerEventListener
         $startedAt = $this->startedAt[$message] ?? null;
         unset($this->startedAt[$message]);
 
-        $duration = $startedAt === null ? null : max(0.0, microtime(true) - $startedAt);
+        $duration = $startedAt === null ? null : (hrtime(true) - $startedAt) / 1e9;
 
-        $this->collector->incMessageHandled($transport, $message::class, $status);
+        try {
+            $this->collector->incMessageHandled($transport, $message::class, $status);
 
-        if ($duration !== null) {
-            $this->collector->observeHandlingDuration($transport, $message::class, $status, $duration);
+            if ($duration !== null) {
+                $this->collector->observeHandlingDuration($transport, $message::class, $status, $duration);
+            }
+        } catch (Throwable $e) {
+            $this->logger->error('Cannot record Messenger metrics', ['exception' => $e]);
         }
 
         $this->notify($transport, $message::class, $status, $duration, $event instanceof WorkerMessageFailedEvent ? $event->getThrowable() : null);

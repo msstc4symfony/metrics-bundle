@@ -8,13 +8,16 @@ use InvalidArgumentException;
 use Msstc4Symfony\MetricsBundle\Application\Metric\MessengerMessageStatus;
 use Throwable;
 
+/**
+ * New fields are added only as optional trailing constructor parameters.
+ */
 final readonly class MessengerMeasurement
 {
     /**
-     * @param string $transport Receiver name the message was consumed from
+     * @param string $transport Receiver name the message was consumed from (the failure transport for messenger:failed:retry)
      * @param class-string $messageClass
      * @param float|null $durationSeconds Same value that was written to the duration metrics; null when no start was seen
-     * @param Throwable|null $exception Throwable of the failed handling attempt, null for handled messages
+     * @param Throwable|null $exception Raw throwable of WorkerMessageFailedEvent (usually HandlerFailedException), null for handled messages
      */
     public function __construct(
         public string $transport,
