@@ -50,6 +50,8 @@ Infrastructure. `AbstractCollector` удалён в 2.0: свой коллект
    `Storage\Factory`, `MetricRepositoryFactory`).
 3. Компилер-пассы (`MetricsBundle::build()`):
    - `AddMonologDecoratorCompilerPass` — декорирует `monolog.logger.*`;
+   - `InjectHttpCachePass` (BEFORE_OPTIMIZATION, priority 0 — после `MergeExtensionConfigurationPass`) — аргумент
+     `$httpCache` `RequestEventListener` = `http_cache`, если его определение публичное (`framework.http_cache`), иначе `null`;
    - `AddDoctrineDBALMonitorPass` (priority 1, раньше `MiddlewaresPass` DoctrineBundle) — при
      параметре `doctrine.connections` регистрирует на каждое соединение
      `msstc4symfony_metrics.doctrine.middleware.<name>` = `NamedConnectionMiddleware` с
@@ -141,13 +143,13 @@ MongoDB, Elastica, Messenger, APCu. Метрики кешей и глубины 
   HTTP — один вызов на записанный главный запрос в `kernel.terminate`; Messenger — один на исход воркера
   (handled/retried/failed).
 - Игнорируемые маршруты (`http.ignored_routes`) и `OPTIONS` не пишутся в метрики и не доходят до наблюдателей.
-- `HttpMeasurement::$method` = значение метки `method` (`BuiltInMetric::HTTP_METHODS`, alias `HttpMethod`; метод
+- `HttpMeasurement::$method` = значение метки `method` (`BuiltInMetric::HTTP_METHODS`, alias `HttpMethod` на `BuiltInMetric`, список может расти; метод
   запроса клиента, HEAD под http_cache остаётся HEAD); `$status` — `int<100, 599>`; `$route` —
   `non-empty-string|null`, null там, где метрика пишет `unknown`. Новые поля обоих measurement — только опциональные
   параметры в конце конструктора.
 - Длительности в обоих listener'ах — `hrtime(true)` (монотонные, без clamp).
 - `RequestEventListener` хранит состояние запроса в одном `WeakMap<Request, RequestMeasurementState>` (`@internal`:
   старт, «уже посчитан», исключение) плюс `?Request $pendingMain` (измеряемый главный запрос до terminate/reset —
-  fallback для `framework.http_cache`), получает `KernelInterface` (проверка `http_cache` как в `Kernel::handle()`) и
-  реализует `ResetInterface`; ESI-фрагменты под HttpCache не измеряются. См. known-issues «Сброс состояния
+  fallback для `framework.http_cache`), получает `?HttpCache` (`InjectHttpCachePass`; осведомлённость о HttpCache — в
+  `@internal` `HttpCacheContext`) и реализует `ResetInterface` (тег `kernel.reset`); ESI-фрагменты под HttpCache не измеряются. См. known-issues «Сброс состояния
   подзапросами», «framework.http_cache» и «ESI-фрагменты под framework.http_cache».

@@ -841,21 +841,31 @@ Listener реализует `ResetInterface` (long-running рантаймы). П
 `HttpCache::forward()` всегда шлёт в ядро MAIN_REQUEST, в том числе промах ESI-фрагмента (`Esi::handle()` →
 `HttpCache::handle(SUB_REQUEST)` → `forward()`). `kernel.terminate` для фрагмента не бывает, поэтому раньше он
 считался в `http_request` без `http_response`. Теперь `onRequestFirst` не начинает измерение (не считает, не наблюдает),
-если: а) уже есть pending главный запрос этого цикла и это не он (промах страницы + промах фрагмента: фрагменты
-раскрываются в `restoreResponseBody()` до terminate страницы; сервисы между ними не сбрасываются — при
-`handlingHttpCache` ядро не ставит `resetServices`); б) путь запроса отличается от `HttpCache::getRequest()` (попадание
-страницы + промах фрагмента: pending пуст, ядро видит только фрагмент). Для (б) listener получает `KernelInterface` и
-делает ту же проверку, что `Kernel::handle()`: `getContainer()->has('http_cache')`. Инжектить `http_cache` напрямую
-нельзя: при выключенном http_cache сервис остаётся приватным и создавался бы (а `Store` создаёт каталог).
-`HttpCache::getRequest()` бросает `Error`, пока HttpCache не обработал главный запрос (ядро вызвали в обход него) —
-тогда запрос считается клиентским. Ограничения: ручная обёртка `new HttpCache($kernel)` в front controller'е без
-`framework.http_cache` (б) не покрывает, а ядро там сбрасывает сервисы на каждом форварде; рантайм, который зовёт
-`http_kernel` напрямую при включённом http_cache, сравнивает путь с устаревшим `getRequest()`. Тест —
-`HttpErrorPathKernelTest::testHttpCacheEsiFragmentIsNotRecordedAsARequest` (env `http_cache_esi`).
+если `getRequestUri()` запроса отличается от `HttpCache::getRequest()` (клон запроса клиента, который HttpCache
+обслуживает). Это покрывает оба сценария: промах страницы + промах фрагмента и попадание страницы + промах фрагмента.
+Сравнивается REQUEST_URI, а не путь: клоны HttpCache (`fetch()/validate()`, HEAD→GET) сохраняют его, а фрагмент из
+`Request::create()` получает свой — включая фрагмент с тем же путём и другим query (`/products` vs
+`/products?partial=1`) и controller reference (`/_fragment?_path=…`). Тот же `getRequestUri()` —
+в `resolveTerminatedRequest()` (fallback оригинал ↔ клон).
 
-Побочный эффект правила (а): главный запрос, пришедший, пока другой главный запрос не дошёл до terminate/reset, не
-измеряется. В штатных рантаймах это только фрагменты: `Kernel::handle()` сбрасывает сервисы (`kernel.reset`) перед
-каждым клиентским запросом.
+Проводка: `InjectHttpCachePass` (default type/priority, после загрузки расширений) ставит аргумент `$httpCache`
+listener'а = `Reference('http_cache')`, только если определение есть и **публичное** — `FrameworkExtension` делает
+`http_cache` публичным ровно при `framework.http_cache.enabled` (`FrameworkExtension.php:871`), и тогда же
+`Kernel::handle()` (`container->has('http_cache')`) пускает главный запрос через него. Иначе `null`: приватный
+неиспользуемый сервис удаляется и не создаётся (`Store` создаёт каталог). Логика — в `@internal`
+`Presentation/EventListener/HttpCacheContext` (`isForwardedFragment()`, `clientRequest()`), listener создаёт его из
+`?HttpCache`. `HttpCache::getRequest()` читает типизированное свойство, которое задаёт только `handle(MAIN)`; до
+этого — `Error`. Гард: `getTraces() === []` → HttpCache ещё ничего не обрабатывал (рантайм вызвал `http_kernel`
+в обход) → запрос клиентский. Ограничения: ручная обёртка `new HttpCache($kernel)` без `framework.http_cache` не
+покрыта (сервис приватный → `null`); рантайм, который зовёт `http_kernel` напрямую при включённом http_cache после
+хотя бы одного запроса через HttpCache, сравнивает URI с устаревшим `getRequest()`. Тест —
+`HttpErrorPathKernelTest::testHttpCacheEsiFragmentIsNotRecordedAsARequest` (env `http_cache_esi`), проводка —
+`RequestEventListenerWiringTest`, `InjectHttpCachePassTest`.
+
+Прежнее правило «не измерять главный запрос, пока другой pending» удалено (2.3, acc2 CR2-002): под HttpCache оно
+избыточно, а если pending не очищался (рантайм без terminate/reset), молча терялись все следующие запросы. `pendingMain`
+теперь перезаписывается каждым измеряемым главным запросом и очищается при любом terminate (в том числе при
+несовпадении URI). Тест — `RequestEventListenerTest::testMainRequestAfterAnUnterminatedOneIsMeasured`.
 
 ## Метка `method` HTTP-метрик (2.3)
 
@@ -867,8 +877,9 @@ Listener реализует `ResetInterface` (long-running рантаймы). П
 ## Rector и проверки при узком `@param` (2.3)
 
 Rector (dead-code) удаляет проверку, если `@param` конструктора уже сужает тип (`$x === ''` при `non-empty-string`). Поэтому
-в `HttpMeasurement` проверки `method` (литеральный union, alias `HttpMethod`), `route` и `status` (`int<100, 599>`), а в
+в `HttpMeasurement` проверки `method` (литеральный union, alias `HttpMethod` объявлен на `BuiltInMetric` рядом с `HTTP_METHODS`), `route` и `status` (`int<100, 599>`), а в
 `MessengerMeasurement` — `transport` (`non-empty-string`) вынесены в приватные `assert*()` с широкими нативными типами;
 Rector их не трогает (проверено `rector -n`). Тесты передают недопустимые значения через
 `ReflectionClass::newInstance()` — прямой вызов PHPStan отвергает. Listener'ы сужают типы до вызова: `method()` по
-`BuiltInMetric::HTTP_METHODS`, статус вне 100..599 и пустое имя receiver'а логируются вместо наблюдения.
+`BuiltInMetric::HTTP_METHODS`, статус вне 100..599 (`HttpMeasurement::isRecordableStatus()` — единый источник
+диапазона) и пустое имя receiver'а логируются вместо наблюдения.

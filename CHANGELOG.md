@@ -18,7 +18,9 @@ All notable changes to this bundle are documented here. The format follows
   Default `metrics-get`, `healthcheck-ping`, `healthcheck-readiness`, `healthcheck-liveliness`; setting it replaces the
   default list.
 - `BuiltInMetric::HTTP_METHODS`: public constant listing the values of the `method` label of the HTTP request metrics
-  (the values `HttpMeasurement::$method` accepts).
+  (the values `HttpMeasurement::$method` accepts). The list may grow in a minor release; the PHPStan alias
+  `HttpMethod` is declared on `BuiltInMetric` (`@phpstan-import-type HttpMethod from BuiltInMetric`).
+- `HttpMeasurement::isRecordableStatus()`: whether a status code (100..599) can be carried by an `HttpMeasurement`.
 
 ### Changed
 
@@ -43,7 +45,8 @@ All notable changes to this bundle are documented here. The format follows
   A `HEAD` miss, which `HttpCache` forwards to the kernel as `GET`, is recorded with `method="HEAD"`.
 - With `framework.http_cache` and ESI, a fragment cache miss, which `HttpCache` forwards to the kernel as a main
   request, is no longer counted in `http_request` (it never reached `kernel.terminate`, so `http_request` outgrew
-  `http_response`); only the page is recorded, once.
+  `http_response`); only the page is recorded, once. Fragments are told apart from the page by the request URI, so a
+  fragment on the page's path with its own query is not recorded either.
 - A metric recorder that throws (a replacement of `MetricRecorderInterface` breaking its contract) no longer escapes
   `kernel.request`, `kernel.terminate` or the Messenger events and no longer skips the observers: the failure is
   logged on the `metrics_bundle` channel.

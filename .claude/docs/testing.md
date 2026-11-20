@@ -119,8 +119,12 @@ Elastica разделены по версии: `SaveElasticaClientsListPassTest`
   fail-open listener'ов.
 - Недопустимые `method`/`route`/`status` в `HttpMeasurement` и пустой `transport` в `MessengerMeasurement` тесты
   передают через `ReflectionClass::newInstance()`: прямой вызов PHPStan отвергает из-за узких типов.
-- `RequestEventListenerTest` создаёт listener со стабом `KernelInterface` (контейнер-стаб: `has()` = false, http_cache
-  нет); `listenerBehindHttpCache()` кладёт настоящий `HttpCache` в `Container` и задаёт его `request` рефлексией.
+- `RequestEventListenerTest` создаёт listener с `$httpCache = null` (http_cache выключен); `listenerBehindHttpCache()`
+  прогоняет запрос клиента через настоящий `HttpCache::handle()` на стабе `HttpKernelInterface` и стабе
+  `StoreInterface` (lookup → null, промах) — без рефлексии по приватным свойствам; `null` — HttpCache без `handle()`.
+- `RequestEventListenerWiringTest` (TestKernel): тег `kernel.reset` проверяется поведением — `services_resetter->reset()`
+  сбрасывает начатое измерение; без `framework.http_cache` сервиса `http_cache` в тестовом контейнере нет (listener
+  его не держит). Ссылку на приватный сервис `test.service_container` отдаёт, только если он не удалён.
   Состояние проверяется через `retainedStates()` (размер `WeakMap` `states`).
 - Статус вне 100..599 `Response::setStatusCode()` не пропускает, `getStatusCode()` — `@final`: тест пишет
   `$this->statusCode` в конструкторе анонимного подкласса.
