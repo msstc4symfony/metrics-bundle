@@ -110,9 +110,17 @@ Elastica разделены по версии: `SaveElasticaClientsListPassTest`
 
 - `TestKernel` env: `http_ignored_routes` (`test_throw` в `http.ignored_routes`), `http_observer` (автоконфигурируемые
   `ThrowingHttpMeasurementObserver` + `RecordingHttpMeasurementObserver`, канал `metrics_bundle` в
-  `monolog.handler.metrics`), `messenger_observer` (то же для Messenger), `http_cache` (`framework.http_cache: true`).
+  `monolog.handler.metrics`), `messenger_observer` (то же для Messenger), `http_cache` (`framework.http_cache: true`),
+  `http_cache_esi` (`http_cache` + `framework.esi`, контроллер `Kernel/Http/EsiTestController`: кешируемая страница
+  `test_esi_page` с некешируемым фрагментом `test_esi_fragment` через `FragmentHandler::render(…, 'esi')`; второй
+  запрос — попадание страницы + промах фрагмента, проверяется по `X-Symfony-Cache`).
 - Контроллер маршрутов `test_ok` / `test_throw` / `test_fragment` — `Kernel/Http/HttpTestController`.
 - `tests/Support/ThrowingMetricRecorder` — рекордер, нарушающий контракт порта (каждая запись бросает): проверка
   fail-open listener'ов.
-- Пустой `route` в `HttpMeasurement` тест передаёт через `ReflectionClass::newInstance()`: прямой вызов с `''` PHPStan
-  отвергает из-за `non-empty-string|null`.
+- Недопустимые `method`/`route`/`status` в `HttpMeasurement` и пустой `transport` в `MessengerMeasurement` тесты
+  передают через `ReflectionClass::newInstance()`: прямой вызов PHPStan отвергает из-за узких типов.
+- `RequestEventListenerTest` создаёт listener со стабом `KernelInterface` (контейнер-стаб: `has()` = false, http_cache
+  нет); `listenerBehindHttpCache()` кладёт настоящий `HttpCache` в `Container` и задаёт его `request` рефлексией.
+  Состояние проверяется через `retainedStates()` (размер `WeakMap` `states`).
+- Статус вне 100..599 `Response::setStatusCode()` не пропускает, `getStatusCode()` — `@final`: тест пишет
+  `$this->statusCode` в конструкторе анонимного подкласса.

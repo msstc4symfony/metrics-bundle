@@ -828,21 +828,47 @@ Listener реализует `ResetInterface` (long-running рантаймы). П
 же зовёт `http_kernel->terminate()` с **оригиналом** (минуя `HttpCache::terminate()` и его `backendRequest`, который
 есть только в http-kernel ≥ 7.4.13 / 8.0.11 и работает лишь при ручной обёртке `new HttpCache($kernel)`). Поиск по
 идентичности в `WeakMap` промахивается → без fallback не писались `http_response`/длительность/наблюдатели. Поэтому
-`RequestEventListener::$pendingMain`: первый главный запрос после terminate/reset (`??=` — ESI-фрагменты HttpCache
-тоже приходят как MAIN_REQUEST и не должны его вытеснить); в `onTerminate` сначала identity, иначе pending при
-совпадении `getPathInfo()`. Метод/маршрут берутся с клона (HEAD форвардится как GET → метка `GET`). Попадания в кеш
-(`fresh`) ядро не видит — не пишутся, как за настоящим прокси. Регрессия ловится `HttpErrorPathKernelTest::
-testHttpCacheMissIsRecordedOnce` (env `http_cache`) на текущем 8.1.
+`RequestEventListener::$pendingMain` — измеряемый главный запрос до terminate/reset; `resolveTerminatedRequest()`
+сначала ищет по идентичности, иначе берёт pending при совпадении `getPathInfo()`. Маршрут — с клона (оригинал не
+маршрутизировался), а метка `method` и `HttpMeasurement::$method` — с запроса клиента: HttpCache форвардит HEAD-промах
+как GET, но в `kernel.terminate` приходит исходный HEAD, а в `onRequest` метод берётся из `HttpCache::getRequest()`
+(клон запроса клиента) — `http_request` и `http_response` пишутся с `HEAD`. Попадания в кеш (`fresh`) ядро не видит —
+не пишутся, как за настоящим прокси. Регрессии: `HttpErrorPathKernelTest::testHttpCacheMissIsRecordedOnce`,
+`testHttpCacheHeadMissKeepsTheClientMethod` (env `http_cache`).
+
+### ESI-фрагменты под framework.http_cache (2.3)
+
+`HttpCache::forward()` всегда шлёт в ядро MAIN_REQUEST, в том числе промах ESI-фрагмента (`Esi::handle()` →
+`HttpCache::handle(SUB_REQUEST)` → `forward()`). `kernel.terminate` для фрагмента не бывает, поэтому раньше он
+считался в `http_request` без `http_response`. Теперь `onRequestFirst` не начинает измерение (не считает, не наблюдает),
+если: а) уже есть pending главный запрос этого цикла и это не он (промах страницы + промах фрагмента: фрагменты
+раскрываются в `restoreResponseBody()` до terminate страницы; сервисы между ними не сбрасываются — при
+`handlingHttpCache` ядро не ставит `resetServices`); б) путь запроса отличается от `HttpCache::getRequest()` (попадание
+страницы + промах фрагмента: pending пуст, ядро видит только фрагмент). Для (б) listener получает `KernelInterface` и
+делает ту же проверку, что `Kernel::handle()`: `getContainer()->has('http_cache')`. Инжектить `http_cache` напрямую
+нельзя: при выключенном http_cache сервис остаётся приватным и создавался бы (а `Store` создаёт каталог).
+`HttpCache::getRequest()` бросает `Error`, пока HttpCache не обработал главный запрос (ядро вызвали в обход него) —
+тогда запрос считается клиентским. Ограничения: ручная обёртка `new HttpCache($kernel)` в front controller'е без
+`framework.http_cache` (б) не покрывает, а ядро там сбрасывает сервисы на каждом форварде; рантайм, который зовёт
+`http_kernel` напрямую при включённом http_cache, сравнивает путь с устаревшим `getRequest()`. Тест —
+`HttpErrorPathKernelTest::testHttpCacheEsiFragmentIsNotRecordedAsARequest` (env `http_cache_esi`).
+
+Побочный эффект правила (а): главный запрос, пришедший, пока другой главный запрос не дошёл до terminate/reset, не
+измеряется. В штатных рантаймах это только фрагменты: `Kernel::handle()` сбрасывает сервисы (`kernel.reset`) перед
+каждым клиентским запросом.
 
 ## Метка `method` HTTP-метрик (2.3)
 
-`RequestEventListener::method()` пропускает только GET/POST/PUT/PATCH/DELETE/HEAD, остальное → `OTHER` (в enum метки
-`BuiltInMetric::HTTP_METHODS`): после 2.3 пишутся и не-смаршрутизированные запросы, и сканеры с произвольным
+`RequestEventListener::method()` пропускает только значения `BuiltInMetric::HTTP_METHODS` (публичная константа с 2.3 —
+единственный источник списка и для метки, и для проверки `HttpMeasurement`), остальное → `OTHER`: после 2.3 пишутся и не-смаршрутизированные запросы, и сканеры с произвольным
 токеном метода плодили бы серии. `OPTIONS` отсекается раньше, в `onRequestFirst`. Enum метки информационный
 (`metrics:list`), рекордер его не валидирует.
 
 ## Rector и проверки при узком `@param` (2.3)
 
-Rector (dead-code) удаляет проверку `$x === ''`, если `@param` конструктора уже `non-empty-string`. В `HttpMeasurement`
-проверка `route` вынесена в приватный `assertRoute(?string)` — там тип широкий, Rector её не трогает (проверено
-`rector -n`). `method`/`status` по той же причине документированы обычными типами.
+Rector (dead-code) удаляет проверку, если `@param` конструктора уже сужает тип (`$x === ''` при `non-empty-string`). Поэтому
+в `HttpMeasurement` проверки `method` (литеральный union, alias `HttpMethod`), `route` и `status` (`int<100, 599>`), а в
+`MessengerMeasurement` — `transport` (`non-empty-string`) вынесены в приватные `assert*()` с широкими нативными типами;
+Rector их не трогает (проверено `rector -n`). Тесты передают недопустимые значения через
+`ReflectionClass::newInstance()` — прямой вызов PHPStan отвергает. Listener'ы сужают типы до вызова: `method()` по
+`BuiltInMetric::HTTP_METHODS`, статус вне 100..599 и пустое имя receiver'а логируются вместо наблюдения.

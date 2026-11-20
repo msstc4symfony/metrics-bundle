@@ -519,11 +519,14 @@ final class SlowRouteObserver implements HttpMeasurementObserverInterface
 ```
 
 - `HttpMeasurement` is delivered once per recorded main request at `kernel.terminate`, with the same duration that was
-  written to the duration metrics. `method` is the value of the `method` label (`GET`, `POST`, `PUT`, `PATCH`,
-  `DELETE`, `HEAD` or `OTHER`). `route` is null where the metrics write `route="unknown"` (the request was not routed).
+  written to the duration metrics. `method` is the value of the `method` label, one of `BuiltInMetric::HTTP_METHODS`
+  (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD` or `OTHER`). `route` is null where the metrics write `route="unknown"` (the request was not routed).
   `exception` is the throwable that reached `kernel.exception` for the main request; a later listener may have turned
   it into a 3xx/401/403 response, so classify by `status`.
 - Requests to the ignored routes (`http.ignored_routes`) and `OPTIONS` requests are neither recorded nor observed.
+- With `framework.http_cache`, cache misses are recorded and observed with the client's method (a `HEAD` miss that
+  `HttpCache` forwards to the kernel as `GET` stays `HEAD`); cache hits and ESI fragments that `HttpCache` forwards to
+  the kernel are neither recorded nor observed.
 - `MessengerMeasurement` (`transport`, `messageClass`, `status`, `durationSeconds`, `exception`) is delivered once per
   worker outcome: handled, retried or failed. `durationSeconds` is null when no start was seen. `transport` is the
   receiver name, so a message replayed with `messenger:failed:retry` reports the failure transport. `exception` is the
