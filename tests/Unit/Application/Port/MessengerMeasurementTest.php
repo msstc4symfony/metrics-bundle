@@ -33,6 +33,11 @@ final class MessengerMeasurementTest extends TestCase
         self::assertNull($measurement->exception);
     }
 
+    public function testZeroDurationIsAccepted(): void
+    {
+        self::assertSame(0.0, (new MessengerMeasurement('async', stdClass::class, MessengerMessageStatus::HANDLED, 0.0, null))->durationSeconds);
+    }
+
     public function testEmptyTransportIsRejected(): void
     {
         $this->expectException(InvalidArgumentException::class);

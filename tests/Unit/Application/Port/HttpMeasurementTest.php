@@ -33,6 +33,11 @@ final class HttpMeasurementTest extends TestCase
         self::assertNull($measurement->exception);
     }
 
+    public function testHttpRangeBoundsAreAccepted(): void
+    {
+        self::assertSame(599, (new HttpMeasurement('GET', null, 599, 0.0, null))->status);
+    }
+
     #[DataProvider('invalidStatuses')]
     public function testStatusOutsideHttpRangeIsRejected(int $status): void
     {
