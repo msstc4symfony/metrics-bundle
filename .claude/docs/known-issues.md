@@ -829,7 +829,7 @@ Listener реализует `ResetInterface` (long-running рантаймы). П
 есть только в http-kernel ≥ 7.4.13 / 8.0.11 и работает лишь при ручной обёртке `new HttpCache($kernel)`). Поиск по
 идентичности в `WeakMap` промахивается → без fallback не писались `http_response`/длительность/наблюдатели. Поэтому
 `RequestEventListener::$pendingMain` — измеряемый главный запрос до terminate/reset; `resolveTerminatedRequest()`
-сначала ищет по идентичности, иначе берёт pending при совпадении `getPathInfo()`. Маршрут — с клона (оригинал не
+сначала ищет по идентичности, иначе берёт pending при совпадении `getRequestUri()`. Маршрут — с клона (оригинал не
 маршрутизировался), а метка `method` и `HttpMeasurement::$method` — с запроса клиента: HttpCache форвардит HEAD-промах
 как GET; и в `onRequest`, и в `onTerminate` метод берётся из `HttpCacheContext::clientRequest()` =
 `HttpCache::getRequest()` (клон запроса клиента) — `http_request` и `http_response` пишутся с `HEAD`.
@@ -856,19 +856,22 @@ libraries») `Kernel::terminate()` идёт через `HttpCache::terminate()`,
 `/products?partial=1`) и controller reference (`/_fragment?_path=…`). Тот же `getRequestUri()` —
 в `resolveTerminatedRequest()` (fallback оригинал ↔ клон).
 
-Проводка: `InjectHttpCachePass` (default type/priority, после загрузки расширений) ставит аргумент `$httpCache`
-listener'а = `Reference('http_cache')`, только если определение есть и **публичное** — `FrameworkExtension` делает
+Проводка: `InjectHttpCachePass` (`TYPE_BEFORE_REMOVING`: после загрузки расширений и `DecoratorServicePass`) ставит
+аргумент `$httpCache` внутреннего сервиса `HttpCacheContext` = `Reference('http_cache')`, только если определение
+есть, **публичное** и его класс (через parameter bag) — `HttpCache` или наследник — `FrameworkExtension` делает
 `http_cache` публичным ровно при `framework.http_cache.enabled` (`FrameworkExtension.php:871`), и тогда же
 `Kernel::handle()` (`container->has('http_cache')`) пускает главный запрос через него. Иначе `null`: приватный
-неиспользуемый сервис удаляется и не создаётся (`Store` создаёт каталог). Логика — в `@internal`
-`Presentation/EventListener/HttpCacheContext` (`isForwardedFragment()`, `clientRequest()`), listener создаёт его из
-`?HttpCache`. `HttpCache::getRequest()` читает типизированное свойство, которое задаёт только `handle(MAIN)`; до
+неиспользуемый сервис удаляется и не создаётся (`Store` создаёт каталог). Декоратор превращает id `http_cache` в публичный alias на декоратор (пасс разбирает alias). Публичный `http_cache`, который не
+`HttpCache` (свой `HttpKernelInterface`) или обёрнут декоратором не-`HttpCache`, тоже даёт `null` — иначе
+`TypeError` в конструкторе давал бы 500 на каждый запрос (CR3-001, найдено в acc3). Логика — в `@internal`
+`Presentation/EventListener/HttpCacheContext` (`isForwardedFragment()`, `clientRequest()`), listener получает готовый
+сервис (регистрируется в `services.php` с `$httpCache = null`, пасс переопределяет). `HttpCache::getRequest()` читает типизированное свойство, которое задаёт только `handle(MAIN)`; до
 этого — `Error`. Гард: `getTraces() === []` → HttpCache ещё ничего не обрабатывал (рантайм вызвал `http_kernel`
 в обход) → запрос клиентский. Ограничения: ручная обёртка `new HttpCache($kernel)` без `framework.http_cache` не
 покрыта (сервис приватный → `null`); рантайм, который зовёт `http_kernel` напрямую при включённом http_cache после
 хотя бы одного запроса через HttpCache, сравнивает URI с устаревшим `getRequest()`. Тест —
 `HttpErrorPathKernelTest::testHttpCacheEsiFragmentIsNotRecordedAsARequest` (env `http_cache_esi`), проводка —
-`RequestEventListenerWiringTest`, `InjectHttpCachePassTest`.
+`RequestEventListenerWiringTest`, `InjectHttpCachePassTest`, `HttpErrorPathKernelTest::testHttpCacheDecoratedByAnotherKernelStillMeasuresRequests` (env `http_cache_decorated`).
 
 Прежнее правило «не измерять главный запрос, пока другой pending» удалено (2.3, acc2 CR2-002): под HttpCache оно
 избыточно, а если pending не очищался (рантайм без terminate/reset), молча терялись все следующие запросы. `pendingMain`

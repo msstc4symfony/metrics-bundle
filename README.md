@@ -527,6 +527,8 @@ final class SlowRouteObserver implements HttpMeasurementObserverInterface
 - With `framework.http_cache`, cache misses are recorded and observed with the client's method (a `HEAD` miss that
   `HttpCache` forwards to the kernel as `GET` stays `HEAD`); cache hits and ESI fragments that `HttpCache` forwards to
   the kernel are neither recorded nor observed.
+- HTTP metrics under `HttpCache` are supported only through `framework.http_cache`; a hand-wrapped
+  `new HttpCache($kernel)` with ESI may lose the page response on older http-kernel versions.
 - `MessengerMeasurement` (`transport`, `messageClass`, `status`, `durationSeconds`, `exception`) is delivered once per
   worker outcome: handled, retried or failed. `durationSeconds` is null when no start was seen. `transport` is the
   receiver name, so a message replayed with `messenger:failed:retry` reports the failure transport. `exception` is the
