@@ -15,6 +15,8 @@ use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Http\ThrowingController;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Messenger\TestMessage;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Messenger\TestMessageHandler;
 use Msstc4Symfony\MetricsBundle\Test\Support\RecordingHttpMeasurementObserver;
+use Msstc4Symfony\MetricsBundle\Test\Support\RecordingMessengerMeasurementObserver;
+use Msstc4Symfony\MetricsBundle\Test\Support\ThrowingMessengerMeasurementObserver;
 use Override;
 use Prometheus\Storage\Adapter;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
@@ -61,6 +63,9 @@ final class TestKernel extends Kernel
 
     // A public autoconfigured HttpMeasurementObserverInterface service is registered.
     public const ENV_HTTP_OBSERVER = 'http_observer';
+
+    // Public autoconfigured Messenger observers (one recording, one throwing) and the metrics_bundle channel in a TestHandler.
+    public const ENV_MESSENGER_OBSERVER = 'messenger_observer';
 
     // The test connection is sqlite in memory.
     public static function hasDoctrine(): bool
@@ -138,6 +143,11 @@ final class TestKernel extends Kernel
             $container->services()->set(RecordingHttpMeasurementObserver::class)->autoconfigure()->public();
         }
 
+        if ($this->environment === self::ENV_MESSENGER_OBSERVER) {
+            $container->services()->set(ThrowingMessengerMeasurementObserver::class)->autoconfigure()->public();
+            $container->services()->set(RecordingMessengerMeasurementObserver::class)->autoconfigure()->public();
+        }
+
         if ($this->environment === self::ENV_HTTP_IGNORED_ROUTES) {
             $container->extension('msstc4symfony_metrics', ['http' => ['ignored_routes' => ['test_throw']]]);
         }
@@ -165,6 +175,14 @@ final class TestKernel extends Kernel
             $container->extension('doctrine', [
                 'dbal' => ['driver' => 'pdo_sqlite', 'memory' => true],
             ]);
+        }
+
+        if ($this->environment === self::ENV_MESSENGER_OBSERVER) {
+            $container->extension('monolog', [
+                'handlers' => ['metrics' => ['type' => 'test', 'channels' => [LogChannel::NAME]]],
+            ]);
+
+            return;
         }
 
         if ($this->environment === self::ENV_FAILING_STORAGE) {

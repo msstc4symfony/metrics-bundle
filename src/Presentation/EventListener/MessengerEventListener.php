@@ -4,14 +4,21 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Presentation\EventListener;
 
+use Monolog\Attribute\WithMonologChannel;
 use Msstc4Symfony\MetricsBundle\Application\Collector\MessengerCollector;
+use Msstc4Symfony\MetricsBundle\Application\LogChannel;
 use Msstc4Symfony\MetricsBundle\Application\Metric\MessengerMessageStatus;
+use Msstc4Symfony\MetricsBundle\Application\Port\MessengerMeasurement;
+use Msstc4Symfony\MetricsBundle\Application\Port\MessengerMeasurementObserverInterface;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\Messenger\Event\AbstractWorkerMessageEvent;
 use Symfony\Component\Messenger\Event\SendMessageToTransportsEvent;
 use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
 use Symfony\Component\Messenger\Event\WorkerMessageHandledEvent;
 use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
+use Throwable;
 use WeakMap;
 
 /**
@@ -24,6 +31,7 @@ use WeakMap;
  *
  * @internal
  */
+#[WithMonologChannel(LogChannel::NAME)]
 #[AsEventListener(event: SendMessageToTransportsEvent::class, method: 'onSendMessageToTransports')]
 // Lowest priority: start the clock right before the bus handles the message.
 #[AsEventListener(event: WorkerMessageReceivedEvent::class, method: 'onMessageReceived', priority: -1024)]
@@ -35,8 +43,14 @@ final class MessengerEventListener
     /** @var WeakMap<object, float> */
     private WeakMap $startedAt;
 
+    /**
+     * @param iterable<MessengerMeasurementObserverInterface> $observers
+     */
     public function __construct(
         private readonly MessengerCollector $collector,
+        #[AutowireIterator(MessengerMeasurementObserverInterface::TAG)]
+        private readonly iterable $observers,
+        private readonly LoggerInterface $logger,
     ) {
         $this->startedAt = new WeakMap();
     }
@@ -76,10 +90,36 @@ final class MessengerEventListener
         $startedAt = $this->startedAt[$message] ?? null;
         unset($this->startedAt[$message]);
 
+        $duration = $startedAt === null ? null : max(0.0, microtime(true) - $startedAt);
+
         $this->collector->incMessageHandled($transport, $message::class, $status);
 
-        if ($startedAt !== null) {
-            $this->collector->observeHandlingDuration($transport, $message::class, $status, microtime(true) - $startedAt);
+        if ($duration !== null) {
+            $this->collector->observeHandlingDuration($transport, $message::class, $status, $duration);
+        }
+
+        $this->notify($transport, $message::class, $status, $duration, $event instanceof WorkerMessageFailedEvent ? $event->getThrowable() : null);
+    }
+
+    /**
+     * @param class-string $messageClass
+     */
+    private function notify(string $transport, string $messageClass, MessengerMessageStatus $status, ?float $duration, ?Throwable $exception): void
+    {
+        try {
+            $measurement = new MessengerMeasurement($transport, $messageClass, $status, $duration, $exception);
+        } catch (Throwable $e) {
+            $this->logger->error('Cannot build Messenger measurement', ['exception' => $e]);
+
+            return;
+        }
+
+        foreach ($this->observers as $observer) {
+            try {
+                $observer->onMessageMeasured($measurement);
+            } catch (Throwable $e) {
+                $this->logger->error('Cannot notify Messenger measurement observer "{class}"', ['class' => $observer::class, 'exception' => $e]);
+            }
         }
     }
 }

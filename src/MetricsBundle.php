@@ -12,6 +12,7 @@ use LogicException;
 use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
 use Msstc4Symfony\MetricsBundle\Application\Metric\MetricDefinitionInterface;
 use Msstc4Symfony\MetricsBundle\Application\Port\HttpMeasurementObserverInterface;
+use Msstc4Symfony\MetricsBundle\Application\Port\MessengerMeasurementObserverInterface;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\AddDoctrineDBALMonitorPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\AddGuzzleMonitorPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\AddHttpClientMonitorPass;
@@ -224,6 +225,9 @@ final class MetricsBundle extends AbstractBundle
 
         $builder->registerForAutoconfiguration(HttpMeasurementObserverInterface::class)
             ->addTag(HttpMeasurementObserverInterface::TAG)
+        ;
+        $builder->registerForAutoconfiguration(MessengerMeasurementObserverInterface::class)
+            ->addTag(MessengerMeasurementObserverInterface::TAG)
         ;
 
         $container->import(__DIR__ . '/Resources/config/services.php');

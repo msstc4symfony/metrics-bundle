@@ -6,10 +6,15 @@ namespace Msstc4Symfony\MetricsBundle\Test\Integration\Presentation\EventListene
 
 use Msstc4Symfony\MetricsBundle\Application\Collector\MessengerCollector;
 use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
+use Msstc4Symfony\MetricsBundle\Application\Metric\MessengerMessageStatus;
 use Msstc4Symfony\MetricsBundle\Application\Metric\MetricRepository;
+use Msstc4Symfony\MetricsBundle\Application\Port\MessengerMeasurementObserverInterface;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Prometheus\PrometheusMetricRecorder;
 use Msstc4Symfony\MetricsBundle\Presentation\EventListener\MessengerEventListener;
+use Msstc4Symfony\MetricsBundle\Test\Support\CollectingLogger;
+use Msstc4Symfony\MetricsBundle\Test\Support\RecordingMessengerMeasurementObserver;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
+use Msstc4Symfony\MetricsBundle\Test\Support\ThrowingMessengerMeasurementObserver;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
@@ -32,6 +37,10 @@ final class MessengerEventListenerTest extends TestCase
 
     private Envelope $envelope;
 
+    private CollectingLogger $logger;
+
+    private RecordingMessengerMeasurementObserver $observer;
+
     #[Override]
     protected function setUp(): void
     {
@@ -40,9 +49,9 @@ final class MessengerEventListenerTest extends TestCase
         }
 
         $this->registry = new CollectorRegistry(new InMemory());
-        $this->listener = new MessengerEventListener(
-            new MessengerCollector(new PrometheusMetricRecorder($this->registry, new MetricRepository([]), 'app', 'cmp')),
-        );
+        $this->logger = new CollectingLogger();
+        $this->observer = new RecordingMessengerMeasurementObserver();
+        $this->listener = $this->listener([$this->observer]);
         $this->envelope = new Envelope(new stdClass());
     }
 
@@ -158,6 +167,91 @@ final class MessengerEventListenerTest extends TestCase
                 [['app', 'cmp', 'audit', 'stdClass'], '1'],
             ],
             RegistrySamples::samples($this->registry, BuiltInMetric::MESSENGER_MESSAGE_SENT),
+        );
+    }
+
+    public function testObserverGetsHandledMeasurementWithDuration(): void
+    {
+        $this->listener->onMessageReceived(new WorkerMessageReceivedEvent($this->envelope, 'async'));
+        $this->listener->onMessageHandled(new WorkerMessageHandledEvent($this->envelope, 'async'));
+
+        self::assertCount(1, $this->observer->measurements);
+        $measurement = $this->observer->measurements[0];
+        self::assertSame('async', $measurement->transport);
+        self::assertSame(stdClass::class, $measurement->messageClass);
+        self::assertSame(MessengerMessageStatus::HANDLED, $measurement->status);
+        self::assertNotNull($measurement->durationSeconds);
+        self::assertGreaterThanOrEqual(0.0, $measurement->durationSeconds);
+        self::assertNull($measurement->exception);
+    }
+
+    public function testObserverGetsRetriedWithThrowable(): void
+    {
+        $exception = new RuntimeException('boom');
+        $failed = new WorkerMessageFailedEvent($this->envelope, 'async', $exception);
+        $failed->setForRetry();
+
+        $this->listener->onMessageReceived(new WorkerMessageReceivedEvent($this->envelope, 'async'));
+        $this->listener->onMessageFailed($failed);
+
+        self::assertCount(1, $this->observer->measurements);
+        self::assertSame(MessengerMessageStatus::RETRIED, $this->observer->measurements[0]->status);
+        self::assertSame($exception, $this->observer->measurements[0]->exception);
+    }
+
+    public function testObserverGetsFailedWithThrowable(): void
+    {
+        $exception = new RuntimeException('boom');
+
+        $this->listener->onMessageReceived(new WorkerMessageReceivedEvent($this->envelope, 'async'));
+        $this->listener->onMessageFailed(new WorkerMessageFailedEvent($this->envelope, 'async', $exception));
+
+        self::assertCount(1, $this->observer->measurements);
+        self::assertSame(MessengerMessageStatus::FAILED, $this->observer->measurements[0]->status);
+        self::assertSame($exception, $this->observer->measurements[0]->exception);
+    }
+
+    public function testObserverGetsNullDurationWithoutStart(): void
+    {
+        $this->listener->onMessageHandled(new WorkerMessageHandledEvent($this->envelope, 'async'));
+
+        self::assertCount(1, $this->observer->measurements);
+        self::assertNull($this->observer->measurements[0]->durationSeconds);
+    }
+
+    public function testObserverGetsTheSameDurationThatWasRecorded(): void
+    {
+        $this->listener->onMessageReceived(new WorkerMessageReceivedEvent($this->envelope, 'async'));
+        $this->listener->onMessageHandled(new WorkerMessageHandledEvent($this->envelope, 'async'));
+
+        $sum = RegistrySamples::samples($this->registry, BuiltInMetric::MESSENGER_MESSAGE_HANDLING_DURATION_HISTOGRAM_SECONDS, '_sum');
+        self::assertCount(1, $sum);
+        self::assertEqualsWithDelta((float) $sum[0][1], $this->observer->measurements[0]->durationSeconds, 1e-12);
+    }
+
+    public function testThrowingObserverIsLoggedAndOthersStillRun(): void
+    {
+        $listener = $this->listener([new ThrowingMessengerMeasurementObserver(), $this->observer]);
+
+        $listener->onMessageReceived(new WorkerMessageReceivedEvent($this->envelope, 'async'));
+        $listener->onMessageHandled(new WorkerMessageHandledEvent($this->envelope, 'async'));
+
+        self::assertCount(1, $this->observer->measurements);
+        self::assertCount(1, $this->logger->records);
+        self::assertStringStartsWith('error: Cannot notify Messenger measurement observer', $this->logger->records[0]);
+        self::assertInstanceOf(RuntimeException::class, $this->logger->contexts[0]['exception'] ?? null);
+        self::assertSame(ThrowingMessengerMeasurementObserver::class, $this->logger->contexts[0]['class'] ?? null);
+    }
+
+    /**
+     * @param list<MessengerMeasurementObserverInterface> $observers
+     */
+    private function listener(array $observers): MessengerEventListener
+    {
+        return new MessengerEventListener(
+            new MessengerCollector(new PrometheusMetricRecorder($this->registry, new MetricRepository([]), 'app', 'cmp')),
+            $observers,
+            $this->logger,
         );
     }
 }
