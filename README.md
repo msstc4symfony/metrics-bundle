@@ -145,6 +145,10 @@ msstc4symfony_metrics:
     errors:
         # Label the exception metric with the short class name instead of the FQCN (less info leakage).
         short_exception_class_name: false
+    http:
+        # Routes never recorded in http_* metrics. Setting this key REPLACES the default list, so repeat
+        # the defaults you still want ignored.
+        ignored_routes: [metrics-get, healthcheck-ping, healthcheck-readiness, healthcheck-liveliness]
     http_client:
         # Replace id/uuid/hash segments of outbound paths (/users/42 -> /users/:id) when no URL assembler matched.
         sanitize_path: true
@@ -494,6 +498,31 @@ The OpenTelemetry Collector does the same with its `prometheus` receiver and `ot
    `increment()` takes counters, `set()` gauges and `observe()` histograms or summaries; any other type throws
    `InvalidArgumentException`.
 
+## Observing measurements
+
+To react to what the bundle measures (a business metric per route, an alert on a slow message), implement
+`Application\Port\HttpMeasurementObserverInterface` or `MessengerMeasurementObserverInterface`. Both are
+autoconfigured: implementing services are tagged (`msstc4symfony_metrics.http_measurement_observer`,
+`msstc4symfony_metrics.messenger_measurement_observer`) with no configuration.
+
+```php
+final class SlowRouteObserver implements HttpMeasurementObserverInterface
+{
+    public function onHttpMeasured(HttpMeasurement $measurement): void
+    {
+        // $measurement->method, ->route (null when unrouted), ->status, ->durationSeconds, ->exception
+    }
+}
+```
+
+- `HttpMeasurement` is delivered once per recorded main request at `kernel.terminate`, with the same duration that was
+  written to the duration metrics; `exception` is the uncaught exception of the request, if any.
+- `MessengerMeasurement` (`transport`, `messageClass`, `status`, `durationSeconds`, `exception`) is delivered once per
+  worker outcome: handled, retried or failed. `durationSeconds` is null when no start was seen. The port has no
+  dependency on `symfony/messenger`.
+- Observers run after the bundle wrote its own metrics. A failing observer is logged on the `metrics_bundle` channel
+  and never affects the response, the worker or the other observers.
+
 ## Public API
 
 Applications and bridges use or implement only these; every other class is `@internal` and may change in a minor
@@ -504,7 +533,7 @@ release.
 | `Application\Metric` | `MetricDefinitionInterface`, `BuiltInMetric`, `MetricType`, `LabelType`, `Metric`, `Label`, `MessengerMessageStatus`, `MetricRepositoryInterface`, `MetricRepository` |
 | `Application\Collector` | `DoctrineConnectionCollector`, `DoctrineQueryType` (wiring DBAL metrics without DoctrineBundle) |
 | `Infrastructure\Doctrine\DBAL\Metrics` | `NamedConnectionMiddleware` |
-| `Application\Port` | `MetricRecorderInterface`, `MetricBatchRecorderInterface` (`incrementBy()` for counts aggregated in memory; an application replacing the recorder aliases both), `MetricStorageInterface`, `MetricExport`, `MetricStorageException` |
+| `Application\Port` | `HttpMeasurement`, `HttpMeasurementObserverInterface`, `MessengerMeasurement`, `MessengerMeasurementObserverInterface` (see "Observing measurements"), `MetricRecorderInterface`, `MetricBatchRecorderInterface` (`incrementBy()` for counts aggregated in memory; an application replacing the recorder aliases both), `MetricStorageInterface`, `MetricExport`, `MetricStorageException` |
 | `Application` | `LogChannel` (`metrics_bundle`) |
 | `Infrastructure\HttpClient\URLAssembler` | `AssemblerInterface` |
 | (root) | `MetricsBundle` |
@@ -512,7 +541,7 @@ release.
 Minor releases add cases to `BuiltInMetric` (new metrics): a `match` over its cases needs a `default` arm.
 
 The configuration keys under `msstc4symfony_metrics` (including `metric_enums`), the container parameters
-`msstc4symfony_metrics.metric_enums`, `.application_name`, `.component_name`, the route `/_/metrics` and the commands
+`msstc4symfony_metrics.metric_enums`, `.application_name`, `.component_name`, `.http.ignored_routes`, the route `/_/metrics` and the commands
 `metrics:list` / `metrics:clear` are public too. Packages such as `msstc4symfony/metrics-bridge-profiling` append their
 enum to `msstc4symfony_metrics.metric_enums` in a
 compiler pass. Every metric name must be declared once: if two enums declare the same name, building

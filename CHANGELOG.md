@@ -4,6 +4,29 @@ All notable changes to this bundle are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions follow
 [Semantic Versioning](https://semver.org/); dates are UTC.
 
+## [Unreleased]
+
+### Added
+
+- `Application\Port\HttpMeasurementObserverInterface` and `HttpMeasurement`: autoconfigured observers (tag
+  `msstc4symfony_metrics.http_measurement_observer`) notified once per recorded main request after the bundle wrote its
+  metrics, with the same duration. A failing observer is logged on the `metrics_bundle` channel.
+- `Application\Port\MessengerMeasurementObserverInterface` and `MessengerMeasurement`: autoconfigured observers (tag
+  `msstc4symfony_metrics.messenger_measurement_observer`) notified once per worker outcome (handled, retried, failed).
+  The port does not depend on `symfony/messenger`.
+- `msstc4symfony_metrics.http.ignored_routes` (parameter of the same name): routes never recorded in `http_*` metrics.
+  Default `metrics-get`, `healthcheck-ping`, `healthcheck-readiness`, `healthcheck-liveliness`; setting it replaces the
+  default list.
+
+### Fixed
+
+- Responses rendered for uncaught exceptions, router 404s and pages with fragment sub-requests were not recorded in
+  `http_response` and the request duration metrics; they are now. The request listener kept one start time that every
+  `kernel.request`, including Symfony's error sub-request, reset. After upgrading, 5xx and 404 responses that were
+  invisible before appear in `http_response` — this is the fix, not a regression.
+- Requests stopped before routing are counted in `http_request` with `route="unknown"`.
+- The request listener resets between requests in long-running runtimes.
+
 ## [2.2.1] - 2026-10-23
 
 ### Fixed

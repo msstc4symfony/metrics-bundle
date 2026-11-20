@@ -103,7 +103,7 @@ final class MetricsBundle extends AbstractBundle
                     ->addDefaultsIfNotSet()
                     ->children()
                         ->arrayNode('ignored_routes')
-                            ->info('Routes never recorded in http_* metrics.')
+                            ->info('Routes never recorded in http_* metrics. Setting this key REPLACES the default list (metrics-get, healthcheck-ping, healthcheck-readiness, healthcheck-liveliness): repeat the defaults you still want ignored.')
                             ->defaultValue(self::DEFAULT_IGNORED_ROUTES)
                             ->scalarPrototype()
                                 ->cannotBeEmpty()

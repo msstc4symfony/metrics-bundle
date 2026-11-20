@@ -5,7 +5,7 @@
 | Слой | Что внутри | Может зависеть от |
 |---|---|---|
 | `Application/Metric` | определения и модель (`MetricDefinitionInterface`, `BuiltInMetric`, `Metric`, `Label`, `MetricType`, `LabelType`, `MessengerMessageStatus` — его значения перечисляет `BuiltInMetric`, `MetricRepository`+фабрика) — публичный API | — |
-| `Application/Port` | `MetricRecorderInterface`, `MetricBatchRecorderInterface` (2.2: `incrementBy()` — новый интерфейс, а не метод в старом: Roave BC), `MetricStorageInterface`, `MetricExport`, `MetricStorageException` — публичный API | — |
+| `Application/Port` | `HttpMeasurementObserverInterface` + `HttpMeasurement`, `MessengerMeasurementObserverInterface` + `MessengerMeasurement` (2.3, см. «Наблюдатели измерений»), `MetricRecorderInterface`, `MetricBatchRecorderInterface` (2.2: `incrementBy()` — новый интерфейс, а не метод в старом: Roave BC), `MetricStorageInterface`, `MetricExport`, `MetricStorageException` — публичный API | — |
 | `Application/Collector` | 10 коллекторов (`final`, получают `MetricRecorderInterface`; `CacheCollector` — единственный со состоянием: счёт hit/miss в памяти, `flush()` пишет через `MetricBatchRecorderInterface`), enum `DoctrineQueryType`; публичны `DoctrineConnectionCollector` и `DoctrineQueryType` (ручной DBAL без DoctrineBundle, вместе с `NamedConnectionMiddleware`) | — |
 | `Infrastructure/Prometheus` | `PrometheusMetricRecorder` (префикс лейблов, выбор типа, лог сбоя в `metrics_bundle`), `PrometheusMetricStorage`, `Storage/` (фабрика адаптера, `ReconnectingRedisAdapter`) | `Application` |
 | `Infrastructure/{Doctrine,Elastica,HttpClient,Guzzle,Cache}` | адаптеры, вызывающие коллекторы; `OutgoingHttp/OutgoingRequestLabels` — общие метки host/path для http-client и Guzzle (ассемблеры + `PathSanitizer`, с 2.2 там же); `Cache/` — декораторы, `CountingCallbackWrapper` + `ComputationCounter`; `Messenger/MessengerQueueDepthReader` | `Application` |
@@ -129,3 +129,17 @@ MongoDB, Elastica, Messenger, APCu. Метрики кешей и глубины 
 
 ## Не-final классы
 
+
+## Наблюдатели измерений (2.3)
+
+- Порты `HttpMeasurementObserverInterface` (TAG `msstc4symfony_metrics.http_measurement_observer`, `onHttpMeasured`) и
+  `MessengerMeasurementObserverInterface` (TAG `msstc4symfony_metrics.messenger_measurement_observer`,
+  `onMessageMeasured`) автоконфигурируются в `MetricsBundle::loadExtension` (`registerForAutoconfiguration`).
+  Порт Messenger не зависит от `symfony/messenger`: `MessengerMeasurement` несёт transport, messageClass,
+  `MessengerMessageStatus`, `?durationSeconds`, `?exception`.
+- Fail-open порядок: сначала listener пишет базовые метрики, потом зовёт наблюдателей с тем же значением длительности.
+  Каждый наблюдатель обёрнут отдельно: исключение логируется в канал `metrics_bundle` и не мешает ни ответу/воркеру,
+  ни остальным наблюдателям. HTTP — один вызов на записанный главный запрос в `kernel.terminate`; Messenger — один на
+  исход воркера (handled/retried/failed).
+- `RequestEventListener` хранит состояние запроса в `WeakMap` (старт, «уже посчитан», исключение) и реализует
+  `ResetInterface`; см. known-issues «Сброс состояния подзапросами».

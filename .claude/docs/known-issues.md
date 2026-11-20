@@ -807,3 +807,16 @@ Symfony DI 8.1 объявил deprecated сопоставление именов
 (`metrics.cache`, иначе алиас `CacheInterface`, как раньше при автовайринге по типу) и передаёт его обоим явно. Тестовые ядра без пула `metrics.cache` этого не
 ловят: алиаса нет — нет и deprecation; `QueueDepthKernel` объявляет пул специально. PHPUnit не падает на нём сам:
 `trigger_deprecation` подавлен `@`, а источник — vendor (`MetricsCacheAutowiringTest` ловит его своим handler'ом).
+
+## Сброс состояния подзапросами в RequestEventListener (исправлено в 2.3)
+
+До 2.3 listener хранил один `$startedAt`, который сбрасывался в null на каждом `kernel.request`, включая подзапросы.
+Error sub-request Symfony `ErrorListener` (http-kernel `ErrorListener.php:99`) и фрагменты (ESI/render) обнуляли старт
+главного запроса, поэтому ответы на необработанные исключения (5xx), 404 роутера и страницы с фрагментами не попадали в
+`http_response` и метрики длительности. Теперь состояние лежит в `WeakMap` по объекту запроса (старт, «посчитан»,
+исключение), подзапросы его не трогают. Запросы, остановленные до роутинга, считаются в terminate с `route="unknown"`.
+Listener реализует `ResetInterface` (long-running рантаймы). После обновления в `http_response` появляются 5xx и 404,
+которых раньше не было, — это исправление, не регрессия.
+
+`http.ignored_routes` ЗАМЕНЯЕТ список по умолчанию (`metrics-get`, `healthcheck-ping`, `healthcheck-readiness`,
+`healthcheck-liveliness`), а не дополняет его; параметр `msstc4symfony_metrics.http.ignored_routes`.
