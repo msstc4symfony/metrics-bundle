@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use Msstc4Symfony\MetricsBundle\Application\Metric\MessengerMessageStatus;
 use Msstc4Symfony\MetricsBundle\Application\Port\MessengerMeasurement;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 use RuntimeException;
 use stdClass;
 
@@ -42,7 +43,8 @@ final class MessengerMeasurementTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
 
-        new MessengerMeasurement('', stdClass::class, MessengerMessageStatus::HANDLED, 0.1, null);
+        // Through reflection: PHPStan rejects '' for the non-empty-string parameter.
+        (new ReflectionClass(MessengerMeasurement::class))->newInstance('', stdClass::class, MessengerMessageStatus::HANDLED, 0.1, null);
     }
 
     public function testNegativeDurationIsRejected(): void

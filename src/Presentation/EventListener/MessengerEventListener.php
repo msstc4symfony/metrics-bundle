@@ -44,7 +44,7 @@ final class MessengerEventListener
     private WeakMap $startedAt;
 
     /**
-     * @param iterable<MessengerMeasurementObserverInterface> $observers
+     * @param iterable<int, MessengerMeasurementObserverInterface> $observers
      */
     public function __construct(
         private readonly MessengerCollector $collector,
@@ -114,6 +114,12 @@ final class MessengerEventListener
      */
     private function notify(string $transport, string $messageClass, MessengerMessageStatus $status, ?float $duration, ?Throwable $exception): void
     {
+        if ($transport === '') {
+            $this->logger->error('Cannot build Messenger measurement: the receiver name is empty');
+
+            return;
+        }
+
         try {
             $measurement = new MessengerMeasurement($transport, $messageClass, $status, $duration, $exception);
         } catch (Throwable $e) {

@@ -264,6 +264,14 @@ final class MessengerEventListenerTest extends TestCase
         self::assertNull($this->observer->measurements[1]->durationSeconds);
     }
 
+    public function testEmptyReceiverNameIsLoggedInsteadOfObserved(): void
+    {
+        $this->listener->onMessageHandled(new WorkerMessageHandledEvent($this->envelope, ''));
+
+        self::assertSame([], $this->observer->measurements);
+        self::assertSame(['error: Cannot build Messenger measurement: the receiver name is empty'], $this->logger->records);
+    }
+
     public function testThrowingRecorderDoesNotBreakSending(): void
     {
         $listener = new MessengerEventListener(new MessengerCollector(new ThrowingMetricRecorder()), [], $this->logger);
