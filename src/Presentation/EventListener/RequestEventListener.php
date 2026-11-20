@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Presentation\EventListener;
 
-use Error;
 use Monolog\Attribute\WithMonologChannel;
 use Msstc4Symfony\MetricsBundle\Application\Collector\RequestCollector;
 use Msstc4Symfony\MetricsBundle\Application\LogChannel;
@@ -20,7 +19,6 @@ use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\Event\TerminateEvent;
 use Symfony\Component\HttpKernel\HttpCache\HttpCache;
-use Symfony\Component\HttpKernel\KernelInterface;
 use Symfony\Contracts\Service\ResetInterface;
 use Throwable;
 use WeakMap;
@@ -50,6 +48,8 @@ final class RequestEventListener implements ResetInterface
      */
     private ?Request $pendingMain = null;
 
+    private readonly HttpCacheContext $httpCacheContext;
+
     /**
      * @param iterable<int, HttpMeasurementObserverInterface> $observers
      * @param list<non-empty-string> $ignoredRoutes
@@ -60,15 +60,16 @@ final class RequestEventListener implements ResetInterface
         private readonly iterable $observers,
         private readonly LoggerInterface $logger,
         private readonly array $ignoredRoutes,
-        private readonly KernelInterface $kernel,
+        ?HttpCache $httpCache,
     ) {
         $this->states = new WeakMap();
+        $this->httpCacheContext = new HttpCacheContext($httpCache);
     }
 
     public function onRequestFirst(RequestEvent $event): void
     {
         $request = $event->getRequest();
-        if (!$event->isMainRequest() || $request->isMethod('OPTIONS') || $this->isForwardedFragment($request)) {
+        if (!$event->isMainRequest() || $request->isMethod('OPTIONS') || $this->httpCacheContext->isForwardedFragment($request)) {
             return;
         }
 
@@ -91,7 +92,7 @@ final class RequestEventListener implements ResetInterface
         }
 
         try {
-            $this->collector->incRequestTotal($this->method($this->httpCacheClientRequest() ?? $request), $requestRoute);
+            $this->collector->incRequestTotal($this->method($this->httpCacheContext->clientRequest($request)), $requestRoute);
             $this->states[$request]->markCounted();
         } catch (Throwable $e) {
             $this->logger->error('Cannot record HTTP request metrics', ['exception' => $e]);
@@ -147,41 +148,6 @@ final class RequestEventListener implements ResetInterface
     {
         $this->states = new WeakMap();
         $this->pendingMain = null;
-    }
-
-    /**
-     * HttpCache forwards every ESI fragment miss to the kernel as a main request, whether the page is a miss forwarded
-     * just before or a cache hit. Its clones of the client request keep REQUEST_URI; a fragment request has its own.
-     */
-    private function isForwardedFragment(Request $request): bool
-    {
-        $client = $this->httpCacheClientRequest();
-
-        return $client instanceof Request && $client->getRequestUri() !== $request->getRequestUri();
-    }
-
-    /**
-     * The client request HttpCache is serving, or null without framework.http_cache. Kernel::handle() makes the same
-     * has('http_cache') check; when disabled the service stays private and unused, so it is never instantiated here.
-     */
-    private function httpCacheClientRequest(): ?Request
-    {
-        $container = $this->kernel->getContainer();
-        if (!$container->has('http_cache')) {
-            return null;
-        }
-
-        $httpCache = $container->get('http_cache');
-        if (!$httpCache instanceof HttpCache) {
-            return null;
-        }
-
-        try {
-            return $httpCache->getRequest();
-        } catch (Error) {
-            // Uninitialised until HttpCache handles a main request: the kernel was called without it.
-            return null;
-        }
     }
 
     /**

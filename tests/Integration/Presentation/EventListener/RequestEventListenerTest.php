@@ -22,7 +22,6 @@ use Prometheus\CollectorRegistry;
 use Prometheus\Storage\InMemory;
 use ReflectionProperty;
 use RuntimeException;
-use Symfony\Component\DependencyInjection\Container;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
@@ -190,7 +189,7 @@ final class RequestEventListenerTest extends TestCase
 
     public function testIgnoredRoutesComeFromConstructor(): void
     {
-        $listener = new RequestEventListener($this->collector, [], $this->logger, ['custom-ignored'], $this->kernel);
+        $listener = new RequestEventListener($this->collector, [], $this->logger, ['custom-ignored'], null);
 
         $request = Request::create('/custom', Request::METHOD_GET);
         $request->attributes->set('_route', 'custom-ignored');
@@ -495,6 +494,7 @@ final class RequestEventListenerTest extends TestCase
 
         $request = Request::create('/orders/42', Request::METHOD_POST);
         $request->attributes->set('_route', 'order_update');
+
         $listener->onRequestFirst($this->requestEvent($request));
         $listener->onRequest($this->requestEvent($request));
         $listener->onTerminate(new TerminateEvent($this->kernel, $request, new Response('')));
@@ -634,7 +634,7 @@ final class RequestEventListenerTest extends TestCase
     public function testThrowingRecorderStillNotifiesObserversAndForgetsTheRequest(): void
     {
         $observer = new RecordingHttpMeasurementObserver();
-        $listener = new RequestEventListener(new RequestCollector(new ThrowingMetricRecorder()), [$observer], $this->logger, [], $this->kernel);
+        $listener = new RequestEventListener(new RequestCollector(new ThrowingMetricRecorder()), [$observer], $this->logger, [], null);
 
         $request = Request::create('/orders/42', Request::METHOD_GET);
         $request->attributes->set('_route', 'order_show');
@@ -664,7 +664,7 @@ final class RequestEventListenerTest extends TestCase
             'healthcheck-ping',
             'healthcheck-readiness',
             'healthcheck-liveliness',
-        ], $this->kernel);
+        ], null);
     }
 
     /**
@@ -673,18 +673,14 @@ final class RequestEventListenerTest extends TestCase
      */
     private function listenerBehindHttpCache(?Request $clientRequest, array $observers = []): RequestEventListener
     {
-        $httpCache = new HttpCache(self::createStub(HttpKernelInterface::class), self::createStub(StoreInterface::class));
+        $backend = self::createStub(HttpKernelInterface::class);
+        $backend->method('handle')->willReturn(new Response(''));
+        $httpCache = new HttpCache($backend, self::createStub(StoreInterface::class));
         if ($clientRequest instanceof Request) {
-            (new ReflectionProperty(HttpCache::class, 'request'))->setValue($httpCache, $clientRequest);
+            $httpCache->handle($clientRequest);
         }
 
-        $container = new Container();
-        $container->set('http_cache', $httpCache);
-
-        $kernel = self::createStub(KernelInterface::class);
-        $kernel->method('getContainer')->willReturn($container);
-
-        return new RequestEventListener($this->collector, $observers, $this->logger, [], $kernel);
+        return new RequestEventListener($this->collector, $observers, $this->logger, [], $httpCache);
     }
 
     private function retainedStates(RequestEventListener $listener): int

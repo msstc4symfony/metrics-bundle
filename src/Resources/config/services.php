@@ -47,6 +47,7 @@ return static function (ContainerConfigurator $container): void {
             '../../Infrastructure/Messenger/',
             // Plain helpers, never services.
             '../../Presentation/EventListener/QueueDepthSamplingState.php',
+            '../../Presentation/EventListener/HttpCacheContext.php',
             '../../Infrastructure/OutgoingHttp/PathSanitizer.php',
             // DecorateCachePoolsPass registers these only for listed pools.
             '../../Infrastructure/Cache/',

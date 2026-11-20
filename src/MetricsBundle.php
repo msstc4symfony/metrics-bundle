@@ -20,6 +20,7 @@ use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\AddMonologDecor
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\AliasThrottleCachePass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\DecorateCachePoolsPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\DecorateElasticaClientsPass;
+use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\InjectHttpCachePass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\KeepCachePoolsReversiblePass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\RegisterMessengerQueueDepthPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\SaveElasticaClientsListPass;
@@ -240,6 +241,8 @@ final class MetricsBundle extends AbstractBundle
 
         $container->addCompilerPass(new AliasThrottleCachePass());
         $container->addCompilerPass(new AddMonologDecoratorCompilerPass());
+        // Default type and priority: after the extensions loaded, so FrameworkExtension has set http_cache's visibility.
+        $container->addCompilerPass(new InjectHttpCachePass());
         $container->addCompilerPass(new AddHttpClientMonitorPass(), priority: -256);
         $container->addCompilerPass(new AddGuzzleMonitorPass(), PassConfig::TYPE_BEFORE_REMOVING);
         $container->addCompilerPass(new DecorateCachePoolsPass(), priority: DecorateCachePoolsPass::PRIORITY);

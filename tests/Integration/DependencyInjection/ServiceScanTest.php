@@ -17,6 +17,7 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Messenger\MessengerQueueDepthRead
 use Msstc4Symfony\MetricsBundle\Infrastructure\OutgoingHttp\PathSanitizer;
 use Msstc4Symfony\MetricsBundle\MetricsBundle;
 use Msstc4Symfony\MetricsBundle\Presentation\EventListener\CacheMetricsFlushListener;
+use Msstc4Symfony\MetricsBundle\Presentation\EventListener\HttpCacheContext;
 use Msstc4Symfony\MetricsBundle\Presentation\EventListener\MessengerEventListener;
 use Msstc4Symfony\MetricsBundle\Presentation\EventListener\MessengerQueueDepthListener;
 use Msstc4Symfony\MetricsBundle\Presentation\EventListener\QueueDepthSamplingState;
@@ -56,6 +57,7 @@ final class ServiceScanTest extends TestCase
         yield 'MessengerQueueDepthListener' => [MessengerQueueDepthListener::class];
         yield 'MessengerQueueDepthReader' => [MessengerQueueDepthReader::class];
         yield 'QueueDepthSamplingState' => [QueueDepthSamplingState::class];
+        yield 'HttpCacheContext' => [HttpCacheContext::class];
         yield 'CountingCacheAdapter' => [CountingCacheAdapter::class];
         yield 'CacheCollector' => [CacheCollector::class];
         yield 'CacheMetricsFlushListener' => [CacheMetricsFlushListener::class];
