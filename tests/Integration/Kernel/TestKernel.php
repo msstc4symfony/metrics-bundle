@@ -11,6 +11,7 @@ use GuzzleHttp\HandlerStack;
 use Msstc4Symfony\MetricsBundle\Application\LogChannel;
 use Msstc4Symfony\MetricsBundle\MetricsBundle;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Guzzle\GuzzleClientFactory;
+use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Http\ThrowingController;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Messenger\TestMessage;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Messenger\TestMessageHandler;
 use Override;
@@ -53,6 +54,9 @@ final class TestKernel extends Kernel
 
     // Counter writes fail and the app/metrics_bundle channels are kept in TestHandlers.
     public const ENV_FAILING_STORAGE = 'failing_storage';
+
+    // msstc4symfony_metrics.http.ignored_routes lists the throwing test route.
+    public const ENV_HTTP_IGNORED_ROUTES = 'http_ignored_routes';
 
     // The test connection is sqlite in memory.
     public static function hasDoctrine(): bool
@@ -122,6 +126,14 @@ final class TestKernel extends Kernel
 
         $container->extension('framework', $framework);
 
+        if (!$this->isRoutingControllersEnvironment()) {
+            $container->services()->set(ThrowingController::class)->autowire()->autoconfigure();
+        }
+
+        if ($this->environment === self::ENV_HTTP_IGNORED_ROUTES) {
+            $container->extension('msstc4symfony_metrics', ['http' => ['ignored_routes' => ['test_throw']]]);
+        }
+
         if (class_exists(HttpClient::class)) {
             $services = $container->services();
             $services->set('test.mock_response', MockResponseFactory::class);
@@ -166,13 +178,21 @@ final class TestKernel extends Kernel
 
     protected function configureRoutes(RoutingConfigurator $routes): void
     {
-        if (\in_array($this->environment, [self::ENV_ROUTING_CONTROLLERS_ONLY, self::ENV_ROUTING_CONTROLLERS_AND_MANUAL_IMPORT], true)) {
+        if ($this->isRoutingControllersEnvironment()) {
             $routes->import('routing.controllers');
+        } else {
+            $routes->import(ThrowingController::class, 'attribute');
         }
 
         if ($this->environment !== self::ENV_ROUTING_CONTROLLERS_ONLY) {
             // The manual import README gives applications without "routing.controllers".
             $routes->import('@MetricsBundle/Presentation/Controller/', 'attribute');
         }
+    }
+
+    // Those environments assert the exact route set of the bundle, so the test controller stays out.
+    private function isRoutingControllersEnvironment(): bool
+    {
+        return \in_array($this->environment, [self::ENV_ROUTING_CONTROLLERS_ONLY, self::ENV_ROUTING_CONTROLLERS_AND_MANUAL_IMPORT], true);
     }
 }

@@ -22,6 +22,7 @@ use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\KeepCachePoolsR
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\RegisterMessengerQueueDepthPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\CompilerPass\SaveElasticaClientsListPass;
 use Msstc4Symfony\MetricsBundle\DependencyInjection\RuntimeIntegrations;
+use Msstc4Symfony\MetricsBundle\Presentation\Controller\GetMetricsController;
 use Override;
 use ReflectionEnum;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
@@ -38,6 +39,13 @@ final class MetricsBundle extends AbstractBundle
     private const DEFAULT_DSN = 'redis://127.0.0.1:6379';
 
     private const UNKNOWN = 'unknown';
+
+    private const DEFAULT_IGNORED_ROUTES = [
+        GetMetricsController::ROUTE_NAME,
+        'healthcheck-ping',
+        'healthcheck-readiness',
+        'healthcheck-liveliness',
+    ];
 
     protected string $extensionAlias = 'msstc4symfony_metrics';
 
@@ -86,6 +94,22 @@ final class MetricsBundle extends AbstractBundle
                         ->booleanNode('short_exception_class_name')
                             ->info('Label exceptions with the short class name instead of the FQCN.')
                             ->defaultFalse()
+                        ->end()
+                    ->end()
+                ->end()
+                ->arrayNode('http')
+                    ->addDefaultsIfNotSet()
+                    ->children()
+                        ->arrayNode('ignored_routes')
+                            ->info('Routes never recorded in http_* metrics.')
+                            ->defaultValue(self::DEFAULT_IGNORED_ROUTES)
+                            ->scalarPrototype()
+                                ->cannotBeEmpty()
+                                ->validate()
+                                    ->ifTrue(static fn (mixed $route): bool => !\is_string($route))
+                                    ->thenInvalid('A route must be a route name, %s given.')
+                                ->end()
+                            ->end()
                         ->end()
                     ->end()
                 ->end()
@@ -187,6 +211,7 @@ final class MetricsBundle extends AbstractBundle
             ->set(self::PARAMETER_PREFIX . 'application_name', $config['application_name'] ?? null)
             ->set(self::PARAMETER_PREFIX . 'component_name', $config['component_name'] ?? null)
             ->set(self::PARAMETER_PREFIX . 'errors.short_exception_class_name', $this->section($config, 'errors')['short_exception_class_name'] ?? null)
+            ->set(self::PARAMETER_PREFIX . 'http.ignored_routes', $this->uniqueStrings($this->section($this->section($config, 'http'), 'ignored_routes')))
             ->set(self::PARAMETER_PREFIX . 'http_client.sanitize_path', $this->section($config, 'http_client')['sanitize_path'] ?? null)
             ->set(DecorateElasticaClientsPass::SANITIZE_PATH_PARAMETER, $this->section($config, 'elastica')['sanitize_path'] ?? null)
             ->set(self::PARAMETER_PREFIX . 'metric_enums', [BuiltInMetric::class, ...array_values($this->section($config, 'metric_enums'))])

@@ -42,7 +42,7 @@ final class RequestEventListenerTest extends TestCase
 
     public function testMainRequestFlowRecordsAllMetrics(): void
     {
-        $listener = new RequestEventListener($this->collector);
+        $listener = $this->listener();
 
         $request = Request::create('/orders/42', Request::METHOD_GET);
         $request->attributes->set('_route', 'order_show');
@@ -65,7 +65,7 @@ final class RequestEventListenerTest extends TestCase
 
     public function testSubRequestIsIgnored(): void
     {
-        $listener = new RequestEventListener($this->collector);
+        $listener = $this->listener();
 
         $request = Request::create('/sub', Request::METHOD_GET);
         $listener->onRequestFirst($this->requestEvent($request, isMain: false));
@@ -76,7 +76,7 @@ final class RequestEventListenerTest extends TestCase
 
     public function testOptionsRequestIsIgnored(): void
     {
-        $listener = new RequestEventListener($this->collector);
+        $listener = $this->listener();
 
         $request = Request::create('/anything', Request::METHOD_OPTIONS);
         $listener->onRequestFirst($this->requestEvent($request));
@@ -87,7 +87,7 @@ final class RequestEventListenerTest extends TestCase
 
     public function testIgnoredRouteResetsStartedAt(): void
     {
-        $listener = new RequestEventListener($this->collector);
+        $listener = $this->listener();
 
         $request = Request::create('/_/metrics', Request::METHOD_GET);
         $request->attributes->set('_route', 'metrics-get');
@@ -98,6 +98,102 @@ final class RequestEventListenerTest extends TestCase
 
         self::assertFalse(RegistrySamples::exists($this->registry, BuiltInMetric::HTTP_REQUEST));
         self::assertFalse(RegistrySamples::exists($this->registry, BuiltInMetric::HTTP_RESPONSE));
+    }
+
+    public function testSubRequestDoesNotResetMainRequestMeasurement(): void
+    {
+        $listener = $this->listener();
+
+        $request = Request::create('/orders/42', Request::METHOD_GET);
+        $request->attributes->set('_route', 'order_show');
+
+        $subRequest = Request::create('/_error/500', Request::METHOD_GET);
+
+        $listener->onRequestFirst($this->requestEvent($request));
+        $listener->onRequest($this->requestEvent($request));
+        $listener->onRequestFirst($this->requestEvent($subRequest, isMain: false));
+        $listener->onRequest($this->requestEvent($subRequest, isMain: false));
+        $listener->onTerminate(new TerminateEvent($this->kernel, $request, new Response('', Response::HTTP_INTERNAL_SERVER_ERROR)));
+
+        self::assertSame(
+            [['app', 'cmp', 'GET', 'order_show', '500']],
+            RegistrySamples::labels($this->registry, BuiltInMetric::HTTP_RESPONSE),
+        );
+        self::assertTrue(RegistrySamples::exists($this->registry, BuiltInMetric::REQUEST_DURATION_HISTOGRAM_SECONDS));
+    }
+
+    public function testRequestWithoutRouteIsCountedAtTerminateAsUnknown(): void
+    {
+        $listener = $this->listener();
+
+        $request = Request::create('/missing', Request::METHOD_GET);
+        $listener->onRequestFirst($this->requestEvent($request));
+        $listener->onTerminate(new TerminateEvent($this->kernel, $request, new Response('', Response::HTTP_NOT_FOUND)));
+
+        self::assertSame(
+            [['app', 'cmp', 'GET', 'unknown']],
+            RegistrySamples::labels($this->registry, BuiltInMetric::HTTP_REQUEST),
+        );
+        self::assertSame(
+            [['app', 'cmp', 'GET', 'unknown', '404']],
+            RegistrySamples::labels($this->registry, BuiltInMetric::HTTP_RESPONSE),
+        );
+    }
+
+    public function testRequestIsCountedOnceWhenOnRequestRan(): void
+    {
+        $listener = $this->listener();
+
+        $request = Request::create('/orders/42', Request::METHOD_GET);
+        $request->attributes->set('_route', 'order_show');
+
+        $listener->onRequestFirst($this->requestEvent($request));
+        $listener->onRequest($this->requestEvent($request));
+        $listener->onTerminate(new TerminateEvent($this->kernel, $request, new Response('ok')));
+
+        self::assertSame(
+            [[['app', 'cmp', 'GET', 'order_show'], '1']],
+            RegistrySamples::samples($this->registry, BuiltInMetric::HTTP_REQUEST),
+        );
+    }
+
+    public function testResetDropsUnfinishedRequest(): void
+    {
+        $listener = $this->listener();
+
+        $request = Request::create('/orders/42', Request::METHOD_GET);
+        $request->attributes->set('_route', 'order_show');
+
+        $listener->onRequestFirst($this->requestEvent($request));
+        $listener->reset();
+        $listener->onTerminate(new TerminateEvent($this->kernel, $request, new Response('ok')));
+
+        self::assertFalse(RegistrySamples::exists($this->registry, BuiltInMetric::HTTP_RESPONSE));
+    }
+
+    public function testIgnoredRoutesComeFromConstructor(): void
+    {
+        $listener = new RequestEventListener($this->collector, ['custom-ignored']);
+
+        $request = Request::create('/custom', Request::METHOD_GET);
+        $request->attributes->set('_route', 'custom-ignored');
+
+        $listener->onRequestFirst($this->requestEvent($request));
+        $listener->onRequest($this->requestEvent($request));
+        $listener->onTerminate(new TerminateEvent($this->kernel, $request, new Response('')));
+
+        self::assertFalse(RegistrySamples::exists($this->registry, BuiltInMetric::HTTP_REQUEST));
+        self::assertFalse(RegistrySamples::exists($this->registry, BuiltInMetric::HTTP_RESPONSE));
+    }
+
+    private function listener(): RequestEventListener
+    {
+        return new RequestEventListener($this->collector, [
+            'metrics-get',
+            'healthcheck-ping',
+            'healthcheck-readiness',
+            'healthcheck-liveliness',
+        ]);
     }
 
     private function requestEvent(Request $request, bool $isMain = true): RequestEvent

@@ -15,6 +15,7 @@ use Msstc4Symfony\MetricsBundle\Infrastructure\Prometheus\PrometheusMetricRecord
 use Msstc4Symfony\MetricsBundle\Infrastructure\Prometheus\PrometheusMetricStorage;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Prometheus\Storage\FactoryInterface;
 use Msstc4Symfony\MetricsBundle\Presentation\EventListener\MessengerEventListener;
+use Msstc4Symfony\MetricsBundle\Presentation\EventListener\RequestEventListener;
 use Prometheus\CollectorRegistry;
 use Prometheus\RegistryInterface;
 use Prometheus\RendererInterface;
@@ -74,6 +75,10 @@ return static function (ContainerConfigurator $container): void {
     if (interface_exists(CommandSubscriber::class)) {
         $services->set(TimingSubscriber::class);
     }
+
+    $services->set(RequestEventListener::class)
+        ->arg('$ignoredRoutes', param('msstc4symfony_metrics.http.ignored_routes'))
+    ;
 
     $services->set(MetricRepository::class)
         ->factory([service(MetricRepositoryFactory::class), 'create'])
