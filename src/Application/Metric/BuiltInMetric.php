@@ -7,6 +7,8 @@ namespace Msstc4Symfony\MetricsBundle\Application\Metric;
 use Override;
 
 /**
+ * The HttpMethod alias must be kept in sync with HTTP_METHODS.
+ *
  * @phpstan-type HttpMethod 'GET'|'POST'|'PUT'|'PATCH'|'DELETE'|'HEAD'|'OTHER'
  */
 enum BuiltInMetric: string implements MetricDefinitionInterface

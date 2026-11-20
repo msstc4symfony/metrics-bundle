@@ -16,8 +16,10 @@ use Throwable;
 final readonly class HttpMeasurement
 {
     /**
-     * @param HttpMethod $method HTTP method as written to the metrics (BuiltInMetric::HTTP_METHODS); any other method is OTHER
-     * @param non-empty-string|null $route Route name; null where the metrics write "unknown" (the request was not routed)
+     * @param HttpMethod $method HTTP method as written to the metrics (BuiltInMetric::HTTP_METHODS); any other method
+     *                           is OTHER
+     * @param non-empty-string|null $route Route name; null where the metrics write "unknown" (the request was not
+     *                                     routed)
      * @param int<100, 599> $status
      * @param float $durationSeconds Same value that was written to the duration metrics
      * @param Throwable|null $exception The throwable that reached kernel.exception for the main request. A later
@@ -47,7 +49,7 @@ final readonly class HttpMeasurement
         return $status >= 100 && $status <= 599;
     }
 
-    // The checks below are kept apart from the constructor: its narrowed @param would let Rector drop them as dead code.
+    // Kept apart from the constructor: its narrowed @param would let Rector drop these checks as dead code.
     private function assertMethod(string $method): void
     {
         if (!\in_array($method, BuiltInMetric::HTTP_METHODS, true)) {

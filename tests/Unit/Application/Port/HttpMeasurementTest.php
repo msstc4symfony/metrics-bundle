@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace Msstc4Symfony\MetricsBundle\Test\Unit\Application\Port;
 
 use InvalidArgumentException;
+use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
 use Msstc4Symfony\MetricsBundle\Application\Port\HttpMeasurement;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use RuntimeException;
 
+/**
+ * @phpstan-import-type HttpMethod from BuiltInMetric
+ */
 final class HttpMeasurementTest extends TestCase
 {
     public function testExposesGivenValues(): void
@@ -31,6 +35,25 @@ final class HttpMeasurementTest extends TestCase
 
         self::assertNull($measurement->route);
         self::assertNull($measurement->exception);
+    }
+
+    /**
+     * @param HttpMethod $method
+     */
+    #[DataProvider('httpMethodProvider')]
+    public function testEveryListedHttpMethodIsAccepted(string $method): void
+    {
+        self::assertSame($method, (new HttpMeasurement($method, null, 200, 0.0, null))->method);
+    }
+
+    /**
+     * @return iterable<string, array{HttpMethod}>
+     */
+    public static function httpMethodProvider(): iterable
+    {
+        foreach (BuiltInMetric::HTTP_METHODS as $method) {
+            yield $method => [$method];
+        }
     }
 
     public function testHttpRangeBoundsAreAccepted(): void
