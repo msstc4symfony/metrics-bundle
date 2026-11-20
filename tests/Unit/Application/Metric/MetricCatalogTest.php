@@ -24,10 +24,10 @@ final class MetricCatalogTest extends TestCase
         yield 'CONSOLE_COMMAND_START' => [BuiltInMetric::CONSOLE_COMMAND_START, 'counter', ['command:string'], []];
         yield 'CONSOLE_COMMAND_FINISH' => [BuiltInMetric::CONSOLE_COMMAND_FINISH, 'counter', ['command:string'], []];
         yield 'CONSOLE_COMMAND_DURATION_HISTOGRAM_SECONDS' => [BuiltInMetric::CONSOLE_COMMAND_DURATION_HISTOGRAM_SECONDS, 'histogram', ['command:string'], [1, 5, 10, 60, 600, 3600, 86400]];
-        yield 'HTTP_REQUEST' => [BuiltInMetric::HTTP_REQUEST, 'counter', ['method:enum=GET|POST|DELETE|PUT|PATCH|HEAD', 'route:string'], []];
-        yield 'HTTP_RESPONSE' => [BuiltInMetric::HTTP_RESPONSE, 'counter', ['method:enum=GET|POST|DELETE|PUT|PATCH|HEAD', 'route:string', 'status:integer'], []];
-        yield 'REQUEST_DURATION_HISTOGRAM_SECONDS' => [BuiltInMetric::REQUEST_DURATION_HISTOGRAM_SECONDS, 'histogram', ['method:enum=GET|POST|DELETE|PUT|PATCH|HEAD', 'route:string'], [0.1, 0.5, 1, 3, 5, 10, 15, 30, 45, 60]];
-        yield 'REQUEST_DURATION_SUMMARY_SECONDS' => [BuiltInMetric::REQUEST_DURATION_SUMMARY_SECONDS, 'summary', ['method:enum=GET|POST|DELETE|PUT|PATCH|HEAD', 'route:string'], []];
+        yield 'HTTP_REQUEST' => [BuiltInMetric::HTTP_REQUEST, 'counter', ['method:enum=GET|POST|DELETE|PUT|PATCH|HEAD|OTHER', 'route:string'], []];
+        yield 'HTTP_RESPONSE' => [BuiltInMetric::HTTP_RESPONSE, 'counter', ['method:enum=GET|POST|DELETE|PUT|PATCH|HEAD|OTHER', 'route:string', 'status:integer'], []];
+        yield 'REQUEST_DURATION_HISTOGRAM_SECONDS' => [BuiltInMetric::REQUEST_DURATION_HISTOGRAM_SECONDS, 'histogram', ['method:enum=GET|POST|DELETE|PUT|PATCH|HEAD|OTHER', 'route:string'], [0.1, 0.5, 1, 3, 5, 10, 15, 30, 45, 60]];
+        yield 'REQUEST_DURATION_SUMMARY_SECONDS' => [BuiltInMetric::REQUEST_DURATION_SUMMARY_SECONDS, 'summary', ['method:enum=GET|POST|DELETE|PUT|PATCH|HEAD|OTHER', 'route:string'], []];
         yield 'EXCEPTION' => [BuiltInMetric::EXCEPTION, 'counter', ['class:string'], []];
         yield 'ERROR' => [BuiltInMetric::ERROR, 'counter', ['level:enum=EMERGENCY|ALERT|CRITICAL|ERROR|WARNING|NOTICE'], []];
         yield 'HTTP_CONNECTION_REQUEST' => [BuiltInMetric::HTTP_CONNECTION_REQUEST, 'counter', ['method:enum=GET|POST|DELETE|PUT|PATCH|HEAD|OPTIONS', 'host:string', 'path:string'], []];

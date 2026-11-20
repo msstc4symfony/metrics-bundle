@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use Msstc4Symfony\MetricsBundle\Application\Port\HttpMeasurement;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 use RuntimeException;
 
 final class HttpMeasurementTest extends TestCase
@@ -61,6 +62,14 @@ final class HttpMeasurementTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         new HttpMeasurement('', null, 200, 0.1, null);
+    }
+
+    public function testEmptyRouteIsRejected(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        // Through reflection: PHPStan rejects '' for the non-empty-string parameter.
+        (new ReflectionClass(HttpMeasurement::class))->newInstance('GET', '', 200, 0.1, null);
     }
 
     public function testLowerCaseMethodIsRejected(): void

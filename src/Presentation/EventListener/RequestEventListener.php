@@ -31,10 +31,16 @@ use WeakMap;
 #[AsEventListener(event: 'kernel.terminate', method: 'onTerminate')]
 final class RequestEventListener implements ResetInterface
 {
+    // Any other method token (scanners send arbitrary ones) would create a new series per token.
+    private const RECORDED_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'];
+
+    private const OTHER_METHOD = 'OTHER';
+
     /**
      * Keyed by the main request: the error sub-request issued by ErrorListener must not disturb it.
+     * Values are hrtime() nanoseconds.
      *
-     * @var WeakMap<Request, float>
+     * @var WeakMap<Request, float|int>
      */
     private WeakMap $startedAt;
 
@@ -47,6 +53,12 @@ final class RequestEventListener implements ResetInterface
      * @var WeakMap<Request, Throwable>
      */
     private WeakMap $exceptions;
+
+    /**
+     * First main request since the last terminate or reset. With framework.http_cache the kernel handles a clone of
+     * the main request, but Kernel::terminate() passes the original one, so the identity lookup misses.
+     */
+    private ?Request $pendingMain = null;
 
     /**
      * @param iterable<HttpMeasurementObserverInterface> $observers
@@ -71,7 +83,9 @@ final class RequestEventListener implements ResetInterface
             return;
         }
 
-        $this->startedAt[$request] = microtime(true);
+        $this->startedAt[$request] = hrtime(true);
+        // ESI fragments forwarded by HttpCache are main requests too; they must not replace the page.
+        $this->pendingMain ??= $request;
     }
 
     public function onRequest(RequestEvent $event): void
@@ -88,8 +102,12 @@ final class RequestEventListener implements ResetInterface
             return;
         }
 
-        $this->collector->incRequestTotal($request->getMethod(), $requestRoute);
-        $this->counted[$request] = true;
+        try {
+            $this->collector->incRequestTotal($this->method($request), $requestRoute);
+            $this->counted[$request] = true;
+        } catch (Throwable $e) {
+            $this->logger->error('Cannot record HTTP request metrics', ['exception' => $e]);
+        }
     }
 
     public function onException(ExceptionEvent $event): void
@@ -104,35 +122,38 @@ final class RequestEventListener implements ResetInterface
 
     public function onTerminate(TerminateEvent $event): void
     {
-        $request = $event->getRequest();
-        if (!isset($this->startedAt[$request])) {
+        $request = $this->measuredRequest($event->getRequest());
+        if (!$request instanceof Request) {
             return;
         }
 
-        $startedAt = $this->startedAt[$request];
+        $duration = (hrtime(true) - $this->startedAt[$request]) / 1e9;
         $requestRoute = $this->route($request);
-        if ($this->isIgnored($requestRoute)) {
-            $this->forget($request);
-
-            return;
-        }
-
-        // The router can throw before onRequest runs (404), so the request is counted here instead.
-        if (!isset($this->counted[$request])) {
-            $this->collector->incRequestTotal($request->getMethod(), $requestRoute);
-        }
-
-        $status = $event->getResponse()->getStatusCode();
-        $this->collector->incResponseTotal($request->getMethod(), $requestRoute, $status);
-
-        $duration = microtime(true) - $startedAt;
-        $this->collector->setRequestDuration($request->getMethod(), $requestRoute, $duration);
-        $this->collector->setRequestDurationSummary($request->getMethod(), $requestRoute, $duration);
-
+        $isCounted = isset($this->counted[$request]);
         $exception = $this->exceptions[$request] ?? null;
         $this->forget($request);
 
-        $this->notify($request, $requestRoute, $status, $duration, $exception);
+        if ($this->isIgnored($requestRoute)) {
+            return;
+        }
+
+        $method = $this->method($request);
+        $status = $event->getResponse()->getStatusCode();
+
+        try {
+            // The router can throw before onRequest runs (404), so the request is counted here instead.
+            if (!$isCounted) {
+                $this->collector->incRequestTotal($method, $requestRoute);
+            }
+
+            $this->collector->incResponseTotal($method, $requestRoute, $status);
+            $this->collector->setRequestDuration($method, $requestRoute, $duration);
+            $this->collector->setRequestDurationSummary($method, $requestRoute, $duration);
+        } catch (Throwable $e) {
+            $this->logger->error('Cannot record HTTP request metrics', ['exception' => $e]);
+        }
+
+        $this->notify($method, $requestRoute, $status, $duration, $exception);
     }
 
     #[Override]
@@ -141,12 +162,31 @@ final class RequestEventListener implements ResetInterface
         $this->startedAt = new WeakMap();
         $this->counted = new WeakMap();
         $this->exceptions = new WeakMap();
+        $this->pendingMain = null;
     }
 
-    private function notify(Request $request, ?string $route, int $status, float $duration, ?Throwable $exception): void
+    private function measuredRequest(Request $terminated): ?Request
+    {
+        $pending = $this->pendingMain;
+        if (!$pending instanceof Request || $pending->getPathInfo() !== $terminated->getPathInfo()) {
+            return isset($this->startedAt[$terminated]) ? $terminated : null;
+        }
+
+        $this->pendingMain = null;
+        if (isset($this->startedAt[$terminated])) {
+            return $terminated;
+        }
+
+        return isset($this->startedAt[$pending]) ? $pending : null;
+    }
+
+    /**
+     * @param non-empty-string|null $route
+     */
+    private function notify(string $method, ?string $route, int $status, float $duration, ?Throwable $exception): void
     {
         try {
-            $measurement = new HttpMeasurement($request->getMethod(), $route, $status, max(0.0, $duration), $exception);
+            $measurement = new HttpMeasurement($method, $route, $status, $duration, $exception);
         } catch (Throwable $e) {
             $this->logger->error('Cannot build HTTP measurement', ['exception' => $e]);
 
@@ -162,11 +202,21 @@ final class RequestEventListener implements ResetInterface
         }
     }
 
+    private function method(Request $request): string
+    {
+        $method = $request->getMethod();
+
+        return \in_array($method, self::RECORDED_METHODS, true) ? $method : self::OTHER_METHOD;
+    }
+
+    /**
+     * @return non-empty-string|null
+     */
     private function route(Request $request): ?string
     {
         $route = $request->attributes->get('_route');
 
-        return \is_string($route) ? $route : null;
+        return \is_string($route) && $route !== '' ? $route : null;
     }
 
     private function isIgnored(?string $route): bool

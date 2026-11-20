@@ -11,11 +11,12 @@ use GuzzleHttp\HandlerStack;
 use Msstc4Symfony\MetricsBundle\Application\LogChannel;
 use Msstc4Symfony\MetricsBundle\MetricsBundle;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Guzzle\GuzzleClientFactory;
-use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Http\ThrowingController;
+use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Http\HttpTestController;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Messenger\TestMessage;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\Messenger\TestMessageHandler;
 use Msstc4Symfony\MetricsBundle\Test\Support\RecordingHttpMeasurementObserver;
 use Msstc4Symfony\MetricsBundle\Test\Support\RecordingMessengerMeasurementObserver;
+use Msstc4Symfony\MetricsBundle\Test\Support\ThrowingHttpMeasurementObserver;
 use Msstc4Symfony\MetricsBundle\Test\Support\ThrowingMessengerMeasurementObserver;
 use Override;
 use Prometheus\Storage\Adapter;
@@ -61,8 +62,11 @@ final class TestKernel extends Kernel
     // msstc4symfony_metrics.http.ignored_routes lists the throwing test route.
     public const ENV_HTTP_IGNORED_ROUTES = 'http_ignored_routes';
 
-    // A public autoconfigured HttpMeasurementObserverInterface service is registered.
+    // Public autoconfigured HTTP observers (one throwing, one recording) and the metrics_bundle channel in a TestHandler.
     public const ENV_HTTP_OBSERVER = 'http_observer';
+
+    // framework.http_cache is enabled: HttpCache forwards a clone of the main request to the kernel.
+    public const ENV_HTTP_CACHE = 'http_cache';
 
     // Public autoconfigured Messenger observers (one recording, one throwing) and the metrics_bundle channel in a TestHandler.
     public const ENV_MESSENGER_OBSERVER = 'messenger_observer';
@@ -133,13 +137,18 @@ final class TestKernel extends Kernel
             $container->services()->set(TestMessageHandler::class)->autoconfigure();
         }
 
+        if ($this->environment === self::ENV_HTTP_CACHE) {
+            $framework['http_cache'] = true;
+        }
+
         $container->extension('framework', $framework);
 
         if (!$this->isRoutingControllersEnvironment()) {
-            $container->services()->set(ThrowingController::class)->autowire()->autoconfigure();
+            $container->services()->set(HttpTestController::class)->autowire()->autoconfigure();
         }
 
         if ($this->environment === self::ENV_HTTP_OBSERVER) {
+            $container->services()->set(ThrowingHttpMeasurementObserver::class)->autoconfigure()->public();
             $container->services()->set(RecordingHttpMeasurementObserver::class)->autoconfigure()->public();
         }
 
@@ -177,7 +186,7 @@ final class TestKernel extends Kernel
             ]);
         }
 
-        if ($this->environment === self::ENV_MESSENGER_OBSERVER) {
+        if (\in_array($this->environment, [self::ENV_HTTP_OBSERVER, self::ENV_MESSENGER_OBSERVER], true)) {
             $container->extension('monolog', [
                 'handlers' => ['metrics' => ['type' => 'test', 'channels' => [LogChannel::NAME]]],
             ]);
@@ -207,7 +216,7 @@ final class TestKernel extends Kernel
         if ($this->isRoutingControllersEnvironment()) {
             $routes->import('routing.controllers');
         } else {
-            $routes->import(ThrowingController::class, 'attribute');
+            $routes->import(HttpTestController::class, 'attribute');
         }
 
         if ($this->environment !== self::ENV_ROUTING_CONTROLLERS_ONLY) {

@@ -12,7 +12,7 @@ use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[AsController]
-final readonly class ThrowingController
+final readonly class HttpTestController
 {
     public function __construct(
         private HttpKernelInterface $kernel,

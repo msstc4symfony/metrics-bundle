@@ -46,8 +46,32 @@ final class HttpErrorPathKernelTest extends KernelTestCase
         $this->serve($kernel, '/_test/throw');
 
         self::assertSame(
+            [[['unknown', 'unknown', 'GET', 'test_throw'], '1']],
+            RegistrySamples::samples($this->registry(), BuiltInMetric::HTTP_REQUEST),
+        );
+        self::assertSame(
             [['unknown', 'unknown', 'GET', 'test_throw', '500']],
             RegistrySamples::labels($this->registry(), BuiltInMetric::HTTP_RESPONSE),
+        );
+    }
+
+    public function testHttpCacheMissIsRecordedOnce(): void
+    {
+        $kernel = self::bootKernel(['environment' => TestKernel::ENV_HTTP_CACHE]);
+
+        $this->serve($kernel, '/_test/ok');
+
+        self::assertSame(
+            [[['unknown', 'unknown', 'GET', 'test_ok'], '1']],
+            RegistrySamples::samples($this->registry(), BuiltInMetric::HTTP_REQUEST),
+        );
+        self::assertSame(
+            [[['unknown', 'unknown', 'GET', 'test_ok', '200'], '1']],
+            RegistrySamples::samples($this->registry(), BuiltInMetric::HTTP_RESPONSE),
+        );
+        self::assertSame(
+            [[['unknown', 'unknown', 'GET', 'test_ok'], '1']],
+            RegistrySamples::samples($this->registry(), BuiltInMetric::REQUEST_DURATION_HISTOGRAM_SECONDS, '_count'),
         );
     }
 
