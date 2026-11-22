@@ -8,8 +8,11 @@ use Msstc4Symfony\MetricsBundle\Application\Collector\ErrorCollector;
 use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
 use Msstc4Symfony\MetricsBundle\Test\Support\CollectingLogger;
 use Msstc4Symfony\MetricsBundle\Test\Support\ThrowingMetricRecorder;
+use Override;
 use PHPUnit\Framework\Attributes\CoversClass;
+use Psr\Log\AbstractLogger;
 use RuntimeException;
+use Stringable;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 #[CoversClass(ErrorCollector::class)]
@@ -64,6 +67,23 @@ final class ErrorCollectorTest extends RecorderTestCase
 
         self::assertSame(1, $recorder->increments);
         self::assertSame(['error: Cannot record error metric'], $logger->records);
+    }
+
+    public function testALoggerFailureOnTopOfARecorderFailureIsSwallowed(): void
+    {
+        $logger = new class extends AbstractLogger {
+            #[Override]
+            public function log(mixed $level, string|Stringable $message, array $context = []): void
+            {
+                throw new RuntimeException('logger failure');
+            }
+        };
+        $collector = new ErrorCollector(new ThrowingMetricRecorder(), false, $logger);
+
+        $collector->incError('ERROR');
+        $collector->incException(new RuntimeException('boom'));
+
+        $this->expectNotToPerformAssertions();
     }
 
     private function build(bool $useShort = false): ErrorCollector

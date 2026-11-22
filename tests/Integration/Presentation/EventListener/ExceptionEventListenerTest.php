@@ -9,6 +9,7 @@ use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
 use Msstc4Symfony\MetricsBundle\Application\Metric\MetricRepository;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Prometheus\PrometheusMetricRecorder;
 use Msstc4Symfony\MetricsBundle\Presentation\EventListener\ExceptionEventListener;
+use Msstc4Symfony\MetricsBundle\Test\Support\CollectingLogger;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use Msstc4Symfony\MetricsBundle\Test\Support\ThrowingMetricRecorder;
 use Override;
@@ -64,8 +65,9 @@ final class ExceptionEventListenerTest extends TestCase
 
     public function testARecorderFailureLeavesTheApplicationExceptionUntouched(): void
     {
+        $logger = new CollectingLogger();
         $listener = new ExceptionEventListener(
-            new ErrorCollector(new ThrowingMetricRecorder(), false, new NullLogger()),
+            new ErrorCollector(new ThrowingMetricRecorder(), false, $logger),
         );
         $original = new RuntimeException('application failure');
         $event = new ExceptionEvent(
@@ -78,5 +80,6 @@ final class ExceptionEventListenerTest extends TestCase
         $listener->onException($event);
 
         self::assertSame($original, $event->getThrowable());
+        self::assertSame(['error: Cannot record exception metric'], $logger->records);
     }
 }

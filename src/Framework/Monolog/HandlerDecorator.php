@@ -31,7 +31,7 @@ final class HandlerDecorator implements LoggerInterface
      */
     private readonly array $allowedLevelMap;
 
-    /** Set while counting a record: a recorder failure logged through this same logger must not count again. */
+    /** Re-entrancy guard for a recorder that logs through this decorated logger while counting a record. */
     private bool $recording = false;
 
     /**

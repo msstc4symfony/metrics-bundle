@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Test\Integration\DependencyInjection;
 
+use Msstc4Symfony\MetricsBundle\Application\Collector\ErrorCollector;
 use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
 use Msstc4Symfony\MetricsBundle\Presentation\EventListener\RequestEventListener;
 use Msstc4Symfony\MetricsBundle\Test\Integration\Kernel\TestKernel;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
 use Override;
 use Prometheus\RegistryInterface;
+use ReflectionProperty;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Bundle\MonologBundle\MonologBundle;
 use Symfony\Component\Filesystem\Filesystem;
@@ -41,6 +43,17 @@ final class RequestEventListenerWiringTest extends KernelTestCase
         parent::tearDown();
         unset($_SERVER[self::DSN_ENV]);
         (new Filesystem())->remove(TestKernel::cacheRoot());
+    }
+
+    public function testErrorCollectorLogsOnTheMetricsBundleChannel(): void
+    {
+        self::bootKernel();
+        $collector = self::getContainer()->get(ErrorCollector::class);
+        self::assertInstanceOf(ErrorCollector::class, $collector);
+
+        $logger = (new ReflectionProperty(ErrorCollector::class, 'logger'))->getValue($collector);
+
+        self::assertSame(self::getContainer()->get('monolog.logger.metrics_bundle'), $logger);
     }
 
     public function testListenerIsResetWithTheKernelServices(): void

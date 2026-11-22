@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Msstc4Symfony\MetricsBundle\Application\Collector;
 
+use Closure;
 use Monolog\Attribute\WithMonologChannel;
 use Msstc4Symfony\MetricsBundle\Application\LogChannel;
 use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
@@ -46,28 +47,33 @@ final readonly class ErrorCollector
             return;
         }
 
-        try {
-            $this->recorder->increment(BuiltInMetric::EXCEPTION, [$this->formatExceptionClass($throwable)]);
-        } catch (Throwable $failure) {
-            $this->logFailure('Cannot record exception metric', $failure);
-        }
+        $this->failOpen(
+            'Cannot record exception metric',
+            fn () => $this->recorder->increment(BuiltInMetric::EXCEPTION, [$this->formatExceptionClass($throwable)]),
+        );
     }
 
     public function incError(string $level): void
     {
-        try {
-            $this->recorder->increment(BuiltInMetric::ERROR, [$level]);
-        } catch (Throwable $failure) {
-            $this->logFailure('Cannot record error metric', $failure);
-        }
+        $this->failOpen(
+            'Cannot record error metric',
+            fn () => $this->recorder->increment(BuiltInMetric::ERROR, [$level]),
+        );
     }
 
-    private function logFailure(string $message, Throwable $failure): void
+    /**
+     * @param Closure(): void $write
+     */
+    private function failOpen(string $message, Closure $write): void
     {
         try {
-            $this->logger->error($message, ['exception' => $failure]);
-        } catch (Throwable) {
-            // Logger failures must not break the application.
+            $write();
+        } catch (Throwable $failure) {
+            try {
+                $this->logger->error($message, ['exception' => $failure]);
+            } catch (Throwable) {
+                // Logger failures must not break the application.
+            }
         }
     }
 
