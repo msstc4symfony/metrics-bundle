@@ -897,3 +897,13 @@ Rector их не трогает (проверено `rector -n`). Тесты п�
 `ReflectionClass::newInstance()` — прямой вызов PHPStan отвергает. Listener'ы сужают типы до вызова: `method()` по
 `BuiltInMetric::HTTP_METHODS`, статус вне 100..599 (`HttpMeasurement::isRecordableStatus()` — единый источник
 диапазона) и пустое имя receiver'а логируются вместо наблюдения.
+
+## Сбой рекордера в ErrorCollector (2.3.1, 2026-11-22 UTC)
+
+`MetricRecorderInterface` публичный: рекордер приложения мог бросить. `ErrorCollector::incException/incError` вызывали
+его без защиты — исключение вылетало из `$logger->error()` через `HandlerDecorator` (внутренний лог терялся) и
+подменяло исключение приложения в `ExceptionEventListener` (kernel.exception, приоритет 4096). Теперь `ErrorCollector`
+ловит `Throwable` и пишет в канал `metrics_bundle` (не декорируется, поэтому рекурсии нет; сбой самого логгера тоже
+глотается). Защита `$recording` в `HandlerDecorator` остаётся второй линией. Конструктор `ErrorCollector` получил
+третий аргумент `LoggerInterface`.
+

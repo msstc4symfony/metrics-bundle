@@ -9,12 +9,12 @@ use Msstc4Symfony\MetricsBundle\Application\Metric\MetricDefinitionInterface;
 use Msstc4Symfony\MetricsBundle\Application\Port\MetricRecorderInterface;
 use Msstc4Symfony\MetricsBundle\Framework\Monolog\HandlerDecorator;
 use Msstc4Symfony\MetricsBundle\Test\Support\CollectingLogger;
+use Msstc4Symfony\MetricsBundle\Test\Support\ThrowingMetricRecorder;
 use Override;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
-use RuntimeException;
 
 #[CoversClass(HandlerDecorator::class)]
 #[UsesClass(ErrorCollector::class)]
@@ -49,7 +49,7 @@ final class HandlerDecoratorReentrancyTest extends TestCase
             {
             }
         };
-        $decorator = new HandlerDecorator($inner, new ErrorCollector($recorder, false));
+        $decorator = new HandlerDecorator($inner, new ErrorCollector($recorder, false, new CollectingLogger()));
         $recorder->logger = $decorator;
 
         $decorator->error('boom');
@@ -62,39 +62,16 @@ final class HandlerDecoratorReentrancyTest extends TestCase
         self::assertSame(2, $recorder->increments, 'the guard is released after counting');
     }
 
-    public function testTheGuardIsReleasedWhenTheCollectorThrows(): void
+    public function testARecorderFailureNeitherEscapesNorSkipsTheInnerLog(): void
     {
-        $recorder = new class implements MetricRecorderInterface {
-            public int $increments = 0;
+        $inner = new CollectingLogger();
+        $recorder = new ThrowingMetricRecorder();
+        $decorator = new HandlerDecorator($inner, new ErrorCollector($recorder, false, new CollectingLogger()));
 
-            #[Override]
-            public function increment(MetricDefinitionInterface $metric, array $labels = []): void
-            {
-                if (++$this->increments === 1) {
-                    throw new RuntimeException('recorder bug');
-                }
-            }
+        $decorator->error('first');
+        $decorator->warning('second');
 
-            #[Override]
-            public function set(MetricDefinitionInterface $metric, float|int $value, array $labels = []): void
-            {
-            }
-
-            #[Override]
-            public function observe(MetricDefinitionInterface $metric, float $value, array $labels = []): void
-            {
-            }
-        };
-        $decorator = new HandlerDecorator(new CollectingLogger(), new ErrorCollector($recorder, false));
-
-        try {
-            $decorator->error('first');
-            self::fail('the recorder exception is expected to propagate');
-        } catch (RuntimeException) {
-        }
-
-        $decorator->error('second');
-
-        self::assertSame(2, $recorder->increments);
+        self::assertSame(['error: first', 'warning: second'], $inner->records);
+        self::assertSame(2, $recorder->increments, 'the guard is released after a failed count');
     }
 }

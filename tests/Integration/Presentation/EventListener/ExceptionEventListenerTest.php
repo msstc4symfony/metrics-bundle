@@ -10,10 +10,12 @@ use Msstc4Symfony\MetricsBundle\Application\Metric\MetricRepository;
 use Msstc4Symfony\MetricsBundle\Infrastructure\Prometheus\PrometheusMetricRecorder;
 use Msstc4Symfony\MetricsBundle\Presentation\EventListener\ExceptionEventListener;
 use Msstc4Symfony\MetricsBundle\Test\Support\RegistrySamples;
+use Msstc4Symfony\MetricsBundle\Test\Support\ThrowingMetricRecorder;
 use Override;
 use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
 use Prometheus\Storage\InMemory;
+use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
@@ -34,7 +36,7 @@ final class ExceptionEventListenerTest extends TestCase
         }
 
         $this->registry = new CollectorRegistry(new InMemory());
-        $this->collector = new ErrorCollector(new PrometheusMetricRecorder($this->registry, new MetricRepository([]), 'app', 'cmp'), false);
+        $this->collector = new ErrorCollector(new PrometheusMetricRecorder($this->registry, new MetricRepository([]), 'app', 'cmp'), false, new NullLogger());
     }
 
     public function testIncrementsExceptionCounter(): void
@@ -58,5 +60,23 @@ final class ExceptionEventListenerTest extends TestCase
         $listener->onException(new ExceptionEvent($kernel, Request::create('/'), HttpKernelInterface::MAIN_REQUEST, new NotFoundHttpException()));
 
         self::assertFalse(RegistrySamples::exists($this->registry, BuiltInMetric::EXCEPTION));
+    }
+
+    public function testARecorderFailureLeavesTheApplicationExceptionUntouched(): void
+    {
+        $listener = new ExceptionEventListener(
+            new ErrorCollector(new ThrowingMetricRecorder(), false, new NullLogger()),
+        );
+        $original = new RuntimeException('application failure');
+        $event = new ExceptionEvent(
+            self::createStub(HttpKernelInterface::class),
+            Request::create('/'),
+            HttpKernelInterface::MAIN_REQUEST,
+            $original,
+        );
+
+        $listener->onException($event);
+
+        self::assertSame($original, $event->getThrowable());
     }
 }

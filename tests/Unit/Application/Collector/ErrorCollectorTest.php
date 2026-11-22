@@ -6,6 +6,8 @@ namespace Msstc4Symfony\MetricsBundle\Test\Unit\Application\Collector;
 
 use Msstc4Symfony\MetricsBundle\Application\Collector\ErrorCollector;
 use Msstc4Symfony\MetricsBundle\Application\Metric\BuiltInMetric;
+use Msstc4Symfony\MetricsBundle\Test\Support\CollectingLogger;
+use Msstc4Symfony\MetricsBundle\Test\Support\ThrowingMetricRecorder;
 use PHPUnit\Framework\Attributes\CoversClass;
 use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -41,8 +43,31 @@ final class ErrorCollectorTest extends RecorderTestCase
         self::assertSame([['increment', BuiltInMetric::ERROR, null, ['ERROR']]], $this->recorder->calls);
     }
 
+    public function testARecorderFailureOnExceptionIsLoggedAndSwallowed(): void
+    {
+        $logger = new CollectingLogger();
+        $recorder = new ThrowingMetricRecorder();
+
+        (new ErrorCollector($recorder, false, $logger))->incException(new RuntimeException('boom'));
+
+        self::assertSame(1, $recorder->increments);
+        self::assertSame(['error: Cannot record exception metric'], $logger->records);
+        self::assertInstanceOf(RuntimeException::class, $logger->contexts[0]['exception'] ?? null);
+    }
+
+    public function testARecorderFailureOnErrorIsLoggedAndSwallowed(): void
+    {
+        $logger = new CollectingLogger();
+        $recorder = new ThrowingMetricRecorder();
+
+        (new ErrorCollector($recorder, false, $logger))->incError('ERROR');
+
+        self::assertSame(1, $recorder->increments);
+        self::assertSame(['error: Cannot record error metric'], $logger->records);
+    }
+
     private function build(bool $useShort = false): ErrorCollector
     {
-        return new ErrorCollector($this->recorder, $useShort);
+        return new ErrorCollector($this->recorder, $useShort, new CollectingLogger());
     }
 }

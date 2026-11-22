@@ -6,6 +6,15 @@ All notable changes to this bundle are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.3.1] - 2026-11-22
+
+### Fixed
+
+- A `MetricRecorderInterface` implementation that throws no longer leaks into the application: `ErrorCollector` logs
+  the failure on the `metrics_bundle` channel and carries on. Before, the exception escaped from
+  `$logger->error()` (skipping the inner log call) through `HandlerDecorator`, and replaced the application exception
+  in the `kernel.exception` listener.
+
 ## [2.3.0] - 2026-11-22
 
 ### Added
@@ -274,7 +283,8 @@ First release of `msstc4symfony/metrics-bundle` (namespace `Msstc4Symfony\Metric
 - Optional: Doctrine DBAL / DoctrineBundle, `mongodb/mongodb`, `ruflin/elastica` ^7.3|^8.0, Symfony
   HttpClient, Messenger, APCu.
 
-[Unreleased]: https://github.com/msstc4symfony/metrics-bundle/compare/v2.3.0...HEAD
+[Unreleased]: https://github.com/msstc4symfony/metrics-bundle/compare/v2.3.1...HEAD
+[2.3.1]: https://github.com/msstc4symfony/metrics-bundle/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/msstc4symfony/metrics-bundle/compare/v2.2.1...v2.3.0
 [2.2.1]: https://github.com/msstc4symfony/metrics-bundle/compare/v2.2.0...v2.2.1
 [2.2.0]: https://github.com/msstc4symfony/metrics-bundle/compare/v2.1.0...v2.2.0

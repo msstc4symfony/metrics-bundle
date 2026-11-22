@@ -14,9 +14,13 @@ use RuntimeException;
  */
 final class ThrowingMetricRecorder implements MetricRecorderInterface
 {
+    public int $increments = 0;
+
     #[Override]
     public function increment(MetricDefinitionInterface $metric, array $labels = []): void
     {
+        $this->increments++;
+
         throw new RuntimeException('recorder failed');
     }
 

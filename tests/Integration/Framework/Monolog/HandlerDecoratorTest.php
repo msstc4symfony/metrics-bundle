@@ -17,6 +17,7 @@ use PHPUnit\Framework\TestCase;
 use Prometheus\CollectorRegistry;
 use Prometheus\Storage\InMemory;
 use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 final class HandlerDecoratorTest extends TestCase
 {
@@ -34,7 +35,7 @@ final class HandlerDecoratorTest extends TestCase
         }
 
         $this->registry = new CollectorRegistry(new InMemory());
-        $this->collector = new ErrorCollector(new PrometheusMetricRecorder($this->registry, new MetricRepository([]), 'app', 'cmp'), false);
+        $this->collector = new ErrorCollector(new PrometheusMetricRecorder($this->registry, new MetricRepository([]), 'app', 'cmp'), false, new NullLogger());
         $this->inner = $this->createMock(LoggerInterface::class);
     }
 
