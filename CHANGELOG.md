@@ -6,6 +6,12 @@ All notable changes to this bundle are documented here. The format follows
 
 ## [Unreleased]
 
+## [2.3.2] - 2026-11-27
+
+### Fixed
+
+- PHP 8.6: no class constant named `NAMESPACE` (deprecated there) in `PrometheusMetricRecorder`.
+
 ## [2.3.1] - 2026-11-22
 
 ### Fixed
@@ -283,7 +289,8 @@ First release of `msstc4symfony/metrics-bundle` (namespace `Msstc4Symfony\Metric
 - Optional: Doctrine DBAL / DoctrineBundle, `mongodb/mongodb`, `ruflin/elastica` ^7.3|^8.0, Symfony
   HttpClient, Messenger, APCu.
 
-[Unreleased]: https://github.com/msstc4symfony/metrics-bundle/compare/v2.3.1...HEAD
+[Unreleased]: https://github.com/msstc4symfony/metrics-bundle/compare/v2.3.2...HEAD
+[2.3.2]: https://github.com/msstc4symfony/metrics-bundle/compare/v2.3.1...v2.3.2
 [2.3.1]: https://github.com/msstc4symfony/metrics-bundle/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/msstc4symfony/metrics-bundle/compare/v2.2.1...v2.3.0
 [2.2.1]: https://github.com/msstc4symfony/metrics-bundle/compare/v2.2.0...v2.2.1

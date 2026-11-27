@@ -24,7 +24,7 @@ use Throwable;
 #[WithMonologChannel(LogChannel::NAME)]
 final readonly class PrometheusMetricRecorder implements MetricRecorderInterface, MetricBatchRecorderInterface
 {
-    private const NAMESPACE = 'symfony';
+    private const METRIC_PREFIX = 'symfony';
 
     private const SUMMARY_QUANTILES = [0.5, 0.9, 0.95, 0.99];
 
@@ -44,7 +44,7 @@ final readonly class PrometheusMetricRecorder implements MetricRecorderInterface
     {
         $definition = $this->definition($metric, 'increment', [MetricType::COUNTER]);
         $this->guarded($definition, fn () => $this->registry
-            ->getOrRegisterCounter(self::NAMESPACE, ...$this->identity($definition))
+            ->getOrRegisterCounter(self::METRIC_PREFIX, ...$this->identity($definition))
             ->inc($this->labelValues($labels)));
     }
 
@@ -57,7 +57,7 @@ final readonly class PrometheusMetricRecorder implements MetricRecorderInterface
         }
 
         $this->guarded($definition, fn () => $this->registry
-            ->getOrRegisterCounter(self::NAMESPACE, ...$this->identity($definition))
+            ->getOrRegisterCounter(self::METRIC_PREFIX, ...$this->identity($definition))
             ->incBy($amount, $this->labelValues($labels)));
     }
 
@@ -66,7 +66,7 @@ final readonly class PrometheusMetricRecorder implements MetricRecorderInterface
     {
         $definition = $this->definition($metric, 'set', [MetricType::GAUGE]);
         $this->guarded($definition, fn () => $this->registry
-            ->getOrRegisterGauge(self::NAMESPACE, ...$this->identity($definition))
+            ->getOrRegisterGauge(self::METRIC_PREFIX, ...$this->identity($definition))
             ->set((float) $value, $this->labelValues($labels)));
     }
 
@@ -85,7 +85,7 @@ final readonly class PrometheusMetricRecorder implements MetricRecorderInterface
     private function observeHistogram(Metric $definition, float $value, array $labels): void
     {
         $this->registry
-            ->getOrRegisterHistogram(self::NAMESPACE, ...[...$this->identity($definition), $definition->batches])
+            ->getOrRegisterHistogram(self::METRIC_PREFIX, ...[...$this->identity($definition), $definition->batches])
             ->observe($value, $this->labelValues($labels))
         ;
     }
@@ -96,7 +96,7 @@ final readonly class PrometheusMetricRecorder implements MetricRecorderInterface
     private function observeSummary(Metric $definition, float $value, array $labels): void
     {
         $this->registry
-            ->getOrRegisterSummary(self::NAMESPACE, ...[...$this->identity($definition), self::SUMMARY_MAX_AGE_SECONDS, self::SUMMARY_QUANTILES])
+            ->getOrRegisterSummary(self::METRIC_PREFIX, ...[...$this->identity($definition), self::SUMMARY_MAX_AGE_SECONDS, self::SUMMARY_QUANTILES])
             ->observe($value, $this->labelValues($labels))
         ;
     }

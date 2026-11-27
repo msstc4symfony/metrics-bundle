@@ -906,3 +906,8 @@ Rector их не трогает (проверено `rector -n`). Тесты п�
 ловит `Throwable` (включая `Error`, намеренно) и пишет в канал `metrics_bundle` (не декорируется, поэтому рекурсии нет; сбой самого логгера тоже
 глотается). Защита `$recording` в `HandlerDecorator` остаётся второй линией. Конструктор `ErrorCollector` получил
 третий аргумент `LoggerInterface`.
+
+## PHP 8.6 (2026-11-27 UTC)
+
+- PHP 8.6 deprecates `spl_object_hash()` (use `spl_object_id()`) and class constants named `NAMESPACE` (any case); the
+  matrix of bundle-standard 4.3.0 runs 8.6, where a deprecation fails PHPUnit.
