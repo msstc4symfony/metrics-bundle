@@ -42,7 +42,7 @@ Auto-collects runtime metrics (HTTP, console, exceptions, Doctrine DBAL, MongoDB
 PHPStan level 10 analyses all of `src/` and `tests/` with no `excludePaths` (shared `bundle-standard` template; Psalm is not used). Accepted findings live only in `phpstan-baseline.neon`, each with a reason. If a PR adds an ignore or baseline entry for new code, push back: fix the type at its origin.
 
 ### 6. Tests & coverage
-- Suites `unit` (`tests/Unit/`) and `integration` (`tests/Integration/`, self-skipping without optional libraries). Coverage source is all of `src/` (shared `bundle-standard` phpunit/codecov templates).
+- Suites `unit` (`tests/Unit/`) and `integration` (`tests/Integration/`, self-skipping without optional libraries). Coverage source is all of `src/` (shared `bundle-standard` phpunit template).
 - PHPUnit is strict (`failOnWarning`, `failOnRisky`, `failOnPhpunitDeprecation`, `beStrictAboutOutputDuringTests`). New tests must be silent and warning-free.
 - PSR-4 for tests: `Msstc4Symfony\MetricsBundle\Test\` → `tests/`.
 
